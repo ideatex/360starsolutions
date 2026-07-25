@@ -1,0 +1,156 @@
+# ==============================================================================
+# PROFESSIONAL PRODUCTION .GITIGNORE
+# Stack: Next.js 15, React, TS, NestJS, Prisma, Node.js, Postgres, Monorepo
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. DEPENDENCIES & PACKAGE MANAGERS
+# ------------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+# Package manager caches
+.npm/
+.yarn/
+.pnpm-store/
+# (Note: package-lock.json, yarn.lock, pnpm-lock.yaml should be committed)
+
+# ------------------------------------------------------------------------------
+# 2. BUILD OUTPUTS & CACHES
+# ------------------------------------------------------------------------------
+# Next.js
+.next/
+out/
+# NestJS / TypeScript build output
+dist/
+build/
+# Caches and temporary folders
+.cache/
+tmp/
+temp/
+coverage/
+
+# ------------------------------------------------------------------------------
+# 3. TYPESCRIPT
+# ------------------------------------------------------------------------------
+*.tsbuildinfo
+
+# ------------------------------------------------------------------------------
+# 4. ENVIRONMENT FILES
+# ------------------------------------------------------------------------------
+# Ignore all environment files
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+.env.server
+.env.test
+.env.staging
+# EXCEPTION: Always track the example template
+!.env.example
+
+# ------------------------------------------------------------------------------
+# 5. PRISMA
+# ------------------------------------------------------------------------------
+# Ignored SQLite databases (if any are accidentally created/used locally)
+*.db
+*.sqlite
+*.sqlite3
+# Prisma generated files / cache (usually stored in node_modules/.prisma)
+.prisma/
+
+# ------------------------------------------------------------------------------
+# 6. LOGS
+# ------------------------------------------------------------------------------
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+# PM2 logs
+.pm2/
+
+# ------------------------------------------------------------------------------
+# 7. IDE & EDITOR FILES
+# ------------------------------------------------------------------------------
+.vscode/
+.idea/
+# JetBrains specific
+*.iml
+*.iws
+.idea_modules/
+# Visual Studio specific
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ------------------------------------------------------------------------------
+# 8. OS SPECIFIC FILES
+# ------------------------------------------------------------------------------
+# Windows
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# Mac
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+# Linux
+*~
+.directory
+
+# ------------------------------------------------------------------------------
+# 9. TESTING & REPORTING
+# ------------------------------------------------------------------------------
+.jest/
+.cypress/
+cypress/videos/
+cypress/screenshots/
+playwright-report/
+test-results/
+.playwright/
+coverage/
+
+# ------------------------------------------------------------------------------
+# 10. DOCKER
+# ------------------------------------------------------------------------------
+# Ignore local Docker override files if needed
+docker-compose.override.yml
+.docker/
+
+# ------------------------------------------------------------------------------
+# 11. RUNTIME & PROCESS FILES
+# ------------------------------------------------------------------------------
+*.pid
+*.seed
+*.pid.lock
+
+# ------------------------------------------------------------------------------
+# 12. MISCELLANEOUS
+# ------------------------------------------------------------------------------
+.eslintcache
+.stylelintcache
+# Vercel / Deployment config temp files
+.vercel/
+
+# ------------------------------------------------------------------------------
+# 13. CUSTOM DEPLOYMENT & BUILD FOLDERS
+# ------------------------------------------------------------------------------
+cpanel-deploy/
+*.zip
+orig_files/

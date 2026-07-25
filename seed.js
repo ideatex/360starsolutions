@@ -1,0 +1,88 @@
+const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
+
+const prisma = new PrismaClient();
+
+async function main() {
+  console.log('🌱 Starting Database Seeding on cPanel...');
+
+  // 1. Seed SH000000 (Super Admin)
+  console.log('Seeding Super Admin 1 (SH000000)...');
+  const adminPassword1 = await bcrypt.hash('TestPassword123!', 10);
+  const admin1 = await prisma.shareholder.upsert({
+    where: { shareholderId: 'SH000000' },
+    update: {
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      passwordHash: adminPassword1,
+    },
+    create: {
+      shareholderId: 'SH000000',
+      name: 'Super Admin',
+      passwordHash: adminPassword1,
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      referralCode: 'SUPERADMINCODE',
+      phone: '9999999999',
+    },
+  });
+
+  // 2. Seed SH100001 (Super Admin 2)
+  console.log('Seeding Super Admin 2 (SH100001)...');
+  const adminPassword2 = await bcrypt.hash('Studio@123', 10);
+  const admin2 = await prisma.shareholder.upsert({
+    where: { shareholderId: 'SH100001' },
+    update: {
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      passwordHash: adminPassword2,
+    },
+    create: {
+      shareholderId: 'SH100001',
+      name: 'Super Admin Studio',
+      passwordHash: adminPassword2,
+      role: 'SUPER_ADMIN',
+      status: 'ACTIVE',
+      referralCode: 'ADMIN01',
+      phone: '9999999998',
+    },
+  });
+
+  // 3. Seed USR000001 (User/Shareholder)
+  console.log('Seeding User/Shareholder (USR000001)...');
+  const userPassword = await bcrypt.hash('UserPassword123!', 10);
+  const user = await prisma.shareholder.upsert({
+    where: { shareholderId: 'USR000001' },
+    update: {
+      role: 'SHAREHOLDER',
+      status: 'ACTIVE',
+      passwordHash: userPassword,
+    },
+    create: {
+      shareholderId: 'USR000001',
+      name: 'Standard Shareholder',
+      passwordHash: userPassword,
+      role: 'SHAREHOLDER',
+      status: 'ACTIVE',
+      referralCode: 'USERCODE001',
+      phone: '9876543210',
+    },
+  });
+
+  console.log('----------------------------------------------------');
+  console.log('✅ Seeding Complete! Credentials available:');
+  console.log('----------------------------------------------------');
+  console.log(`[Admin 1] ID: ${admin1.shareholderId} | Pass: TestPassword123!`);
+  console.log(`[Admin 2] ID: ${admin2.shareholderId} | Pass: Studio@123`);
+  console.log(`[User 1]  ID: ${user.shareholderId}  | Pass: UserPassword123!`);
+  console.log('----------------------------------------------------');
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error during seeding:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

@@ -1,0 +1,486 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SHAREHOLDER
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+  DELETED
+  DISABLED
+  AUTO_ARCHIVED
+  RESTORED
+}
+
+enum CommissionStatus {
+  PENDING
+  CONFIRMED
+  REVERSED
+}
+
+enum NotificationType {
+  SYSTEM
+  FINANCE
+  SECURITY
+}
+
+enum NotificationPriority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum InvestmentStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Shareholder {
+  id               String   @id @default(uuid())
+  name             String   @default("")
+  shareholderId    String   @unique
+  phone            String?
+  passwordHash     String
+  role             Role     @default(SHAREHOLDER)
+  status           UserStatus @default(ACTIVE)
+  referralCode     String   @unique
+  
+  parentId         String?
+  parent           Shareholder?    @relation("ReferralHierarchy", fields: [parentId], references: [id])
+  children         Shareholder[]   @relation("ReferralHierarchy")
+  
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  dob               DateTime?
+  
+  // Complete Address
+  addressBuilding   String?
+  addressArea       String?
+  addressCity       String?
+  addressDistrict   String?
+  addressPincode    String?
+  addressState      String?
+
+  // Bank Details
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  bankBranch        String?
+  bankIfsc          String?
+
+  disabledAt        DateTime?
+  
+  investments          Investment[]
+  profitLedgers        ProfitLedger[]
+  commissionLedgers    CommissionLedger[]
+  payoutDetails        PayoutDetail[]
+  notifications        Notification[]
+  contributions        Contribution[]
+  sentMessages         Message[]              @relation("SentMessages")
+  receivedMessages     Message[]              @relation("ReceivedMessages")
+  announcementReads    AnnouncementRead[]
+  investorProfile      InvestorProfile?
+  contributionSummary  ContributionSummary?
+  referrerRelations    ReferralRelationship[] @relation("ReferrerRel")
+  referredRelation     ReferralRelationship?  @relation("ReferredRel")
+
+  @@map("User")
+  @@index([parentId])
+}
+
+model Investment {
+  id              String   @id @default(uuid())
+  shareholderId          String
+  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id])
+  amount          Decimal  @db.Decimal(19, 4)
+  dailyProfitRate Decimal  @db.Decimal(5, 4)
+  status          InvestmentStatus @default(PENDING)
+  startDate       DateTime @default(now())
+  validityMonths  Int      @default(12)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  profitLedgers   ProfitLedger[]
+  commissionLedgers CommissionLedger[]
+
+  @@index([shareholderId])
+}
+
+model ProfitLedger {
+  id              String   @id @default(uuid())
+  shareholderId          String
+  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id])
+  investmentId    String
+  investment      Investment @relation(fields: [investmentId], references: [id])
+  
+  cycleStart      DateTime
+  cycleEnd        DateTime
+  eligibleDays    Int
+  amount          Decimal  @db.Decimal(19, 4)
+  
+  createdAt       DateTime @default(now())
+
+  @@index([shareholderId])
+  @@index([investmentId])
+}
+
+model CommissionLedger {
+  id               String   @id @default(uuid())
+  shareholderId           String
+  shareholder             Shareholder     @relation(fields: [shareholderId], references: [id])
+  fromInvestmentId String?
+  fromInvestment   Investment? @relation(fields: [fromInvestmentId], references: [id])
+  
+  level            Int
+  rate             Decimal  @db.Decimal(5, 4)
+  amount           Decimal  @db.Decimal(19, 4)
+  status           CommissionStatus @default(PENDING)
+  
+  createdAt        DateTime @default(now())
+
+  @@index([shareholderId])
+  @@index([fromInvestmentId])
+}
+
+model PayoutBatch {
+  id              String   @id @default(uuid())
+  cycleStart      DateTime
+  cycleEnd        DateTime
+  status          BatchStatus @default(PENDING)
+  totalAmount     Decimal  @db.Decimal(19, 4)
+  
+  approvedAt      DateTime?
+  releasedAt      DateTime?
+  
+  details         PayoutDetail[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+enum BatchStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  RELEASED
+  REJECTED
+}
+
+model PayoutDetail {
+  id              String   @id @default(uuid())
+  batchId         String
+  batch           PayoutBatch @relation(fields: [batchId], references: [id])
+  shareholderId          String
+  shareholder            Shareholder        @relation(fields: [shareholderId], references: [id])
+  
+  profitAmount    Decimal  @db.Decimal(19, 4)
+  commissionAmount Decimal @db.Decimal(19, 4)
+  totalAmount     Decimal  @db.Decimal(19, 4)
+  
+  status          PayoutStatus @default(PENDING)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([batchId])
+  @@index([shareholderId])
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model SystemSetting {
+  key             String   @id
+  value           String
+  updatedAt       DateTime @updatedAt
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  shareholderId          String?
+  action          String
+  entityType      String
+  entityId        String?
+  oldValue        String?
+  newValue        String?
+  ipAddress       String?
+  
+  createdAt       DateTime @default(now())
+}
+
+model Notification {
+  id              String   @id @default(uuid())
+  shareholderId          String
+  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  title           String
+  message         String
+  isRead          Boolean  @default(false)
+  isArchived      Boolean  @default(false)
+  isDeleted       Boolean  @default(false)
+  type            NotificationType @default(SYSTEM)
+  priority        NotificationPriority @default(MEDIUM)
+  
+  createdAt       DateTime @default(now())
+}
+
+model Contribution {
+  id              String             @id @default(uuid())
+  shareholderId          String
+  shareholder            Shareholder               @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  amount          Decimal            @db.Decimal(19, 4)
+  mode            String             // Cash, Bank Transfer, Cheque, etc.
+  date            DateTime
+  issuedAgreement Boolean            @default(false)
+  issuedCheque    Boolean            @default(false)
+  status          ContributionStatus @default(PENDING)
+  validityMonths  Int                @default(12)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([shareholderId])
+}
+
+model BusinessConfiguration {
+  id                        String   @id @default(uuid())
+  version                   Int      @default(1)
+  userIdPrefix              String   @default("USR")
+  userIdStartingNumber      Int      @default(1)
+  userIdNextNumber          Int      @default(1)
+  userIdLength              Int      @default(6)
+  levelOpeningVolume        Json?
+  profitSharingPercentage   Decimal? @db.Decimal(5, 4)
+  levelWiseProfitSharing    Json?
+  referralLevelSettings     Json?
+  systemDefaults            Json?
+  futureBusinessParameters  Json?
+  createdById               String
+  createdAt                 DateTime @default(now())
+}
+
+model Announcement {
+  id            String             @id @default(uuid())
+  title         String
+  content       String             // HTML/Rich text
+  imageUrl      String?
+  attachmentUrl String?
+  priority      String             // HIGH, MEDIUM, LOW
+  audience      String             // EVERYONE, ADMINS, SHAREHOLDERS, INDIVIDUAL_USER
+  targetUserId  String?
+  pinned        Boolean            @default(false)
+  scheduledFor  DateTime?
+  expiresAt     DateTime?
+  status        String             // DRAFT, PUBLISHED, EXPIRED, ARCHIVED
+  createdBy     String
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  reads         AnnouncementRead[]
+}
+
+model AnnouncementRead {
+  id             String       @id @default(uuid())
+  announcementId String
+  announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  shareholderId         String
+  shareholder           Shareholder         @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@unique([announcementId, shareholderId])
+}
+
+model Message {
+  id                   String              @id @default(uuid())
+  senderId             String
+  sender               Shareholder                @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId          String
+  recipient            Shareholder                @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  subject              String?
+  content              String
+  parentMessageId      String?
+  parentMessage        Message?            @relation("MessageThread", fields: [parentMessageId], references: [id])
+  replies              Message[]           @relation("MessageThread")
+  isDraft              Boolean             @default(false)
+  isRead               Boolean             @default(false)
+  isStarredBySender    Boolean             @default(false)
+  isStarredByRecipient Boolean             @default(false)
+  isDeletedBySender    Boolean             @default(false)
+  isDeletedByRecipient Boolean             @default(false)
+  isArchivedBySender   Boolean             @default(false)
+  isArchivedByRecipient Boolean            @default(false)
+  createdAt            DateTime            @default(now())
+  attachments          MessageAttachment[]
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  fileName  String
+  fileUrl   String
+  fileSize  Int
+  mimeType  String
+  createdAt DateTime @default(now())
+}
+
+model FounderArticle {
+  id           String                  @id @default(uuid())
+  title        String
+  slug         String                  @unique
+  content      String
+  coverImage   String?
+  seoTitle     String?
+  seoDesc      String?
+  seoKeywords  String?
+  status       String                  // DRAFT, PUBLISHED, SCHEDULED, ARCHIVED
+  version      Int                     @default(1)
+  scheduledFor DateTime?
+  publishedAt  DateTime?
+  createdBy    String
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  history      FounderArticleHistory[]
+}
+
+model FounderArticleHistory {
+  id        String         @id @default(uuid())
+  articleId String
+  article   FounderArticle @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  title     String
+  content   String
+  version   Int
+  updatedBy String
+  updatedAt DateTime       @default(now())
+}
+
+model JwtBlacklist {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+
+model BusinessVolume {
+  id          String   @id @default(uuid())
+  shareholderId      String
+  level       Int
+  totalVolume Decimal  @db.Decimal(19, 4)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([shareholderId, level])
+}
+
+enum ProfitSharingType {
+  PERCENT
+  FIXED
+}
+
+model LevelConfiguration {
+  id              String            @id @default(uuid())
+  levelNumber     Int               @unique
+  volumeThreshold Decimal           @db.Decimal(19, 4)
+  profitType      ProfitSharingType @default(PERCENT)
+  profitValue     Decimal           @db.Decimal(19, 4)
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+enum CalculationStatus {
+  PENDING
+  PROCESSED
+  FAILED
+}
+
+model ProfitCalculation {
+  id           String            @id @default(uuid())
+  shareholderId       String
+  level        Int
+  volume       Decimal           @db.Decimal(19, 4)
+  profitAmount Decimal           @db.Decimal(19, 4)
+  batchId      String?
+  status       CalculationStatus @default(PENDING)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+enum ContributionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum InvestorStatus {
+  ACTIVE
+  INACTIVE
+  DISABLED
+  ARCHIVED
+  DELETED
+}
+
+model InvestorProfile {
+  id           String         @id @default(uuid())
+  shareholderId       String         @unique
+  shareholder         Shareholder           @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  status       InvestorStatus @default(ACTIVE)
+  activatedAt  DateTime       @default(now())
+  investorType String         @default("STANDARD")
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model ReferralRelationship {
+  id           String   @id @default(uuid())
+  parentId     String
+  childId      String   @unique
+  parent       Shareholder     @relation("ReferrerRel", fields: [parentId], references: [id])
+  child        Shareholder     @relation("ReferredRel", fields: [childId], references: [id], onDelete: Cascade)
+  referralDate DateTime @default(now())
+  status       String   @default("ACTIVE")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([parentId])
+}
+
+model ContributionSummary {
+  id            String   @id @default(uuid())
+  shareholderId        String   @unique
+  shareholder          Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  totalApproved Decimal  @db.Decimal(19, 4) @default(0)
+  totalPending  Decimal  @db.Decimal(19, 4) @default(0)
+  totalRejected Decimal  @db.Decimal(19, 4) @default(0)
+  lastUpdated   DateTime @default(now())
+}
+
+model ProfitConfiguration {
+  id                  String   @id @default(uuid())
+  version             Int      @default(1)
+  maxReferralLevels   Int      @default(7)
+  levelOpeningVolumes Json     // e.g. {"1": 10000, "2": 25000}
+  levelPercentages    Json     // e.g. {"1": 0.05, "2": 0.03}
+  effectiveDate       DateTime @default(now())
+  status              String   @default("ACTIVE") // ACTIVE, INACTIVE, DRAFT
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+
+
