@@ -3,11 +3,10 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  // If we are in production but the URL points to localhost, fall back to relative path
-  if (process.env.NODE_ENV === 'production' && envUrl && envUrl.includes('localhost')) {
-    return '/api/v1';
+  if (process.env.NODE_ENV === 'production' && envUrl && !envUrl.includes('localhost')) {
+    return envUrl;
   }
-  return envUrl || '/api/v1';
+  return envUrl || 'http://localhost:3002/api/v1';
 };
 
 export const api = axios.create({

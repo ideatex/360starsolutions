@@ -412,7 +412,7 @@ export class UsersService {
 
     // Copy updates to clean data object
     const fields = [
-      'shareholderId', 'name', 'phone', 'role', 'status', 'firstName', 'lastName', 'dob',
+      'shareholderId', 'name', 'phone', 'role', 'status', 'dob',
       'addressBuilding', 'addressArea', 'addressCity', 'addressDistrict', 'addressPincode', 'addressState',
       'bankAccountName', 'bankAccountNumber', 'bankName', 'bankBranch', 'bankIfsc'
     ];
@@ -440,10 +440,12 @@ export class UsersService {
     }
 
     // Enforce name formatting
-    if (updates.name !== undefined || updates.name !== undefined) {
-      const fn = updates.name !== undefined ? updates.name : shareholder.name;
-      const ln = updates.name !== undefined ? updates.name : shareholder.name;
+    if (updates.firstName !== undefined || updates.lastName !== undefined) {
+      const fn = updates.firstName !== undefined ? updates.firstName : '';
+      const ln = updates.lastName !== undefined ? updates.lastName : '';
       data.name = `${fn || ''} ${ln || ''}`.trim() || data.name || shareholder.name;
+    } else if (updates.name !== undefined) {
+      data.name = updates.name;
     }
 
     const updated = await this.prisma.shareholder.update({
