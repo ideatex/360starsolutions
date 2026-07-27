@@ -9,8 +9,42 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, UserPlus, ShieldAlert, Edit3, X, Check, Eye, Trash2, Key, 
-  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet
+  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus
 } from 'lucide-react';
+import { 
+  getIndianStates, 
+  getDistrictsByState, 
+  getCitiesByDistrict, 
+  getPincodesByCity 
+} from '@/lib/indianLocations';
+
+const DEFAULT_INDIAN_BANKS = [
+  "State Bank of India (SBI)",
+  "HDFC Bank",
+  "ICICI Bank",
+  "Bank of Baroda",
+  "Punjab National Bank (PNB)",
+  "Canara Bank",
+  "Union Bank of India",
+  "Axis Bank",
+  "Kotak Mahindra Bank",
+  "IndusInd Bank",
+  "Bank of India",
+  "Central Bank of India",
+  "Indian Bank",
+  "UCO Bank",
+  "IDBI Bank",
+  "Federal Bank",
+  "YES Bank",
+  "Punjab & Sind Bank",
+  "Indian Overseas Bank",
+  "Bandhan Bank",
+  "RBL Bank",
+  "IDFC FIRST Bank",
+  "Jammu & Kashmir Bank",
+  "Karur Vysya Bank",
+  "South Indian Bank"
+];
 
 export default function AdminUsersPage() {
   const shareholder = useAuthStore((state) => state.shareholder);
@@ -30,6 +64,55 @@ export default function AdminUsersPage() {
   const [isResetOpen, setIsResetOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  // Bank options & Add bank modal state
+  const [bankList, setBankList] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('custom_indian_banks');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          return Array.from(new Set([...DEFAULT_INDIAN_BANKS, ...parsed]));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    return DEFAULT_INDIAN_BANKS;
+  });
+
+  const [isAddBankModalOpen, setIsAddBankModalOpen] = useState(false);
+  const [newBankInput, setNewBankInput] = useState('');
+  const [addBankTarget, setAddBankTarget] = useState<'create' | 'edit'>('create');
+
+  const handleAddNewBank = () => {
+    const trimmed = newBankInput.trim();
+    if (!trimmed) {
+      toast({ title: "Validation Error", description: "Please enter a valid bank name.", type: "warning" });
+      return;
+    }
+    if (!bankList.includes(trimmed)) {
+      const updated = [...bankList, trimmed];
+      setBankList(updated);
+      if (typeof window !== 'undefined') {
+        const customOnly = updated.filter(b => !DEFAULT_INDIAN_BANKS.includes(b));
+        localStorage.setItem('custom_indian_banks', JSON.stringify(customOnly));
+      }
+    }
+    if (addBankTarget === 'create') {
+      setCreateForm(prev => ({ ...prev, bankName: trimmed }));
+    } else {
+      setEditForm(prev => ({ ...prev, bankName: trimmed }));
+    }
+    setNewBankInput('');
+    setIsAddBankModalOpen(false);
+    toast({ title: "Bank Name Added", description: `"${trimmed}" added to bank dropdown and selected.`, type: "success" });
+  };
+
+  const isAccountNumberValid = (accNum: string) => {
+    if (!accNum) return true;
+    return /^\d{15}$/.test(accNum);
+  };
 
   // Wizard Creation Step
   const [wizardStep, setWizardStep] = useState(1);
@@ -449,12 +532,11 @@ export default function AdminUsersPage() {
             <table className="w-full text-left border-collapse">
               <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                 <tr>
+                  <th className="px-6 py-4">Name</th>
                   <th className="px-6 py-4">Shareholder ID</th>
-                  <th className="px-6 py-4">Name / shareholderId</th>
-                  <th className="px-6 py-4">Phone</th>
+                  <th className="px-6 py-4">Phone / Location</th>
                   <th className="px-6 py-4">Role</th>
                   <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Ref Code</th>
                   <th className="px-6 py-4">Total Contribution</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
@@ -462,12 +544,16 @@ export default function AdminUsersPage() {
               <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
                 {usersData?.data?.map((u: any) => (
                   <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4 font-mono font-extrabold text-gray-900 dark:text-white">{u.customId || 'Pending'}</td>
                     <td className="px-6 py-4">
                       <div className="font-extrabold text-gray-950 dark:text-white">{u.name || 'N/A'}</div>
-                      <div className="text-[10px] text-gray-400 font-mono mt-0.5">{u.shareholderId}</div>
                     </td>
-                    <td className="px-6 py-4 font-semibold">{u.phone || '-'}</td>
+                    <td className="px-6 py-4 font-mono font-extrabold text-brand-primary">
+                      {u.shareholderId}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-gray-900 dark:text-white">{u.phone || '-'}</div>
+                      {u.addressCity && <div className="text-[10px] text-muted-foreground">{u.addressCity}{u.addressState ? `, ${u.addressState}` : ''}</div>}
+                    </td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
                         u.role === 'SUPER_ADMIN' 
@@ -490,7 +576,6 @@ export default function AdminUsersPage() {
                         {u.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-mono font-extrabold text-brand-primary">{u.referralCode}</td>
                     <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                       ${(u.contributions
                         ? u.contributions
@@ -612,17 +697,28 @@ export default function AdminUsersPage() {
                     <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl flex items-center gap-3">
                       <User className="text-brand-primary w-5 h-5 shrink-0" />
                       <div>
-                        <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Automatic custom ID sequence</p>
-                        <p className="text-[9px] text-muted-foreground mt-0.5">Sequential Shareholder ID is automatically padded and prefix-linked by the backend config rules on save.</p>
+                        <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Business Configuration ID Format</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">Shareholder ID / Admin ID format is strictly governed by the active <strong>Business Configuration</strong> module rules (Prefix + Padded Counter).</p>
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Shareholder ID *</label>
-                      <input type="shareholderId" required value={createForm.shareholderId} onChange={e => setCreateForm({...createForm, shareholderId: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="SH100001" />
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Shareholder / Admin ID *</label>
+                        <span className="text-[9px] font-semibold text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-full border border-brand-primary/20">Configured Pattern</span>
+                      </div>
+                      <input 
+                        type="text" 
+                        required 
+                        value={createForm.shareholderId} 
+                        onChange={e => setCreateForm({...createForm, shareholderId: e.target.value.toUpperCase()})} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 tracking-wider" 
+                        placeholder="e.g. SH100001" 
+                      />
+                      <p className="text-[9px] text-muted-foreground">Auto-generated sequential ID based on active Business Configuration.</p>
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Initial Password *</label>
-                      <input type="password" required value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢Ã¢â‚¬Â¢" />
+                      <input type="password" required value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="••••••••" />
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Security Role</label>
@@ -664,23 +760,92 @@ export default function AdminUsersPage() {
                         <input type="text" value={createForm.addressArea} onChange={e => setCreateForm({...createForm, addressArea: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Greenwood" />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-4">
+                    
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City</label>
-                        <input type="text" value={createForm.addressCity} onChange={e => setCreateForm({...createForm, addressCity: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="City" />
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State (India) *</label>
+                        <select 
+                          value={createForm.addressState} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCreateForm(prev => ({ ...prev, addressState: val, addressDistrict: '', addressCity: '', addressPincode: '' }));
+                          }} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer"
+                        >
+                          <option value="">Select Indian State / UT...</option>
+                          {getIndianStates().map(st => (
+                            <option key={st} value={st}>{st}</option>
+                          ))}
+                        </select>
                       </div>
+
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">District</label>
-                        <input type="text" value={createForm.addressDistrict} onChange={e => setCreateForm({...createForm, addressDistrict: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="District" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State</label>
-                        <input type="text" value={createForm.addressState} onChange={e => setCreateForm({...createForm, addressState: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="State" />
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">District *</label>
+                        <select 
+                          value={createForm.addressDistrict} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            setCreateForm(prev => ({ ...prev, addressDistrict: val, addressCity: '', addressPincode: '' }));
+                          }} 
+                          disabled={!createForm.addressState}
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer disabled:opacity-50"
+                        >
+                          <option value="">{createForm.addressState ? "Select District..." : "Select State First"}</option>
+                          {getDistrictsByState(createForm.addressState).map(dist => (
+                            <option key={dist} value={dist}>{dist}</option>
+                          ))}
+                        </select>
                       </div>
                     </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode</label>
-                      <input type="text" value={createForm.addressPincode} onChange={e => setCreateForm({...createForm, addressPincode: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="10001" />
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Locality *</label>
+                        <select 
+                          value={createForm.addressCity} 
+                          onChange={e => {
+                            const val = e.target.value;
+                            const pins = getPincodesByCity(createForm.addressState, createForm.addressDistrict, val);
+                            setCreateForm(prev => ({ 
+                              ...prev, 
+                              addressCity: val, 
+                              addressPincode: pins.length > 0 ? pins[0] : prev.addressPincode 
+                            }));
+                          }} 
+                          disabled={!createForm.addressDistrict}
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer disabled:opacity-50"
+                        >
+                          <option value="">{createForm.addressDistrict ? "Select City..." : "Select District First"}</option>
+                          {getCitiesByDistrict(createForm.addressState, createForm.addressDistrict).map(ct => (
+                            <option key={ct} value={ct}>{ct}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode *</label>
+                        {getPincodesByCity(createForm.addressState, createForm.addressDistrict, createForm.addressCity).length > 0 ? (
+                          <select 
+                            value={createForm.addressPincode} 
+                            onChange={e => setCreateForm({ ...createForm, addressPincode: e.target.value })} 
+                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer"
+                          >
+                            <option value="">Select Pincode...</option>
+                            {getPincodesByCity(createForm.addressState, createForm.addressDistrict, createForm.addressCity).map(pin => (
+                              <option key={pin} value={pin}>{pin}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            type="text" 
+                            maxLength={6}
+                            value={createForm.addressPincode} 
+                            onChange={e => setCreateForm({ ...createForm, addressPincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} 
+                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                            placeholder="6-digit Pincode" 
+                          />
+                        )}
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -693,17 +858,61 @@ export default function AdminUsersPage() {
                       <input type="text" value={createForm.bankAccountName} onChange={e => setCreateForm({...createForm, bankAccountName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="John Doe" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</label>
-                      <input type="text" value={createForm.bankAccountNumber} onChange={e => setCreateForm({...createForm, bankAccountNumber: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono" placeholder="123456789" />
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number * (Strict Requirement: 15 Digits)</label>
+                      <input 
+                        type="text" 
+                        maxLength={15}
+                        value={createForm.bankAccountNumber} 
+                        onChange={e => setCreateForm({...createForm, bankAccountNumber: e.target.value.replace(/\D/g, '').slice(0, 15)})} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
+                        placeholder="Enter 15 digit account number" 
+                      />
+                      {createForm.bankAccountNumber ? (
+                        <p className={`text-[10px] mt-1 font-semibold ${isAccountNumberValid(createForm.bankAccountNumber) ? 'text-emerald-500' : 'text-red-500 flex items-center gap-1'}`}>
+                          {isAccountNumberValid(createForm.bankAccountNumber) ? (
+                            '✓ Valid 15-digit bank account number'
+                          ) : (
+                            <><AlertTriangle size={12} /> Strict requirement: Must be exactly 15 numeric digits ({createForm.bankAccountNumber.length}/15 digits entered)</>
+                          )}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">Strict requirement: Must be exactly 15 numeric digits.</p>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name</label>
-                        <input type="text" value={createForm.bankName} onChange={e => setCreateForm({...createForm, bankName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Chase" />
+                        <div className="flex justify-between items-center">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name (Indian Banks)</label>
+                          <button
+                            type="button"
+                            onClick={() => { setAddBankTarget('create'); setIsAddBankModalOpen(true); }}
+                            className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                          >
+                            <Plus size={12} /> Add Bank
+                          </button>
+                        </div>
+                        <select 
+                          value={createForm.bankName} 
+                          onChange={e => {
+                            if (e.target.value === 'ADD_NEW') {
+                              setAddBankTarget('create');
+                              setIsAddBankModalOpen(true);
+                            } else {
+                              setCreateForm({...createForm, bankName: e.target.value});
+                            }
+                          }} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-bold text-muted-foreground bg-white dark:bg-card focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                        >
+                          <option value="">Select Indian Bank...</option>
+                          {bankList.map((b) => (
+                            <option key={b} value={b}>{b}</option>
+                          ))}
+                          <option value="ADD_NEW" className="font-bold text-brand-primary">+ Add New Bank...</option>
+                        </select>
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branch</label>
-                        <input type="text" value={createForm.bankBranch} onChange={e => setCreateForm({...createForm, bankBranch: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Downtown" />
+                        <input type="text" value={createForm.bankBranch} onChange={e => setCreateForm({...createForm, bankBranch: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Downtown Branch" />
                       </div>
                     </div>
                     <div className="space-y-1.5">
@@ -726,14 +935,29 @@ export default function AdminUsersPage() {
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 4: Referral Links</h4>
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Referrer Code / Shareholder ID</label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Referrer Shareholder ID *</label>
                       <div className="flex gap-2">
-                        <input type="text" value={createForm.referrerId} onChange={e => setCreateForm({...createForm, referrerId: e.target.value})} onBlur={(e) => validateReferrer(e.target.value)} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono" placeholder="Enter Referrer Code or Shareholder ID" />
+                        <input 
+                          type="text" 
+                          value={createForm.referrerId} 
+                          onChange={e => {
+                            const val = e.target.value.toUpperCase();
+                            setCreateForm({...createForm, referrerId: val});
+                            if (val.length >= 3) {
+                              validateReferrer(val);
+                            } else {
+                              setReferrerName('');
+                            }
+                          }} 
+                          onBlur={(e) => validateReferrer(e.target.value)} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono uppercase" 
+                          placeholder="e.g. SH000000 or SH100001" 
+                        />
                       </div>
                       {isValidatingReferrer && <p className="text-[10px] text-brand-primary mt-1">Validating referrer...</p>}
-                      {referrerName && <p className="text-[10px] text-emerald-500 mt-1 font-bold">âœ“ Valid Referrer: {referrerName}</p>}
+                      {referrerName && <p className="text-[10px] text-emerald-500 mt-1 font-bold">✓ Valid Referrer: {referrerName}</p>}
                       <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
-                        Validates parent referrer links. Cycle-loops are prevented dynamically.
+                        Enter the Shareholder ID of the parent referrer. Referral code is equal to Shareholder ID.
                       </p>
                     </div>
                   </motion.div>
@@ -801,9 +1025,8 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">shareholderId:</strong> {createForm.shareholderId}</div>
                         <div><strong className="text-muted-foreground">Role:</strong> {createForm.role}</div>
                       </div>
-                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">First Name:</strong> {createForm.firstName || '-'}</div>
-                        <div><strong className="text-muted-foreground">Last Name:</strong> {createForm.lastName || '-'}</div>
+                      <div className="pb-2 border-b border-border-subtle">
+                        <strong className="text-muted-foreground">Full Name:</strong> {createForm.name || '-'}
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
                         <div><strong className="text-muted-foreground">Phone:</strong> {createForm.phone || '-'}</div>
@@ -881,9 +1104,15 @@ export default function AdminUsersPage() {
                           }
                         }
                       }
-                      if (wizardStep === 3 && createForm.bankIfsc && !isIfscValid(createForm.bankIfsc)) {
-                        toast({ title: "IFSC Mismatch", description: "Please enter a valid IFSC code block.", type: "warning" });
-                        return;
+                      if (wizardStep === 3) {
+                        if (createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber)) {
+                          toast({ title: "Account Number Mismatch", description: "Bank Account Number must be strictly 15 numeric digits.", type: "warning" });
+                          return;
+                        }
+                        if (createForm.bankIfsc && !isIfscValid(createForm.bankIfsc)) {
+                          toast({ title: "IFSC Mismatch", description: "Please enter a valid IFSC code block.", type: "warning" });
+                          return;
+                        }
                       }
                       setWizardStep(s => s + 1);
                       setHighestStepReached(Math.max(highestStepReached, wizardStep + 1));
@@ -964,23 +1193,91 @@ export default function AdminUsersPage() {
                       <input type="text" value={editForm.addressArea} onChange={e => setEditForm({...editForm, addressArea: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City</label>
-                      <input type="text" value={editForm.addressCity} onChange={e => setEditForm({...editForm, addressCity: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State (India)</label>
+                      <select 
+                        value={editForm.addressState} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditForm(prev => ({ ...prev, addressState: val, addressDistrict: '', addressCity: '', addressPincode: '' }));
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer"
+                      >
+                        <option value="">Select Indian State...</option>
+                        {getIndianStates().map(st => (
+                          <option key={st} value={st}>{st}</option>
+                        ))}
+                      </select>
                     </div>
+
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">District</label>
-                      <input type="text" value={editForm.addressDistrict} onChange={e => setEditForm({...editForm, addressDistrict: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State</label>
-                      <input type="text" value={editForm.addressState} onChange={e => setEditForm({...editForm, addressState: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
+                      <select 
+                        value={editForm.addressDistrict} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          setEditForm(prev => ({ ...prev, addressDistrict: val, addressCity: '', addressPincode: '' }));
+                        }} 
+                        disabled={!editForm.addressState}
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="">{editForm.addressState ? "Select District..." : "Select State First"}</option>
+                        {getDistrictsByState(editForm.addressState).map(dist => (
+                          <option key={dist} value={dist}>{dist}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode</label>
-                    <input type="text" value={editForm.addressPincode} onChange={e => setEditForm({...editForm, addressPincode: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Locality</label>
+                      <select 
+                        value={editForm.addressCity} 
+                        onChange={e => {
+                          const val = e.target.value;
+                          const pins = getPincodesByCity(editForm.addressState, editForm.addressDistrict, val);
+                          setEditForm(prev => ({ 
+                            ...prev, 
+                            addressCity: val, 
+                            addressPincode: pins.length > 0 ? pins[0] : prev.addressPincode 
+                          }));
+                        }} 
+                        disabled={!editForm.addressDistrict}
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer disabled:opacity-50"
+                      >
+                        <option value="">{editForm.addressDistrict ? "Select City..." : "Select District First"}</option>
+                        {getCitiesByDistrict(editForm.addressState, editForm.addressDistrict).map(ct => (
+                          <option key={ct} value={ct}>{ct}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode</label>
+                      {getPincodesByCity(editForm.addressState, editForm.addressDistrict, editForm.addressCity).length > 0 ? (
+                        <select 
+                          value={editForm.addressPincode} 
+                          onChange={e => setEditForm({ ...editForm, addressPincode: e.target.value })} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-card bg-white cursor-pointer"
+                        >
+                          <option value="">Select Pincode...</option>
+                          {getPincodesByCity(editForm.addressState, editForm.addressDistrict, editForm.addressCity).map(pin => (
+                            <option key={pin} value={pin}>{pin}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input 
+                          type="text" 
+                          maxLength={6}
+                          value={editForm.addressPincode} 
+                          onChange={e => setEditForm({ ...editForm, addressPincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-semibold focus:outline-none" 
+                          placeholder="6-digit Pincode" 
+                        />
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -992,13 +1289,49 @@ export default function AdminUsersPage() {
                     <input type="text" value={editForm.bankAccountName} onChange={e => setEditForm({...editForm, bankAccountName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</label>
-                    <input type="text" value={editForm.bankAccountNumber} onChange={e => setEditForm({...editForm, bankAccountNumber: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none font-mono" />
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number (Strict Requirement: 15 Digits)</label>
+                    <input 
+                      type="text" 
+                      maxLength={15}
+                      value={editForm.bankAccountNumber} 
+                      onChange={e => setEditForm({...editForm, bankAccountNumber: e.target.value.replace(/\D/g, '').slice(0, 15)})} 
+                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none ${editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
+                      placeholder="Enter 15 digit account number"
+                    />
+                    {editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) && (
+                      <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Strict requirement: Must be strictly 15 numeric digits ({editForm.bankAccountNumber.length}/15 entered).</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name</label>
-                      <input type="text" value={editForm.bankName} onChange={e => setEditForm({...editForm, bankName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name (Indian Banks)</label>
+                        <button
+                          type="button"
+                          onClick={() => { setAddBankTarget('edit'); setIsAddBankModalOpen(true); }}
+                          className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <Plus size={12} /> Add Bank
+                        </button>
+                      </div>
+                      <select 
+                        value={editForm.bankName} 
+                        onChange={e => {
+                          if (e.target.value === 'ADD_NEW') {
+                            setAddBankTarget('edit');
+                            setIsAddBankModalOpen(true);
+                          } else {
+                            setEditForm({...editForm, bankName: e.target.value});
+                          }
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-bold text-muted-foreground bg-white dark:bg-card focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                      >
+                        <option value="">Select Indian Bank...</option>
+                        {bankList.map((b) => (
+                          <option key={b} value={b}>{b}</option>
+                        ))}
+                        <option value="ADD_NEW" className="font-bold text-brand-primary">+ Add New Bank...</option>
+                      </select>
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branch</label>
@@ -1087,7 +1420,13 @@ export default function AdminUsersPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => editUserMutation.mutate()}
+                  onClick={() => {
+                    if (editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber)) {
+                      toast({ title: "Validation Error", description: "Bank Account Number must be strictly 15 numeric digits.", type: "warning" });
+                      return;
+                    }
+                    editUserMutation.mutate();
+                  }}
                   disabled={editUserMutation.isPending}
                   className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer uppercase tracking-wider"
                 >
@@ -1138,7 +1477,8 @@ export default function AdminUsersPage() {
                     <div><span className="text-muted-foreground block text-[10px]">Last Name</span> <strong className="text-gray-800 dark:text-white font-bold">{selectedUser.lastName || '-'}</strong></div>
                     <div className="col-span-2 pt-2"><span className="text-muted-foreground block text-[10px]">Shareholder ID</span> <strong className="text-gray-800 dark:text-white font-mono text-xs select-text">{selectedUser.shareholderId}</strong></div>
                     <div className="pt-2"><span className="text-muted-foreground block text-[10px]">Phone</span> <strong className="text-gray-800 dark:text-white font-semibold">{selectedUser.phone || '-'}</strong></div>
-                    <div className="pt-2"><span className="text-muted-foreground block text-[10px]">DOB</span> <strong className="text-gray-800 dark:text-white font-semibold">{selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : '-'}</strong></div>
+                    <div className="pt-2"><span className="text-muted-foreground block text-[10px]">City</span> <strong className="text-gray-800 dark:text-white font-semibold">{selectedUser.addressCity || '-'}</strong></div>
+                    <div className="pt-2 col-span-2"><span className="text-muted-foreground block text-[10px]">DOB</span> <strong className="text-gray-800 dark:text-white font-semibold">{selectedUser.dob ? new Date(selectedUser.dob).toLocaleDateString() : '-'}</strong></div>
                   </div>
                 </div>
 
@@ -1267,6 +1607,38 @@ export default function AdminUsersPage() {
               <div className="flex gap-3 select-none">
                 <button onClick={() => { setIsDeleteOpen(false); setSelectedUser(null); }} className="flex-1 py-2.5 border border-border-subtle rounded-xl hover:bg-muted text-xs font-bold text-gray-650 cursor-pointer">Cancel</button>
                 <button onClick={() => deleteMutation.mutate(selectedUser.id)} className="flex-1 py-2.5 bg-red-650 hover:bg-red-700 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer uppercase tracking-wider">Confirm Delete</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ADD NEW INDIAN BANK MODAL */}
+      <AnimatePresence>
+        {isAddBankModalOpen && (
+          <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="bg-white dark:bg-card rounded-3xl max-w-md w-full p-6 shadow-2xl relative border border-border-subtle">
+              <button onClick={() => { setIsAddBankModalOpen(false); setNewBankInput(''); }} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground p-1 hover:bg-muted dark:hover:bg-secondary rounded-lg transition-all cursor-pointer"><X size={16} /></button>
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2 text-brand-primary"><Landmark size={20} /> Add New Indian Bank Name</h3>
+              <p className="text-xs text-muted-foreground dark:text-gray-400 mb-5 leading-relaxed">
+                Add an official Indian bank name to the operator dropdown selection list.
+              </p>
+              <div className="space-y-4">
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Bank Name *</label>
+                  <input
+                    type="text"
+                    value={newBankInput}
+                    onChange={e => setNewBankInput(e.target.value)}
+                    placeholder="e.g. Saraswat Cooperative Bank"
+                    className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-secondary/35"
+                    autoFocus
+                  />
+                </div>
+                <div className="flex gap-3 select-none pt-2">
+                  <button onClick={() => { setIsAddBankModalOpen(false); setNewBankInput(''); }} className="flex-1 py-2.5 border border-border-subtle rounded-xl hover:bg-muted text-xs font-bold text-gray-500 cursor-pointer">Cancel</button>
+                  <button onClick={handleAddNewBank} className="flex-1 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white font-bold rounded-xl text-xs shadow-md cursor-pointer uppercase tracking-wider">Add Bank</button>
+                </div>
               </div>
             </motion.div>
           </div>

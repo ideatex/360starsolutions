@@ -15,6 +15,7 @@ async function main() {
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       passwordHash: adminPassword1,
+      referralCode: 'SH000000',
     },
     create: {
       shareholderId: 'SH000000',
@@ -22,7 +23,7 @@ async function main() {
       passwordHash: adminPassword1,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
-      referralCode: 'SUPERADMINCODE',
+      referralCode: 'SH000000',
       phone: '9999999999',
     },
   });
@@ -36,6 +37,7 @@ async function main() {
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       passwordHash: adminPassword2,
+      referralCode: 'SH100001',
     },
     create: {
       shareholderId: 'SH100001',
@@ -43,7 +45,7 @@ async function main() {
       passwordHash: adminPassword2,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
-      referralCode: 'ADMIN01',
+      referralCode: 'SH100001',
       phone: '9999999998',
     },
   });
@@ -57,6 +59,7 @@ async function main() {
       role: 'SHAREHOLDER',
       status: 'ACTIVE',
       passwordHash: userPassword,
+      referralCode: 'USR000001',
     },
     create: {
       shareholderId: 'USR000001',
@@ -64,7 +67,7 @@ async function main() {
       passwordHash: userPassword,
       role: 'SHAREHOLDER',
       status: 'ACTIVE',
-      referralCode: 'USERCODE001',
+      referralCode: 'USR000001',
       phone: '9876543210',
     },
   });

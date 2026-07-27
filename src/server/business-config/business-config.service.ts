@@ -16,9 +16,9 @@ export class BusinessConfigService implements OnModuleInit {
       await this.prisma.businessConfiguration.create({
         data: {
           version: 1,
-          userIdPrefix: 'USR',
-          userIdStartingNumber: 1,
-          userIdNextNumber: 1,
+          userIdPrefix: 'SH',
+          userIdStartingNumber: 100001,
+          userIdNextNumber: 100001,
           userIdLength: 6,
           levelOpeningVolume: {
             "1": 10000,

@@ -10,14 +10,16 @@ async function main() {
   
   const user = await prisma.shareholder.upsert({
     where: { shareholderId: 'SH000000' },
-    update: {},
+    update: {
+      referralCode: 'SH000000'
+    },
     create: {
       shareholderId: 'SH000000',
       passwordHash,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       name: 'Super Admin',
-      referralCode: 'SUPERADMINCODE'
+      referralCode: 'SH000000'
     },
   });
 

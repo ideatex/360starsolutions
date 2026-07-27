@@ -12,11 +12,12 @@ import {
   Edge,
   Handle,
   Position,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { Search, Network, Info, Award, Users, Eye, X } from 'lucide-react';
+import { Search, Network, Info, Award, Users, Eye, X, Loader2, RotateCcw, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 // Custom Node component displaying referral metadata with Name and Amount
@@ -64,7 +65,7 @@ const CustomNode = ({ data }: { data: any }) => {
           <div className="flex justify-between items-center">
             <span>Approved Amount:</span>
             <span className="text-brand-primary font-bold bg-brand-primary/10 px-2 py-0.5 rounded-md border border-brand-primary/20">
-              ₹{Number(data.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ${Number(data.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -85,13 +86,15 @@ const CustomNode = ({ data }: { data: any }) => {
   );
 };
 
-export default function ReferralTree() {
-  const { data } = useQuery({
+function ReferralTreeInner() {
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['referralTree'],
     queryFn: async () => {
       const res = await api.get('/shareholders/me/referral-tree');
       return res.data;
     },
+    staleTime: 30000,
+    retry: 2,
   });
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
@@ -109,21 +112,18 @@ export default function ReferralTree() {
   const stats = useMemo(() => {
     if (!data) return { totalCount: 0, maxDepth: 0 };
     const downline = data.downline || [];
-    const root = data.shareholder || {};
-    const rootDepth = root.depth || 0;
 
     const totalCount = downline.length;
-    const maxDepth = downline.reduce((max: number, u: any) => Math.max(max, (u.depth || u.relativeDepth || 0) - rootDepth), 0);
+    const maxDepth = downline.reduce((max: number, u: any) => Math.max(max, u.relativeDepth || u.depth || 0), 0);
 
     return { totalCount, maxDepth };
   }, [data]);
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || !data.shareholder) return;
 
     const root = data.shareholder;
     const downline = data.downline || [];
-    const rootDepth = root.depth || 0;
 
     const flowNodes: Node[] = [];
     const flowEdges: Edge[] = [];
@@ -170,11 +170,10 @@ export default function ReferralTree() {
       position: { x: 350, y: 50 },
     });
 
-    // 2. Group downline by depth relative to Root
+    // 2. Group downline by depth relative to Root (Level 1 = Direct Referrals)
     const depthGroups: Record<number, any[]> = {};
     downline.forEach((u: any) => {
-      const d = (u.relativeDepth !== undefined ? u.relativeDepth : u.depth) - rootDepth;
-      const calcDepth = d > 0 ? d : 1;
+      const calcDepth = u.relativeDepth !== undefined ? u.relativeDepth : (u.depth || 1);
       if (!depthGroups[calcDepth]) depthGroups[calcDepth] = [];
       depthGroups[calcDepth].push(u);
     });
@@ -209,16 +208,16 @@ export default function ReferralTree() {
           position: { x: levelX, y: levelY },
         });
 
-        // Determine parent connection path
+        // Determine parent connection path safely
         let parentId = root.id;
-        if (u.materializedPath) {
+        if (u.parentId && (u.parentId === root.id || downline.some((dl: any) => dl.id === u.parentId))) {
+          parentId = u.parentId;
+        } else if (u.materializedPath) {
           const parts = u.materializedPath.split('.');
           const myParentId = parts[parts.length - 1];
-          if (myParentId && myParentId !== root.id && downline.some((dl: any) => dl.id === myParentId)) {
+          if (myParentId && (myParentId === root.id || downline.some((dl: any) => dl.id === myParentId))) {
             parentId = myParentId;
           }
-        } else if (u.parentId) {
-          parentId = u.parentId;
         }
 
         // Draw edge connections
@@ -244,6 +243,38 @@ export default function ReferralTree() {
     setSelectedNodeDetails(node.data);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-card rounded-2xl border border-border p-12 text-center space-y-4">
+        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Loading Referral Network...</h3>
+          <p className="text-xs text-muted-foreground mt-1">Retrieving account downline lineage and volume statistics.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isError || !data?.shareholder) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-card rounded-2xl border border-border p-12 text-center space-y-4">
+        <div className="p-3 bg-red-500/10 text-red-500 rounded-full">
+          <AlertCircle className="w-8 h-8" />
+        </div>
+        <div>
+          <h3 className="text-sm font-bold text-foreground">Unable to Load Referral Tree</h3>
+          <p className="text-xs text-muted-foreground mt-1">Please verify network connectivity or session status.</p>
+        </div>
+        <button
+          onClick={() => refetch()}
+          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl hover:bg-brand-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+        >
+          <RotateCcw className="w-3.5 h-3.5" /> Retry Loading
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 flex flex-col h-full w-full">
       {/* Toolbar & Search */}
@@ -255,7 +286,7 @@ export default function ReferralTree() {
             placeholder="Search Name or Shareholder ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-background"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-background font-medium"
           />
         </div>
 
@@ -272,9 +303,9 @@ export default function ReferralTree() {
         </div>
       </div>
 
-      {/* Main Flow Canvas */}
-      <div className="relative flex-1 min-h-[500px] border border-border rounded-2xl bg-muted/20 overflow-hidden flex flex-col xl:flex-row gap-4 p-4">
-        <div className="flex-1 w-full h-[500px] xl:h-auto rounded-xl overflow-hidden relative border border-border">
+      {/* Main Flow Canvas Container */}
+      <div className="relative flex-1 border border-border rounded-2xl bg-muted/20 overflow-hidden flex flex-col xl:flex-row gap-4 p-4">
+        <div className="flex-1 w-full h-[600px] rounded-xl overflow-hidden relative border border-border bg-background">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -282,7 +313,11 @@ export default function ReferralTree() {
             onEdgesChange={onEdgesChange}
             nodeTypes={nodeTypes}
             onNodeClick={onNodeClick}
+            onInit={(instance) => instance.fitView({ padding: 0.3 })}
             fitView
+            fitViewOptions={{ padding: 0.3 }}
+            minZoom={0.2}
+            maxZoom={2}
             attributionPosition="bottom-right"
           >
             <Controls />
@@ -332,7 +367,7 @@ export default function ReferralTree() {
                   <div>
                     <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Approved Contribution Amount</span>
                     <span className="text-brand-primary font-bold text-base block">
-                      ₹{Number(selectedNodeDetails.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ${Number(selectedNodeDetails.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
@@ -353,5 +388,13 @@ export default function ReferralTree() {
         </AnimatePresence>
       </div>
     </div>
+  );
+}
+
+export default function ReferralTree() {
+  return (
+    <ReactFlowProvider>
+      <ReferralTreeInner />
+    </ReactFlowProvider>
   );
 }

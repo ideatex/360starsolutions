@@ -102,14 +102,26 @@ export class UsersService {
   }
 
   async validateReferral(code: string) {
-    const parent = await this.prisma.shareholder.findUnique({
-      where: { referralCode: code },
-      select: { name: true, shareholderId: true }
-    });
-    if (!parent) {
-      throw new NotFoundException('Invalid Referral ID');
+    const searchCode = (code || '').trim();
+    if (!searchCode) {
+      throw new NotFoundException('Referrer ID / Code is required');
     }
-    return { name: parent.name, shareholderId: parent.shareholderId };
+
+    const parent = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { shareholderId: { equals: searchCode, mode: 'insensitive' } },
+          { referralCode: { equals: searchCode, mode: 'insensitive' } },
+          { id: searchCode },
+        ],
+      },
+      select: { name: true, shareholderId: true, referralCode: true }
+    });
+
+    if (!parent) {
+      throw new NotFoundException('Invalid Referral ID / Shareholder ID');
+    }
+    return { name: parent.name, shareholderId: parent.shareholderId, referralCode: parent.referralCode || parent.shareholderId };
   }
 
   async generateNextShareholderId() {
@@ -209,6 +221,14 @@ export class UsersService {
       }
     }
 
+    // Bank Account Number validation (Strict requirement: 15 numeric digits)
+    if (data.bankAccountNumber) {
+      const accNum = String(data.bankAccountNumber).trim();
+      if (!/^\d{15}$/.test(accNum)) {
+        errors.bankAccountNumber = 'Bank Account Number must be strictly 15 numeric digits';
+      }
+    }
+
     // Address validation
     if (!combinedAddress || combinedAddress.length < 10) {
       errors.address = 'Complete address must be at least 10 characters';
@@ -288,7 +308,8 @@ export class UsersService {
 
     // Auto generate Shareholder ID strictly based on business config sequential rules
     const finalShareholderId = await this.businessConfigService.generateNextUserId();
-    const referralCode = randomBytes(4).toString('hex').toUpperCase();
+    // Referral code is equal to Shareholder ID
+    const referralCode = finalShareholderId;
 
     const shareholder = await this.prisma.shareholder.create({
       data: {
@@ -299,7 +320,7 @@ export class UsersService {
         dob: data.dob ? new Date(data.dob) : null,
         role: data.role ?? 'SHAREHOLDER',
         status: data.status ?? 'ACTIVE',
-        referralCode,
+        referralCode: finalShareholderId,
         addressBuilding: data.addressBuilding || '',
         addressArea: data.addressArea || '',
         addressCity: data.addressCity || '',
@@ -368,6 +389,14 @@ export class UsersService {
     const shareholder = await this.prisma.shareholder.findUnique({ where: { id } });
     if (!shareholder) {
       throw new NotFoundException('Shareholder not found');
+    }
+
+    // Validate Bank Account Number if provided
+    if (updates.bankAccountNumber) {
+      const accNum = String(updates.bankAccountNumber).trim();
+      if (!/^\d{15}$/.test(accNum)) {
+        throw new BadRequestException('Bank Account Number must be strictly 15 numeric digits');
+      }
     }
 
     // Validate IFSC format if provided
@@ -672,8 +701,15 @@ export class UsersService {
   }
 
   async getReferralTree(shareholderId: string) {
-    const shareholder = await this.prisma.shareholder.findUnique({
-      where: { id: shareholderId },
+    const searchId = (shareholderId || '').trim();
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { id: searchId },
+          { shareholderId: searchId },
+          { shareholderId: searchId.toUpperCase() },
+        ],
+      },
       select: {
         id: true,
         shareholderId: true,
@@ -685,10 +721,11 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    const children = await this.referralTreeService.getFullDownline(shareholderId);
+    const actualId = shareholder.id;
+    const children = await this.referralTreeService.getFullDownline(actualId);
 
     // Collect all shareholder IDs (root + downline) to query amounts
-    const allShareholderIds = [shareholderId, ...children.map(c => c.id)];
+    const allShareholderIds = [actualId, ...children.map(c => c.id)];
 
     const approvedContributions = await this.prisma.contribution.groupBy({
       by: ['shareholderId'],
@@ -706,7 +743,7 @@ export class UsersService {
       amountMap.set(ac.shareholderId, Number(ac._sum.amount || 0));
     });
 
-    const rootAmount = amountMap.get(shareholderId) || 0;
+    const rootAmount = amountMap.get(actualId) || 0;
 
     const formattedDownline = children.map(c => ({
       ...c,

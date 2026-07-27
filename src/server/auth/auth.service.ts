@@ -51,7 +51,20 @@ export class AuthService {
   }
 
   async login(shareholderId: string, pass: string) {
-    const shareholder = await this.prisma.shareholder.findUnique({ where: { shareholderId } });
+    const searchId = (shareholderId || '').trim();
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { shareholderId: searchId },
+          { shareholderId: searchId.toUpperCase() },
+          { shareholderId: searchId.toLowerCase() },
+          { referralCode: searchId },
+          { referralCode: searchId.toUpperCase() },
+          { phone: searchId },
+        ],
+      },
+    });
+
     if (!shareholder) {
       throw new UnauthorizedException('Invalid credentials');
     }

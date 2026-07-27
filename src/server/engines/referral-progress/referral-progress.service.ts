@@ -11,11 +11,23 @@ export class ReferralProgressService {
 
   async getReferralProgress(shareholderId: string) {
     const startTime = Date.now();
+    const searchId = (shareholderId || '').trim();
     // 1. Ensure shareholder exists
-    const shareholder = await this.prisma.shareholder.findUnique({ where: { id: shareholderId } });
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { id: searchId },
+          { shareholderId: searchId },
+          { shareholderId: searchId.toUpperCase() },
+        ],
+      },
+    });
+
     if (!shareholder) {
       throw new NotFoundException('Shareholder not found');
     }
+
+    const actualId = shareholder.id;
 
     // 2. Read from BusinessConfiguration
     const config = await this.prisma.businessConfiguration.findFirst({
@@ -36,16 +48,16 @@ export class ReferralProgressService {
       levelVolumes[l] = 0;
     }
 
-    // Level 1 = "You" (the user's own approved contributions)
+    // Own approved contributions (Personal Investment)
     const ownContributions = await this.prisma.contribution.aggregate({
-      where: { shareholderId, status: 'APPROVED' },
+      where: { shareholderId: actualId, status: 'APPROVED' },
       _sum: { amount: true },
     });
-    levelVolumes[1] = Number(ownContributions._sum.amount || 0);
+    const ownVolume = Number(ownContributions._sum.amount || 0);
 
-    // Downline levels starting from Level 2
-    let currentParentIds = [shareholderId];
-    let currentDepth = 2;
+    // Downline levels: Level 1 = Direct Referrals, Level 2 = Level 1 Downline, etc.
+    let currentParentIds = [actualId];
+    let currentDepth = 1;
 
     while (currentParentIds.length > 0 && currentDepth <= maxReferralLevels) {
       const children = await this.prisma.shareholder.findMany({
@@ -74,7 +86,7 @@ export class ReferralProgressService {
     // 4. Determine progress and sequential locking
     let previousUnlocked = true;
     let totalQualifiedLevels = 0;
-    let overallBusinessVolume = 0;
+    let overallBusinessVolume = ownVolume;
     let currentActiveLevel = 0;
     let nextUnlockTarget = 1;
 
@@ -109,7 +121,7 @@ export class ReferralProgressService {
 
       progress.push({
         level,
-        levelName: level === 1 ? 'You' : `Level ${level}`,
+        levelName: `Level ${level}`,
         requiredVolume,
         currentVolume,
         remainingVolume,
@@ -144,12 +156,13 @@ export class ReferralProgressService {
       summary: {
         totalQualifiedLevels,
         currentActiveLevel,
-        currentActiveLevelName: currentActiveLevel === 1 ? 'You' : (currentActiveLevel > 0 ? `Level ${currentActiveLevel}` : 'None'),
+        currentActiveLevelName: currentActiveLevel > 0 ? `Level ${currentActiveLevel}` : 'None',
         overallBusinessVolume,
         overallProgressPercentage: Number(overallProgressPercentage.toFixed(2)),
         nextUnlockTarget,
-        nextUnlockTargetName: nextUnlockTarget === 1 ? 'You' : `Level ${nextUnlockTarget}`,
+        nextUnlockTargetName: nextUnlockTarget > 0 ? `Level ${nextUnlockTarget}` : 'Level 1',
         remainingVolumeToNextLevel,
+        ownVolume,
       },
       progress,
       configurationVersion: config.version,
