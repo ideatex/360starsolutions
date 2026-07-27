@@ -3,6 +3,11 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    if (!envUrl || envUrl.includes('localhost')) {
+      return '/api/v1';
+    }
+  }
   if (process.env.NODE_ENV === 'production' && envUrl && !envUrl.includes('localhost')) {
     return envUrl;
   }

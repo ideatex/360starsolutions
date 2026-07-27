@@ -41,6 +41,37 @@ filesToCopy.forEach((item) => {
   }
 });
 
+console.log('📦 Backing up generated Prisma client for cPanel...');
+const backupDir = path.join(deployDir, 'prisma-backup');
+fs.mkdirSync(backupDir, { recursive: true });
+if (fs.existsSync(path.join(__dirname, 'node_modules/.prisma'))) {
+  fs.cpSync(path.join(__dirname, 'node_modules/.prisma'), path.join(backupDir, '.prisma'), { recursive: true });
+}
+if (fs.existsSync(path.join(__dirname, 'node_modules/@prisma/client'))) {
+  fs.cpSync(path.join(__dirname, 'node_modules/@prisma/client'), path.join(backupDir, '@prisma/client'), { recursive: true });
+}
+console.log('✅ Prisma client backed up.');
+
+const postinstallScript = `
+const fs = require('fs');
+const path = require('path');
+if (fs.existsSync('prisma-backup')) {
+  try {
+    const prismaClientPackagePath = require.resolve('@prisma/client/package.json');
+    const prismaClientPath = path.dirname(prismaClientPackagePath);
+    const dotPrismaPath = path.join(prismaClientPath, '../../.prisma');
+    
+    fs.cpSync('prisma-backup/.prisma', dotPrismaPath, { recursive: true });
+    fs.cpSync('prisma-backup/@prisma/client', prismaClientPath, { recursive: true });
+    console.log('✅ Successfully restored Prisma client binaries to:', prismaClientPath);
+  } catch(e) {
+    console.error('❌ Failed to restore Prisma client:', e);
+  }
+}
+`;
+fs.writeFileSync(path.join(deployDir, 'postinstall.js'), postinstallScript);
+console.log('✅ Created postinstall.js script for cPanel restore');
+
 // 4. Create an .htaccess if needed (optional for Passenger)
 // Passenger (Node.js selector in cPanel) uses the startup file defined in cPanel.
 // Let's create a server.js file at the root to make it easier for cPanel's Passenger
