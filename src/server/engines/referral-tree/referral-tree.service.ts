@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 
 @Injectable()
@@ -79,8 +79,24 @@ export class ReferralTreeService {
    * Retrieves the full downline of a shareholder up to 7 levels dynamically.
    */
   async getFullDownline(shareholderId: string) {
+    const searchId = (shareholderId || '').trim();
+    let rootId = searchId;
+    const rootUser = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { id: searchId },
+          { shareholderId: searchId },
+          { shareholderId: searchId.toUpperCase() },
+        ],
+      },
+      select: { id: true }
+    });
+    if (rootUser) {
+      rootId = rootUser.id;
+    }
+
     const downline: any[] = [];
-    let currentLevelIds = [shareholderId];
+    let currentLevelIds = [rootId];
     let currentDepth = 1;
 
     while (currentLevelIds.length > 0 && currentDepth <= 7) {
