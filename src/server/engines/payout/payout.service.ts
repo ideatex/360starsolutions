@@ -225,7 +225,7 @@ export class PayoutService {
           await this.prisma.profitLedger.create({
             data: {
               shareholderId: sh.id,
-              investmentId: sh.investments?.[0]?.id || c.id,
+              investmentId: sh.investments?.[0]?.id || null,
               cycleStart: contribDate > cycleStart ? contribDate : cycleStart,
               cycleEnd,
               eligibleDays: days,

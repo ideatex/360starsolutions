@@ -128,8 +128,8 @@ model ProfitLedger {
   id              String   @id @default(uuid())
   shareholderId   String
   shareholder     Shareholder     @relation(fields: [shareholderId], references: [id])
-  investmentId    String
-  investment      Investment @relation(fields: [investmentId], references: [id])
+  investmentId    String?
+  investment      Investment? @relation(fields: [investmentId], references: [id])
   
   cycleStart      DateTime
   cycleEnd        DateTime
