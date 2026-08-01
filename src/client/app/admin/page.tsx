@@ -131,6 +131,7 @@ export default function AdminDashboardPage() {
 
       {/* Metrics Widgets */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* 1. Active Shareholders */}
         <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Shareholders</h3>
@@ -141,16 +142,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Shareholders</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">{metrics?.totalShareholders || 0}</p>
-          </div>
-          <div className="p-3 bg-brand-info/10 rounded-xl text-brand-info">
-            <Users size={24} />
-          </div>
-        </div>
-
+        {/* 2. Active Capital */}
         <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Capital</h3>
@@ -161,16 +153,7 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overall Capital</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.overallCapital?.toLocaleString() || '0'}</p>
-          </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-            <Database size={24} />
-          </div>
-        </div>
-
+        {/* 3. Gross Payouts */}
         <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Gross Payouts</h3>
@@ -181,6 +164,29 @@ export default function AdminDashboardPage() {
           </div>
         </div>
 
+        {/* 4. Total Shareholders */}
+        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Shareholders</h3>
+            <p className="text-3xl font-bold text-foreground mt-1">{metrics?.totalShareholders || 0}</p>
+          </div>
+          <div className="p-3 bg-brand-info/10 rounded-xl text-brand-info">
+            <Users size={24} />
+          </div>
+        </div>
+
+        {/* 5. Overall Capital */}
+        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
+          <div>
+            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overall Capital</h3>
+            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.overallCapital?.toLocaleString() || '0'}</p>
+          </div>
+          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
+            <Database size={24} />
+          </div>
+        </div>
+
+        {/* 6. Released Funds */}
         <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
           <div>
             <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Released Funds</h3>

@@ -646,6 +646,24 @@ export class InvestorsService {
         if (isEligible) {
           const profitAmount = achVolume * pct;
 
+          // Check if an active or processed commission already exists for this shareholder and level
+          const existingCommission = await this.prisma.commissionLedger.findFirst({
+            where: {
+              shareholderId,
+              level,
+              OR: [
+                { payoutBatchId: batchId },
+                { status: { in: ['PROCESSED', 'PAID'] } },
+                { payoutBatchId: { not: null } },
+              ]
+            }
+          });
+
+          if (existingCommission) {
+            this.logger.log(`Commission for shareholder ${shareholderId} level ${level} already processed or linked to batch ${existingCommission.payoutBatchId}. Skipping duplicate.`);
+            continue;
+          }
+
           // Save ProfitCalculation record
           const calcRecord = await this.prisma.profitCalculation.create({
             data: {

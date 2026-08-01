@@ -164,9 +164,13 @@ export class UsersService {
       }
     }
 
+    const isAdminRole = data.role === 'ADMIN' || data.role === 'SUPER_ADMIN';
+
     // Date of birth validation
     if (!data.dob) {
-      errors.dob = 'Date of birth is required';
+      if (!isAdminRole) {
+        errors.dob = 'Date of birth is required';
+      }
     } else {
       const dobDate = new Date(data.dob);
       if (isNaN(dobDate.getTime())) {
@@ -203,8 +207,10 @@ export class UsersService {
 
     // Phone validation
     if (!phone) {
-      errors.phone = 'Phone number is required';
-      errors.phoneNumber = 'Phone number is required';
+      if (!isAdminRole) {
+        errors.phone = 'Phone number is required';
+        errors.phoneNumber = 'Phone number is required';
+      }
     } else {
       const digitsOnly = phone.replace('+', '');
       if (digitsOnly.length < 10 || digitsOnly.length > 15) {
@@ -221,19 +227,14 @@ export class UsersService {
       }
     }
 
-    // Bank Account Number validation (Strict requirement: 15 numeric digits)
-    if (data.bankAccountNumber) {
-      const accNum = String(data.bankAccountNumber).trim();
-      if (!/^\d{15}$/.test(accNum)) {
-        errors.bankAccountNumber = 'Bank Account Number must be strictly 15 numeric digits';
-      }
-    }
 
     // Address validation
-    if (!combinedAddress || combinedAddress.length < 10) {
-      errors.address = 'Complete address must be at least 10 characters';
-    } else if (combinedAddress.length > 255) {
-      errors.address = 'Complete address must not exceed 255 characters';
+    if (!isAdminRole) {
+      if (!combinedAddress || combinedAddress.length < 10) {
+        errors.address = 'Complete address must be at least 10 characters';
+      } else if (combinedAddress.length > 255) {
+        errors.address = 'Complete address must not exceed 255 characters';
+      }
     }
 
     // Referrer validation
@@ -306,8 +307,8 @@ export class UsersService {
       });
     }
 
-    // Auto generate Shareholder ID strictly based on business config sequential rules
-    const finalShareholderId = await this.businessConfigService.generateNextUserId();
+    // Use provided Shareholder ID or auto-generate based on business config sequential rules
+    const finalShareholderId = data.shareholderId?.trim() ? data.shareholderId.trim().toUpperCase() : await this.businessConfigService.generateNextUserId();
     // Referral code is equal to Shareholder ID
     const referralCode = finalShareholderId;
 
@@ -391,13 +392,6 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    // Validate Bank Account Number if provided
-    if (updates.bankAccountNumber) {
-      const accNum = String(updates.bankAccountNumber).trim();
-      if (!/^\d{15}$/.test(accNum)) {
-        throw new BadRequestException('Bank Account Number must be strictly 15 numeric digits');
-      }
-    }
 
     // Validate IFSC format if provided
     if (updates.bankIfsc) {

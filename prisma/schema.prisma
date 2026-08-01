@@ -26,6 +26,8 @@ enum UserStatus {
 enum CommissionStatus {
   PENDING
   CONFIRMED
+  PROCESSED
+  PAID
   REVERSED
 }
 
@@ -124,8 +126,8 @@ model Investment {
 
 model ProfitLedger {
   id              String   @id @default(uuid())
-  shareholderId          String
-  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id])
+  shareholderId   String
+  shareholder     Shareholder     @relation(fields: [shareholderId], references: [id])
   investmentId    String
   investment      Investment @relation(fields: [investmentId], references: [id])
   
@@ -133,17 +135,21 @@ model ProfitLedger {
   cycleEnd        DateTime
   eligibleDays    Int
   amount          Decimal  @db.Decimal(19, 4)
+  status          PayoutStatus @default(PENDING)
+  payoutBatchId   String?
+  payoutBatch     PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
   
   createdAt       DateTime @default(now())
 
   @@index([shareholderId])
   @@index([investmentId])
+  @@index([payoutBatchId])
 }
 
 model CommissionLedger {
   id               String   @id @default(uuid())
-  shareholderId           String
-  shareholder             Shareholder     @relation(fields: [shareholderId], references: [id])
+  shareholderId    String
+  shareholder      Shareholder     @relation(fields: [shareholderId], references: [id])
   fromInvestmentId String?
   fromInvestment   Investment? @relation(fields: [fromInvestmentId], references: [id])
   
@@ -151,11 +157,14 @@ model CommissionLedger {
   rate             Decimal  @db.Decimal(5, 4)
   amount           Decimal  @db.Decimal(19, 4)
   status           CommissionStatus @default(PENDING)
+  payoutBatchId    String?
+  payoutBatch      PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
   
   createdAt        DateTime @default(now())
 
   @@index([shareholderId])
   @@index([fromInvestmentId])
+  @@index([payoutBatchId])
 }
 
 model PayoutBatch {
@@ -169,6 +178,8 @@ model PayoutBatch {
   releasedAt      DateTime?
   
   details         PayoutDetail[]
+  profitLedgers   ProfitLedger[]
+  commissions     CommissionLedger[]
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

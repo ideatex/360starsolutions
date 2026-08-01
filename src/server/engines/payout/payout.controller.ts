@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Body, Query, UseGuards, Request } from '@nestjs/common';
 import { PayoutService } from '@server/engines/payout/payout.service';
 import { JwtAuthGuard } from '@server/auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '@server/auth/roles.guard';
@@ -20,6 +20,18 @@ export class PayoutController {
     return this.payoutService.getBatchDetails(id);
   }
 
+  @Get('shareholder-payouts')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getAllShareholderPayouts(
+    @Query('search') search?: string,
+    @Query('batchId') batchId?: string,
+    @Query('status') status?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.payoutService.getAllShareholderPayouts(search, batchId, status, Number(page), Number(limit));
+  }
+
   @Post('batches/generate')
   @Roles('ADMIN', 'SUPER_ADMIN')
   async generateBatch(@Body() body: { cycleStart: string; cycleEnd: string }) {
@@ -38,5 +50,23 @@ export class PayoutController {
   async releaseBatch(@Param('id') id: string) {
     await this.payoutService.releaseBatch(id);
     return { success: true };
+  }
+
+  @Post('batches/:id/reprocess')
+  @Roles('SUPER_ADMIN')
+  async reprocessBatch(@Request() req: any, @Param('id') id: string) {
+    return this.payoutService.reprocessBatch(id, req.shareholder.id);
+  }
+
+  @Patch('commissions/:id/reverse')
+  @Roles('SUPER_ADMIN')
+  async reverseCommission(@Request() req: any, @Param('id') id: string) {
+    return this.payoutService.reverseCommission(id, req.shareholder.id);
+  }
+
+  @Patch('commissions/:id/reprocess')
+  @Roles('SUPER_ADMIN')
+  async reprocessCommission(@Request() req: any, @Param('id') id: string) {
+    return this.payoutService.reprocessCommission(id, req.shareholder.id);
   }
 }

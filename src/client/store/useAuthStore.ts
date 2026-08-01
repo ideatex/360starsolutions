@@ -1,4 +1,5 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 
 interface Shareholder {
   id: string;
@@ -16,10 +17,17 @@ interface AuthState {
   logout: () => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  shareholder: null,
-  token: null,
-  isAuthenticated: false,
-  login: (shareholder, token) => set({ shareholder, token, isAuthenticated: true }),
-  logout: () => set({ shareholder: null, token: null, isAuthenticated: false }),
-}));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      shareholder: null,
+      token: null,
+      isAuthenticated: false,
+      login: (shareholder, token) => set({ shareholder, token, isAuthenticated: true }),
+      logout: () => set({ shareholder: null, token: null, isAuthenticated: false }),
+    }),
+    {
+      name: 'auth-storage',
+    }
+  )
+);

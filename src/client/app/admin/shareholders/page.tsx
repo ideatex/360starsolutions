@@ -425,8 +425,8 @@ export default function AdminUsersPage() {
       contributionAmount: '',
       contributionMode: 'Bank Transfer',
       contributionDate: new Date().toISOString().split('T')[0],
-      issuedAgreement: false,
-      issuedCheque: false,
+      issuedAgreement: u.contributions?.[0]?.issuedAgreement ?? false,
+      issuedCheque: u.contributions?.[0]?.issuedCheque ?? false,
       validityMonths: '12',
     });
     setIsEditOpen(true);
@@ -858,26 +858,14 @@ export default function AdminUsersPage() {
                       <input type="text" value={createForm.bankAccountName} onChange={e => setCreateForm({...createForm, bankAccountName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="John Doe" />
                     </div>
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number * (Strict Requirement: 15 Digits)</label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</label>
                       <input 
                         type="text" 
-                        maxLength={15}
                         value={createForm.bankAccountNumber} 
-                        onChange={e => setCreateForm({...createForm, bankAccountNumber: e.target.value.replace(/\D/g, '').slice(0, 15)})} 
-                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
-                        placeholder="Enter 15 digit account number" 
+                        onChange={e => setCreateForm({...createForm, bankAccountNumber: e.target.value})} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                        placeholder="Enter account number" 
                       />
-                      {createForm.bankAccountNumber ? (
-                        <p className={`text-[10px] mt-1 font-semibold ${isAccountNumberValid(createForm.bankAccountNumber) ? 'text-emerald-500' : 'text-red-500 flex items-center gap-1'}`}>
-                          {isAccountNumberValid(createForm.bankAccountNumber) ? (
-                            '✓ Valid 15-digit bank account number'
-                          ) : (
-                            <><AlertTriangle size={12} /> Strict requirement: Must be exactly 15 numeric digits ({createForm.bankAccountNumber.length}/15 digits entered)</>
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Strict requirement: Must be exactly 15 numeric digits.</p>
-                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
@@ -1058,6 +1046,14 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">Fund Amount:</strong> ${createForm.contributionAmount || '0'}</div>
                         <div><strong className="text-muted-foreground">Mode:</strong> {createForm.contributionMode}</div>
                         <div><strong className="text-muted-foreground">Validity:</strong> {createForm.validityMonths} Mos</div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold">
+                        <span className={createForm.issuedAgreement ? 'text-emerald-600 font-bold flex items-center gap-1' : 'text-muted-foreground flex items-center gap-1'}>
+                          {createForm.issuedAgreement ? '✓ Signed Agreement Issued' : '✕ Agreement Not Issued'}
+                        </span>
+                        <span className={createForm.issuedCheque ? 'text-emerald-600 font-bold flex items-center gap-1' : 'text-muted-foreground flex items-center gap-1'}>
+                          {createForm.issuedCheque ? '✓ Company Cheque Issued' : '✕ Cheque Not Issued'}
+                        </span>
                       </div>
                     </div>
                   </motion.div>
@@ -1289,18 +1285,14 @@ export default function AdminUsersPage() {
                     <input type="text" value={editForm.bankAccountName} onChange={e => setEditForm({...editForm, bankAccountName: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number (Strict Requirement: 15 Digits)</label>
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Number</label>
                     <input 
                       type="text" 
-                      maxLength={15}
                       value={editForm.bankAccountNumber} 
-                      onChange={e => setEditForm({...editForm, bankAccountNumber: e.target.value.replace(/\D/g, '').slice(0, 15)})} 
-                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none ${editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
-                      placeholder="Enter 15 digit account number"
+                      onChange={e => setEditForm({...editForm, bankAccountNumber: e.target.value})} 
+                      className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-secondary/35" 
+                      placeholder="Enter account number"
                     />
-                    {editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) && (
-                      <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Strict requirement: Must be strictly 15 numeric digits ({editForm.bankAccountNumber.length}/15 entered).</p>
-                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -1511,24 +1503,93 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="space-y-3">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-border-subtle pb-1">Document & Compliance Issuance</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+                      (selectedUser.contributions?.some((c: any) => c.issuedAgreement) || selectedUser.issuedAgreement)
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold">Company Agreement</p>
+                          <p className="text-[10px] opacity-80">
+                            {(selectedUser.contributions?.some((c: any) => c.issuedAgreement) || selectedUser.issuedAgreement)
+                              ? 'Signed & Issued'
+                              : 'Not Issued / Pending'}
+                          </p>
+                        </div>
+                      </div>
+                      {(selectedUser.contributions?.some((c: any) => c.issuedAgreement) || selectedUser.issuedAgreement) ? (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-500/20 border border-emerald-500/30 uppercase">Yes (Issued)</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-500/20 border border-amber-500/30 uppercase">No (Pending)</span>
+                      )}
+                    </div>
+
+                    <div className={`p-3.5 rounded-2xl border flex items-center justify-between ${
+                      (selectedUser.contributions?.some((c: any) => c.issuedCheque) || selectedUser.issuedCheque)
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700 dark:text-emerald-400'
+                        : 'bg-amber-500/10 border-amber-500/20 text-amber-700 dark:text-amber-400'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <Landmark className="w-4 h-4 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold">Company Issued Cheque</p>
+                          <p className="text-[10px] opacity-80">
+                            {(selectedUser.contributions?.some((c: any) => c.issuedCheque) || selectedUser.issuedCheque)
+                              ? 'Security Cheque Issued'
+                              : 'Not Issued / Pending'}
+                          </p>
+                        </div>
+                      </div>
+                      {(selectedUser.contributions?.some((c: any) => c.issuedCheque) || selectedUser.issuedCheque) ? (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-emerald-500/20 border border-emerald-500/30 uppercase">Yes (Issued)</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md text-[9px] font-extrabold bg-amber-500/20 border border-amber-500/30 uppercase">No (Pending)</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
                   <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest border-b border-border-subtle pb-1">Contributions Registry</h4>
                   {selectedUser.contributions && selectedUser.contributions.length > 0 ? (
                     <div className="space-y-2">
                       {selectedUser.contributions.map((c: any) => (
-                        <div key={c.id} className="p-3.5 border border-border-subtle rounded-2xl flex justify-between items-center text-xs bg-white dark:bg-card">
+                        <div key={c.id} className="p-3.5 border border-border-subtle rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs bg-white dark:bg-card">
                           <div>
-                            <span className="font-extrabold text-gray-900 dark:text-white">${Number(c.amount).toLocaleString()}</span>
-                            <span className="text-gray-300 dark:text-gray-700 mx-2">|</span>
-                            <span className="text-muted-foreground font-semibold mr-2">{c.mode}</span>
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
-                              c.status === 'APPROVED' 
-                                ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900/40' 
-                                : c.status === 'REJECTED' 
-                                ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/40' 
-                                : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
-                            }`}>
-                              {c.status || 'APPROVED'}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-gray-900 dark:text-white">${Number(c.amount).toLocaleString()}</span>
+                              <span className="text-gray-300 dark:text-gray-700">|</span>
+                              <span className="text-muted-foreground font-semibold">{c.mode}</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${
+                                c.status === 'APPROVED' 
+                                  ? 'bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border-green-100 dark:border-green-900/40' 
+                                  : c.status === 'REJECTED' 
+                                  ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/40' 
+                                  : 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
+                              }`}>
+                                {c.status || 'APPROVED'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
+                                c.issuedAgreement
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-muted text-muted-foreground border-border-subtle'
+                              }`}>
+                                Agreement: {c.issuedAgreement ? 'Issued ✓' : 'Not Issued'}
+                              </span>
+                              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${
+                                c.issuedCheque
+                                  ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
+                                  : 'bg-muted text-muted-foreground border-border-subtle'
+                              }`}>
+                                Cheque: {c.issuedCheque ? 'Issued ✓' : 'Not Issued'}
+                              </span>
+                            </div>
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-muted-foreground font-semibold">{new Date(c.date).toLocaleDateString()}</span>

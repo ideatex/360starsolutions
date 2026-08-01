@@ -22,9 +22,30 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().token;
+  let token = useAuthStore.getState().token;
+  if (!token && typeof window !== 'undefined') {
+    try {
+      const stored = localStorage.getItem('auth-storage');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        token = parsed?.state?.token || null;
+      }
+    } catch (e) {
+      console.error('Error reading token from localStorage', e);
+    }
+  }
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 && typeof window !== 'undefined') {
+      useAuthStore.getState().logout();
+    }
+    return Promise.reject(error);
+  }
+);

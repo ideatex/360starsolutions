@@ -17,6 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 const userLinks = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
   { name: 'Referral Tree', href: '/dashboard/referral-tree', icon: Network },
   { name: 'Referral Progress', href: '/dashboard/referral-progress', icon: Target },
   { name: 'Profit Sharing', href: '/dashboard/profit-sharing', icon: PieChart },

@@ -1,6 +1,7 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { AuditService } from '@server/engines/audit/audit.service';
+import { MessagingGateway } from '@server/messaging/messaging.gateway';
 import { Cron } from '@nestjs/schedule';
 
 @Injectable()
@@ -8,7 +9,8 @@ export class AnnouncementsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
-  ) {}
+    private readonly messagingGateway: MessagingGateway,
+  ) { }
 
   async createAnnouncement(data: any, adminId: string) {
     const isScheduled = data.scheduledFor && new Date(data.scheduledFor) > new Date();
@@ -78,7 +80,7 @@ export class AnnouncementsService {
     return announcements.filter(a => {
       if (a.audience === 'EVERYONE') return true;
       if (a.audience === 'ADMINS') return userRole === 'ADMIN' || userRole === 'SUPER_ADMIN';
-      if (a.audience === 'SHAREHOLDERS') return true;
+      if (a.audience === 'SHAREHOLDERS') return userRole === 'SHAREHOLDER';
       if (a.audience === 'INDIVIDUAL_USER' || a.audience === 'TARGETED_SHAREHOLDERS') {
         if (!a.targetUserId) return false;
         let targetIds: string[] = [];
@@ -91,7 +93,11 @@ export class AnnouncementsService {
         } catch {
           targetIds = [a.targetUserId.trim()];
         }
-        return targetIds.includes(shareholderId) || (customShareholderId ? targetIds.includes(customShareholderId) : false);
+        const normalizedTargets = targetIds.map(t => String(t).trim().toLowerCase());
+        const matchId = shareholderId.toLowerCase();
+        const matchCustomId = customShareholderId ? customShareholderId.toLowerCase() : null;
+
+        return normalizedTargets.includes(matchId) || (matchCustomId ? normalizedTargets.includes(matchCustomId) : false);
       }
       return true;
     });
@@ -135,7 +141,7 @@ export class AnnouncementsService {
       newValue: JSON.stringify(updated),
     });
 
-    if (announcement.status !== 'PUBLISHED' && updated.status === 'PUBLISHED') {
+    if (updated.status === 'PUBLISHED') {
       await this.dispatchNotificationsForAnnouncement(updated);
     }
 
@@ -148,6 +154,7 @@ export class AnnouncementsService {
         announcementId_shareholderId: { announcementId, shareholderId },
       },
     });
+
     if (!existing) {
       await this.prisma.announcementRead.create({
         data: { announcementId, shareholderId },
@@ -156,8 +163,7 @@ export class AnnouncementsService {
       const notification = await this.prisma.notification.findFirst({
         where: {
           shareholderId,
-          title: 'New Announcement',
-          message: { contains: announcementId }, // Or matching by message content
+          message: { contains: announcementId },
         },
       });
       if (notification) {
@@ -215,46 +221,63 @@ export class AnnouncementsService {
   }
 
   private async dispatchNotificationsForAnnouncement(announcement: any) {
-    // Determine shareholder list based on audience
     let shareholders: any[] = [];
+
     if (announcement.audience === 'EVERYONE') {
-      shareholders = await this.prisma.shareholder.findMany({ where: { status: 'ACTIVE' }, select: { id: true } });
+      shareholders = await this.prisma.shareholder.findMany({
+        where: { status: { notIn: ['DELETED', 'AUTO_ARCHIVED'] } },
+        select: { id: true, shareholderId: true },
+      });
     } else if (announcement.audience === 'ADMINS') {
       shareholders = await this.prisma.shareholder.findMany({
         where: {
           role: { in: ['ADMIN', 'SUPER_ADMIN'] },
-          status: 'ACTIVE',
+          status: { notIn: ['DELETED', 'AUTO_ARCHIVED'] },
         },
-        select: { id: true },
+        select: { id: true, shareholderId: true },
       });
     } else if (announcement.audience === 'SHAREHOLDERS') {
       shareholders = await this.prisma.shareholder.findMany({
-        where: { role: 'SHAREHOLDER', status: 'ACTIVE' },
-        select: { id: true },
+        where: {
+          role: 'SHAREHOLDER',
+          status: { notIn: ['DELETED', 'AUTO_ARCHIVED'] },
+        },
+        select: { id: true, shareholderId: true },
       });
     } else if ((announcement.audience === 'INDIVIDUAL_USER' || announcement.audience === 'TARGETED_SHAREHOLDERS') && announcement.targetUserId) {
-      let targetIds: string[] = [];
+      let rawTargetIds: string[] = [];
       try {
         if (announcement.targetUserId.trim().startsWith('[')) {
-          targetIds = JSON.parse(announcement.targetUserId);
+          rawTargetIds = JSON.parse(announcement.targetUserId);
         } else {
-          targetIds = announcement.targetUserId.split(',').map((s: string) => s.trim());
+          rawTargetIds = announcement.targetUserId.split(',').map((s: string) => s.trim());
         }
       } catch {
-        targetIds = [announcement.targetUserId.trim()];
+        rawTargetIds = [announcement.targetUserId.trim()];
       }
-      targetIds = targetIds.filter(Boolean);
+      rawTargetIds = rawTargetIds.map(s => String(s).trim()).filter(Boolean);
 
-      if (targetIds.length > 0) {
+      if (rawTargetIds.length > 0) {
+        const uppercaseTargets = rawTargetIds.map(t => t.toUpperCase());
+        const lowercaseTargets = rawTargetIds.map(t => t.toLowerCase());
+        const allTargets = Array.from(new Set([...rawTargetIds, ...uppercaseTargets, ...lowercaseTargets]));
+
+        const orConditions: any[] = [
+          { id: { in: allTargets } },
+          { shareholderId: { in: allTargets } }
+        ];
+
+        for (const target of rawTargetIds) {
+          orConditions.push({ id: { equals: target, mode: 'insensitive' } });
+          orConditions.push({ shareholderId: { equals: target, mode: 'insensitive' } });
+        }
+
         shareholders = await this.prisma.shareholder.findMany({
           where: {
-            OR: [
-              { id: { in: targetIds } },
-              { shareholderId: { in: targetIds } },
-            ],
-            status: 'ACTIVE',
+            OR: orConditions,
+            status: { notIn: ['DELETED'] },
           },
-          select: { id: true },
+          select: { id: true, shareholderId: true },
         });
       }
     }
@@ -265,19 +288,38 @@ export class AnnouncementsService {
       LOW: 'LOW',
     };
 
-    // Bulk create notifications
-    const notificationData = shareholders.map(u => ({
-      shareholderId: u.id,
-      title: announcement.title,
-      message: `${announcement.content.substring(0, 100)}... (Ref: ${announcement.id})`,
-      priority: priorityMap[announcement.priority] || 'MEDIUM',
-      type: 'SYSTEM' as any,
-    }));
+    const refTag = `(Ref: ${announcement.id})`;
 
-    if (notificationData.length > 0) {
-      await this.prisma.notification.createMany({
-        data: notificationData,
+    for (const u of shareholders) {
+      // Check if notification already exists for this shareholder and announcement
+      const existing = await this.prisma.notification.findFirst({
+        where: {
+          shareholderId: u.id,
+          message: { contains: refTag },
+        },
       });
+
+      if (!existing) {
+        const notif = await this.prisma.notification.create({
+          data: {
+            shareholderId: u.id,
+            title: announcement.title,
+            message: `${announcement.content} ${refTag}`,
+            priority: priorityMap[announcement.priority] || 'MEDIUM',
+            type: 'SYSTEM',
+          },
+        });
+
+        // Notify client real-time via WebSocket
+        if (this.messagingGateway) {
+          this.messagingGateway.sendMessageToUser(u.id, 'notification:received', notif);
+        }
+      }
+    }
+
+    // Broadcast global notification update event to all connected sockets
+    if (this.messagingGateway && this.messagingGateway.server) {
+      this.messagingGateway.server.emit('notification:received', { announcementId: announcement.id });
     }
   }
 }

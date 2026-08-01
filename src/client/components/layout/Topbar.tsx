@@ -136,6 +136,8 @@ export default function Topbar() {
 
   const breadcrumbs = getBreadcrumbs();
 
+  const [selectedNotifForModal, setSelectedNotifForModal] = useState<any>(null);
+
   return (
     <header className="h-16 bg-white/80 dark:bg-sidebar/80 backdrop-blur-md border-b border-border-subtle flex items-center justify-between px-6 sticky top-0 z-20">
       {/* Breadcrumbs / Mobile trigger */}
@@ -181,7 +183,7 @@ export default function Topbar() {
             className="w-full pl-9 pr-8 py-1.5 bg-muted/50 focus:bg-white dark:focus:bg-card border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-primary placeholder:text-muted-foreground transition-all"
           />
           <span className="absolute right-2.5 top-2 px-1 py-0.5 rounded border border-border-subtle bg-white dark:bg-card text-[9px] font-mono text-muted-foreground select-none">
-            âŒ˜K
+            Ctrl+K
           </span>
         </div>
 
@@ -223,7 +225,7 @@ export default function Topbar() {
                 initial={{ opacity: 0, y: 12, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 12, scale: 0.96 }}
-                className="absolute right-0 top-12 w-80 bg-white dark:bg-card border border-border-subtle shadow-premium rounded-3xl overflow-hidden z-50 py-2"
+                className="absolute right-0 top-12 w-80 sm:w-96 bg-white dark:bg-card border border-border-subtle shadow-premium rounded-3xl overflow-hidden z-50 py-2"
               >
                 <div className="flex justify-between items-center px-4 py-2 border-b border-border-subtle bg-muted/20">
                   <span className="font-extrabold text-gray-900 dark:text-white text-xs">Notifications ({unreadCount})</span>
@@ -246,7 +248,7 @@ export default function Topbar() {
                   </div>
                 </div>
                 
-                <div className="max-h-64 overflow-y-auto divide-y divide-border-subtle custom-scrollbar">
+                <div className="max-h-72 overflow-y-auto divide-y divide-border-subtle custom-scrollbar">
                   {isNotificationsLoading ? (
                     <div className="py-8 space-y-3 px-4">
                       <div className="h-3 bg-muted rounded-full w-2/3 animate-pulse"></div>
@@ -269,10 +271,17 @@ export default function Topbar() {
                       >
                         <div 
                           className="space-y-0.5 flex-1 cursor-pointer" 
-                          onClick={() => !n.isRead && readMutation.mutate(n.id)}
+                          onClick={() => {
+                            if (!n.isRead) readMutation.mutate(n.id);
+                            setSelectedNotifForModal(n);
+                            setIsOpen(false);
+                          }}
                         >
-                          <p className={`text-[11px] leading-snug ${!n.isRead ? 'font-extrabold text-gray-900 dark:text-white' : 'text-muted-foreground'}`}>{n.title}</p>
-                          <p className="text-[10px] text-muted-foreground/90 dark:text-gray-400 leading-normal">{n.message}</p>
+                          <div className="flex items-center justify-between gap-1">
+                            <p className={`text-[11px] leading-snug line-clamp-1 ${!n.isRead ? 'font-extrabold text-gray-900 dark:text-white' : 'text-muted-foreground'}`}>{n.title}</p>
+                            <span className="text-[9px] text-brand-primary font-bold shrink-0 hover:underline">Full View</span>
+                          </div>
+                          <p className="text-[10px] text-muted-foreground/90 dark:text-gray-400 leading-normal line-clamp-2">{n.message}</p>
                           <p className="text-[8px] text-muted-foreground/60 font-mono mt-1">{new Date(n.createdAt).toLocaleDateString()} at {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                         </div>
                         <div className="flex items-center gap-1 shrink-0 mt-0.5">
@@ -292,10 +301,88 @@ export default function Topbar() {
                     ))
                   )}
                 </div>
+
+                <Link
+                  href="/dashboard/announcements"
+                  onClick={() => setIsOpen(false)}
+                  className="block text-center py-2 text-xs font-bold text-brand-primary border-t border-border-subtle bg-muted/20 hover:bg-muted/40 transition-all"
+                >
+                  View All Announcements
+                </Link>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
+
+        {/* Notification / Announcement Full View Modal */}
+        <AnimatePresence>
+          {selectedNotifForModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white dark:bg-card border border-border-subtle rounded-3xl p-6 max-w-lg w-full shadow-2xl relative space-y-4 max-h-[85vh] flex flex-col"
+              >
+                <div className="flex justify-between items-start border-b border-border-subtle pb-3 shrink-0">
+                  <div>
+                    <span className={`inline-block text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full mb-1.5 ${
+                      selectedNotifForModal.priority === 'HIGH' 
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20' 
+                        : selectedNotifForModal.priority === 'MEDIUM' 
+                        ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20' 
+                        : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                    }`}>
+                      {selectedNotifForModal.priority || 'NORMAL'} PRIORITY
+                    </span>
+                    <h3 className="text-base font-bold text-foreground leading-snug">{selectedNotifForModal.title}</h3>
+                    <p className="text-[10px] text-muted-foreground font-mono mt-1">
+                      Received: {new Date(selectedNotifForModal.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date(selectedNotifForModal.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setSelectedNotifForModal(null)}
+                    className="p-1.5 text-muted-foreground hover:text-foreground rounded-xl hover:bg-muted dark:hover:bg-secondary transition-all cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Full Message Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 py-2 text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap bg-muted/10 p-4 rounded-2xl border border-border-subtle">
+                  {selectedNotifForModal.message}
+                </div>
+
+                <div className="flex items-center justify-between border-t border-border-subtle pt-3 shrink-0">
+                  <Link
+                    href="/dashboard/announcements"
+                    onClick={() => setSelectedNotifForModal(null)}
+                    className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1"
+                  >
+                    View All Announcements <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        archiveMutation.mutate(selectedNotifForModal.id);
+                        setSelectedNotifForModal(null);
+                      }}
+                      className="px-3 py-1.5 rounded-xl border border-border-subtle text-xs font-semibold hover:bg-muted dark:hover:bg-secondary transition-all cursor-pointer"
+                    >
+                      Archive
+                    </button>
+                    <button
+                      onClick={() => setSelectedNotifForModal(null)}
+                      className="px-4 py-1.5 bg-brand-primary text-white rounded-xl text-xs font-bold hover:bg-brand-primary/90 transition-all shadow-sm cursor-pointer"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block"></div>
 
