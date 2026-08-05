@@ -37,6 +37,7 @@ export class BusinessConfigService implements OnModuleInit {
           systemDefaults: {
             daily_profit_rate: "0.0033",
             payout_cycle_days: 30,
+            payout_cycle_dates: [15, "LAST_DAY"],
           },
           futureBusinessParameters: {},
           createdById: 'system',

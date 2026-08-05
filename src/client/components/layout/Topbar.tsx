@@ -41,7 +41,12 @@ export default function Topbar() {
     const token = useAuthStore.getState().token;
     if (!token) return;
 
-    const socket = io('http://localhost:3002', {
+    const envUrl = process.env.NEXT_PUBLIC_API_URL;
+    const baseUrl = (envUrl && !envUrl.includes('localhost'))
+      ? envUrl.replace('/api/v1', '') 
+      : (typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3002');
+      
+    const socket = io(baseUrl, {
       auth: { token },
       query: { token },
     });

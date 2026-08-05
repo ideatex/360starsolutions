@@ -27,7 +27,8 @@ const filesToCopy = [
   'package-lock.json',
   'prisma',
   'dist',
-  'seed.js'
+  'seed.js',
+  'seed-config.js'
 ];
 
 filesToCopy.forEach((item) => {

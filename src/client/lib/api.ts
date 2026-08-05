@@ -2,7 +2,13 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const getBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3002/api/v1';
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (typeof window !== 'undefined') {
+    if (!envUrl || envUrl.includes('localhost')) {
+      return '/api/v1';
+    }
+  }
+  return envUrl || 'http://localhost:3002/api/v1';
 };
 
 export const api = axios.create({

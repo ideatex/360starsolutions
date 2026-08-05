@@ -280,7 +280,7 @@ export default function AdminPayoutsPage() {
 
         <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Investor Profits</h3>
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Contribution Fund Earnings</h3>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
               ${Number(shareholderPayouts?.summary?.totalProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
@@ -292,7 +292,7 @@ export default function AdminPayoutsPage() {
 
         <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Referral Commissions</h3>
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Referral Earnings</h3>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
               ${Number(shareholderPayouts?.summary?.totalCommission || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
@@ -390,9 +390,9 @@ export default function AdminPayoutsPage() {
                 <tr>
                   <th className="px-6 py-4">Shareholder</th>
                   <th className="px-6 py-4">Bank Account & IFSC</th>
-                  <th className="px-6 py-4 text-right">Investor Profit</th>
-                  <th className="px-6 py-4 text-right">Referral Commission</th>
-                  <th className="px-6 py-4 text-right">Total Payout</th>
+                  <th className="px-6 py-4 text-right">Contribution Fund Earnings</th>
+                  <th className="px-6 py-4 text-right">Referral Earnings</th>
+                  <th className="px-6 py-4 text-right">Total Earnings</th>
                   <th className="px-6 py-4">Cycle Range</th>
                   <th className="px-6 py-4">Status</th>
                 </tr>
@@ -608,9 +608,9 @@ export default function AdminPayoutsPage() {
                                       <tr>
                                         <th className="px-4 py-3">Shareholder</th>
                                         <th className="px-4 py-3">Bank Details</th>
-                                        <th className="px-4 py-3 text-right">Profit Amount</th>
-                                        <th className="px-4 py-3 text-right">Commission Amount</th>
-                                        <th className="px-4 py-3 text-right">Total Payout</th>
+                                        <th className="px-4 py-3 text-right">Contribution Fund Earnings</th>
+                                        <th className="px-4 py-3 text-right">Referral Earnings</th>
+                                        <th className="px-4 py-3 text-right">Total Earnings</th>
                                         <th className="px-4 py-3">Status</th>
                                       </tr>
                                     </thead>

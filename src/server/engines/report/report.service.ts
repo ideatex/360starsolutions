@@ -1,4 +1,4 @@
-﻿import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { convertToCSV } from '@server/engines/report/reports-export.utility';
 import { Prisma, UserStatus } from '@prisma/client';
@@ -62,6 +62,13 @@ export class ReportService {
     const where: Prisma.ShareholderWhereInput = {};
     
     if (filters.status) where.status = filters.status as UserStatus;
+    
+    // Only fetch SHAREHOLDERs by default in the admin users dashboard, unless they filter by a specific role
+    if (filters.role) {
+      where.role = filters.role;
+    } else {
+      where.role = 'SHAREHOLDER';
+    }
 
     if (filters.month) {
       const [y, m] = filters.month.split('-');
@@ -152,7 +159,7 @@ export class ReportService {
 
     let result = investments.map(i => ({
       id: i.id,
-      usershareholderId: i.shareholder.shareholderId,
+      userShareholderId: i.shareholder.shareholderId,
       userName: i.shareholder.name,
       amount: Number(i.amount),
       dailyProfitRate: Number(i.dailyProfitRate),
@@ -191,12 +198,13 @@ export class ReportService {
 
     const profits = await this.prisma.profitLedger.findMany({
       where,
-      include: { shareholder: { select: { shareholderId: true } }, investment: { select: { amount: true } } },
+      include: { shareholder: { select: { shareholderId: true, name: true } }, investment: { select: { amount: true } } },
     });
 
     let result = profits.map(p => ({
       id: p.id,
-      usershareholderId: p.shareholder.shareholderId,
+      userShareholderId: p.shareholder.shareholderId,
+      userName: p.shareholder.name,
       investmentAmount: Number(p.investment.amount),
       cycleStart: p.cycleStart,
       cycleEnd: p.cycleEnd,
@@ -236,15 +244,18 @@ export class ReportService {
     const commissions = await this.prisma.commissionLedger.findMany({
       where,
       include: {
-        shareholder: { select: { shareholderId: true } },
-        fromInvestment: { include: { shareholder: { select: { shareholderId: true } } } },
+        shareholder: { select: { shareholderId: true, name: true } },
+        sourceShareholder: { select: { shareholderId: true, name: true } },
+        fromInvestment: { include: { shareholder: { select: { shareholderId: true, name: true } } } },
       },
     });
 
     let result = commissions.map(c => ({
       id: c.id,
-      recipientshareholderId: c.shareholder.shareholderId,
-      sourceshareholderId: c.fromInvestment?.shareholder?.shareholderId || 'N/A',
+      recipientShareholderId: c.shareholder.shareholderId,
+      recipientName: c.shareholder.name,
+      sourceShareholderId: c.sourceShareholder?.shareholderId || c.fromInvestment?.shareholder?.shareholderId || 'N/A',
+      sourceName: c.sourceShareholder?.name || c.fromInvestment?.shareholder?.name || 'N/A',
       investmentAmount: c.fromInvestment ? Number(c.fromInvestment.amount) : 0,
       level: c.level,
       rate: Number(c.rate),

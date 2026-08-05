@@ -427,7 +427,10 @@ export default function AdminDashboardPage() {
                     {reportData.map((r: any) => (
                       <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
                         <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
-                        <td className="px-6 py-4">{r.userShareholderId}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-foreground">{r.userName || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.userShareholderId}</div>
+                        </td>
                         <td className="px-6 py-4 font-semibold">${r.amount.toFixed(2)}</td>
                         <td className="px-6 py-4 font-semibold text-brand-primary">{(r.dailyProfitRate * 100).toFixed(2)}%</td>
                         <td className="px-6 py-4">
@@ -456,6 +459,9 @@ export default function AdminDashboardPage() {
                       <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('userShareholderId')}>
                         Shareholder <SortIcon field="userShareholderId" />
                       </th>
+                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('investmentAmount')}>
+                        Investment <SortIcon field="investmentAmount" />
+                      </th>
                       <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('cycleStart')}>
                         Cycle Period <SortIcon field="cycleStart" />
                       </th>
@@ -471,7 +477,11 @@ export default function AdminDashboardPage() {
                     {reportData.map((r: any) => (
                       <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
                         <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
-                        <td className="px-6 py-4">{r.userShareholderId}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-foreground">{r.userName || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.userShareholderId}</div>
+                        </td>
+                        <td className="px-6 py-4 font-semibold">${r.investmentAmount?.toFixed(2) || '0.00'}</td>
                         <td className="px-6 py-4 text-muted-foreground">
                           {new Date(r.cycleStart).toLocaleDateString()} - {new Date(r.cycleEnd).toLocaleDateString()}
                         </td>
@@ -508,8 +518,14 @@ export default function AdminDashboardPage() {
                     {reportData.map((r: any) => (
                       <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
                         <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
-                        <td className="px-6 py-4">{r.recipientShareholderId}</td>
-                        <td className="px-6 py-4">{r.sourceShareholderId}</td>
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-foreground">{r.recipientName || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.recipientShareholderId}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-semibold text-foreground">{r.sourceName || 'N/A'}</div>
+                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.sourceShareholderId}</div>
+                        </td>
                         <td className="px-6 py-4">
                           <span className="bg-brand-info/10 text-brand-info border border-brand-info/20 text-xs font-semibold px-2.5 py-1 rounded-md uppercase">
                             Level {r.level}

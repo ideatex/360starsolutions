@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, UserPlus, ShieldAlert, Edit3, X, Check, Eye, Trash2, Key, 
-  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus
+  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus, FileText
 } from 'lucide-react';
 import { 
   getIndianStates, 
@@ -53,7 +53,7 @@ export default function AdminUsersPage() {
   const { confirm } = useConfirm();
 
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('SHAREHOLDER');
   const [statusFilter, setStatusFilter] = useState('');
   const [page, setPage] = useState(1);
 

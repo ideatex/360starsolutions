@@ -318,8 +318,10 @@ export class InvestorsService {
     const maxDepth = config.maxReferralLevels;
 
     const levelVolumes: { [level: number]: number } = {};
+    const levelContributors: { [level: number]: { shareholderId: string, volume: number }[] } = {};
     for (let l = 1; l <= maxDepth; l++) {
       levelVolumes[l] = 0;
+      levelContributors[l] = [];
     }
 
     let currentParentIds = [shareholderId];
@@ -342,7 +344,10 @@ export class InvestorsService {
 
       children.forEach((d) => {
         const sum = d.contributions.reduce((acc, c) => acc + Number(c.amount), 0);
-        levelVolumes[currentDepth] += sum;
+        if (sum > 0) {
+          levelVolumes[currentDepth] += sum;
+          levelContributors[currentDepth].push({ shareholderId: d.id, volume: sum });
+        }
       });
 
       currentParentIds = children.map((c) => c.id);
@@ -353,7 +358,7 @@ export class InvestorsService {
     const results = Object.keys(levelVolumes).map((lvl) => {
       const level = parseInt(lvl);
       const totalVolume = levelVolumes[level];
-      return { level, totalVolume };
+      return { level, totalVolume, contributors: levelContributors[level] };
     });
 
     // Write to BusinessVolume cache table
@@ -603,8 +608,10 @@ export class InvestorsService {
       // Calculate volumes for this shareholder
       const volumes = await this.getBusinessVolume(shareholderId);
       const volumeMap = new Map<number, number>();
+      const contributorsMap = new Map<number, { shareholderId: string, volume: number }[]>();
       for (const v of volumes) {
         volumeMap.set(v.level, v.totalVolume);
+        contributorsMap.set(v.level, v.contributors || []);
       }
 
       let sequenceTerminated = false;
@@ -676,17 +683,25 @@ export class InvestorsService {
             },
           });
 
-          // Also log a direct commission into the CommissionLedger table for audit/payout batch integration
-          await this.prisma.commissionLedger.create({
-            data: {
-              shareholderId,
-              fromInvestmentId: null, // Dynamic tree commissions are aggregates, not linked to a single investment
-              level,
-              rate: new Prisma.Decimal(pct),
-              amount: new Prisma.Decimal(profitAmount),
-              status: 'CONFIRMED',
-            },
-          });
+          // Also log direct commissions into the CommissionLedger table for audit/payout batch integration
+          // Splitting the commission for each contributing shareholder
+          const contributors = contributorsMap.get(level) || [];
+          for (const contributor of contributors) {
+            const contributorProfit = contributor.volume * pct;
+            if (contributorProfit > 0) {
+              await this.prisma.commissionLedger.create({
+                data: {
+                  shareholderId,
+                  fromInvestmentId: null,
+                  sourceShareholderId: contributor.shareholderId,
+                  level,
+                  rate: new Prisma.Decimal(pct),
+                  amount: new Prisma.Decimal(contributorProfit),
+                  status: 'CONFIRMED',
+                },
+              });
+            }
+          }
 
           // Record distribution in Audit Log
           await this.prisma.auditLog.create({

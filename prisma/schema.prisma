@@ -100,6 +100,7 @@ model Shareholder {
   contributionSummary  ContributionSummary?
   referrerRelations    ReferralRelationship[] @relation("ReferrerRel")
   referredRelation     ReferralRelationship?  @relation("ReferredRel")
+  commissionsSourced   CommissionLedger[]     @relation("CommissionSource")
 
   @@map("User")
   @@index([parentId])
@@ -161,6 +162,9 @@ model CommissionLedger {
   payoutBatch      PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
   
   createdAt        DateTime @default(now())
+
+  sourceShareholderId String?
+  sourceShareholder   Shareholder? @relation("CommissionSource", fields: [sourceShareholderId], references: [id])
 
   @@index([shareholderId])
   @@index([fromInvestmentId])

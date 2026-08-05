@@ -149,103 +149,34 @@ export class PayoutService {
         cycleStart,
         cycleEnd,
         status: 'PENDING',
-        totalAmount: 0 // Will update after details are aggregated
+        totalAmount: 0
       }
     });
 
     // Run the dynamic MLM profit sharing calculation cycle for active investors.
     await this.investorsService.runProfitSharingCalculationCycle(batch.id);
 
-    // Fetch active BusinessConfiguration to determine daily percentage rate
-    const latestConfig = await this.prisma.businessConfiguration.findFirst({
-      orderBy: { version: 'desc' }
-    });
-
-    // Determine daily percentage rate
-    let dailyPercentage = 0.0033; // Default 0.33% per day (~10% per 30-day cycle)
-    if (latestConfig?.systemDefaults && (latestConfig.systemDefaults as any).daily_profit_rate) {
-      dailyPercentage = Number((latestConfig.systemDefaults as any).daily_profit_rate);
-    } else if (latestConfig?.profitSharingPercentage) {
-      const pct = Number(latestConfig.profitSharingPercentage);
-      dailyPercentage = pct > 1 ? (pct / 100) / 30 : pct > 0.05 ? pct / 30 : pct;
-    }
-
-    // Query all shareholders with APPROVED contributions
-    const shareholdersWithContributions = await this.prisma.shareholder.findMany({
-      where: {
-        status: { notIn: ['DELETED'] },
-        contributions: {
-          some: {
-            status: 'APPROVED',
-            date: { lte: cycleEnd }
-          }
-        }
-      },
-      include: {
-        contributions: {
-          where: {
-            status: 'APPROVED',
-            date: { lte: cycleEnd }
-          }
-        },
-        investments: {
-          where: {
-            status: 'ACTIVE'
-          }
-        }
-      }
-    });
-
     const userTotals = new Map<string, { profit: number, commission: number }>();
 
-    // Calculate individual shareholder payouts:
-    // Formula: ((End of cycle date - contribution fund date in days) * (Contribution Fund Amount) * (calculated daily percentage))
-    for (const sh of shareholdersWithContributions) {
-      let totalCalculatedProfit = 0;
-
-      for (const c of sh.contributions) {
-        const contribDate = new Date(c.date);
-
-        // Calculate days difference: (End of cycle date - contribution fund date)
-        const timeDiffMs = cycleEnd.getTime() - contribDate.getTime();
-        const days = Math.max(0, Math.floor(timeDiffMs / (1000 * 60 * 60 * 24)));
-
-        if (days > 0) {
-          // Check if shareholder has specific dailyProfitRate on active investment
-          let rate = dailyPercentage;
-          if (sh.investments && sh.investments.length > 0 && sh.investments[0].dailyProfitRate) {
-            rate = Number(sh.investments[0].dailyProfitRate);
-          }
-
-          const fundAmount = Number(c.amount);
-          const contributionProfit = days * fundAmount * rate;
-          totalCalculatedProfit += contributionProfit;
-
-          // Record entry in ProfitLedger table
-          await this.prisma.profitLedger.create({
-            data: {
-              shareholderId: sh.id,
-              investmentId: sh.investments?.[0]?.id || null,
-              cycleStart: contribDate > cycleStart ? contribDate : cycleStart,
-              cycleEnd,
-              eligibleDays: days,
-              amount: new Prisma.Decimal(contributionProfit),
-              status: 'PROCESSED',
-              payoutBatchId: batch.id
-            }
-          });
-        }
+    // Query unassigned profits that are PENDING
+    const profits = await this.prisma.profitLedger.findMany({
+      where: {
+        payoutBatchId: null,
+        status: 'PENDING',
+        cycleEnd: { lte: cycleEnd }
       }
+    });
 
-      if (totalCalculatedProfit > 0) {
-        userTotals.set(sh.id, { profit: totalCalculatedProfit, commission: 0 });
-      }
+    for (const p of profits) {
+      const current = userTotals.get(p.shareholderId) || { profit: 0, commission: 0 };
+      current.profit += Number(p.amount);
+      userTotals.set(p.shareholderId, current);
     }
 
     // Query unassigned commissions that are in eligible status (PENDING or CONFIRMED)
     const commissions = await this.prisma.commissionLedger.findMany({
       where: {
-        createdAt: { gte: cycleStart, lte: cycleEnd },
+        createdAt: { lte: cycleEnd },
         payoutBatchId: null,
         status: { in: ['PENDING', 'CONFIRMED'] }
       }
@@ -278,7 +209,14 @@ export class PayoutService {
       }
     }
 
-    // Link processed commissions to this batch to prevent duplicate inclusion in future batches
+    // Link processed ledgers to this batch to prevent duplicate inclusion in future batches
+    if (profits.length > 0) {
+      await this.prisma.profitLedger.updateMany({
+        where: { id: { in: profits.map(p => p.id) } },
+        data: { payoutBatchId: batch.id, status: 'PROCESSED' }
+      });
+    }
+
     if (commissions.length > 0) {
       await this.prisma.commissionLedger.updateMany({
         where: { id: { in: commissions.map(c => c.id) } },
@@ -296,7 +234,7 @@ export class PayoutService {
       action: 'GENERATE_PAYOUT_BATCH',
       entityType: 'PayoutBatch',
       entityId: batch.id,
-      newValue: `Total: $${batchTotal}, Shareholders: ${userTotals.size}, Formula: (cycleEnd - contributionDate) * Fund * DailyPercentage`,
+      newValue: `Total: $${batchTotal}, Shareholders: ${userTotals.size}, Formula: Aggregation`,
     });
 
     this.logger.log(`Payout Batch ${batch.id} generated with total $${batchTotal} for ${userTotals.size} individual shareholders.`);
