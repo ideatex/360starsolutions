@@ -21,12 +21,23 @@ import { FounderCmsModule } from '@server/founder-cms/founder-cms.module';
 import { MlmModule } from '@server/engines/mlm/mlm.module';
 import { InvestorsModule } from '@server/engines/investors/investors.module';
 import { ReferralProgressModule } from '@server/engines/referral-progress/referral-progress.module';
+import { WithdrawalsModule } from '@server/withdrawals/withdrawals.module';
 
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
 
 @Module({
   imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'public'),
+      serveRoot: '/',
+      exclude: ['/api/{*splat}'],
+    }),
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'src', 'client', 'public'),
+      serveRoot: '/',
+      exclude: ['/api/{*splat}'],
+    }),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'client'),
       exclude: ['/api/{*splat}'],
@@ -51,6 +62,7 @@ import { join } from 'path';
     MlmModule,
     InvestorsModule,
     ReferralProgressModule,
+    WithdrawalsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

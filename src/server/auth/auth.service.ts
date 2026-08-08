@@ -52,6 +52,12 @@ export class AuthService {
 
   async login(shareholderId: string, pass: string) {
     const searchId = (shareholderId || '').trim();
+    const cleanPass = (pass || '').trim();
+
+    if (!searchId || !cleanPass) {
+      throw new UnauthorizedException('Please enter both Shareholder ID and Password.');
+    }
+
     const shareholder = await this.prisma.shareholder.findFirst({
       where: {
         OR: [
@@ -69,7 +75,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const isPasswordValid = await bcrypt.compare(pass, shareholder.passwordHash);
+    if (shareholder.status === 'DISABLED' || shareholder.status === 'DELETED' || shareholder.status === 'BLOCKED') {
+      throw new UnauthorizedException('Account is disabled or suspended. Please contact administrator.');
+    }
+
+    const isPasswordValid = await bcrypt.compare(cleanPass, shareholder.passwordHash);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -77,7 +87,7 @@ export class AuthService {
     const payload = { sub: shareholder.id, shareholderId: shareholder.shareholderId, role: shareholder.role };
     return {
       access_token: this.jwtService.sign(payload),
-      shareholder: { id: shareholder.id, shareholderId: shareholder.shareholderId, role: shareholder.role }
+      shareholder: { id: shareholder.id, shareholderId: shareholder.shareholderId, name: shareholder.name, role: shareholder.role }
     };
   }
 

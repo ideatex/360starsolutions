@@ -3,12 +3,17 @@ import { useAuthStore } from '@/store/useAuthStore';
 
 const getBaseUrl = () => {
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (typeof window !== 'undefined') {
-    if (!envUrl || envUrl.includes('localhost')) {
-      return '/api/v1';
-    }
+  if (envUrl) {
+    return envUrl;
   }
-  return envUrl || 'http://localhost:3002/api/v1';
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3002/api/v1';
+    }
+    return '/api/v1';
+  }
+  return 'http://localhost:3002/api/v1';
 };
 
 export const api = axios.create({

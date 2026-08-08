@@ -391,14 +391,10 @@ export default function Topbar() {
 
         <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block"></div>
 
-        {/* Profile Avatars / Sign Out */}
+        {/* Profile Avatar */}
         <div className="flex items-center gap-3 select-none">
-          <div className="hidden lg:flex flex-col items-end">
-            <span className="text-xs font-bold text-gray-900 dark:text-white truncate max-w-[120px]">{shareholder?.shareholderId || 'Shareholder'}</span>
-            <span className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-widest">{shareholder?.role || 'Investor'}</span>
-          </div>
-          <div className="h-8 w-8 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary flex items-center justify-center font-extrabold text-xs select-none">
-            {shareholder?.shareholderId?.charAt(0).toUpperCase() || 'U'}
+          <div className="h-9 w-9 rounded-full bg-brand-primary/10 border border-brand-primary/20 text-brand-primary flex items-center justify-center font-extrabold text-sm select-none shadow-xs">
+            {(shareholder?.name || shareholder?.shareholderId || 'U').charAt(0).toUpperCase()}
           </div>
         </div>
       </div>

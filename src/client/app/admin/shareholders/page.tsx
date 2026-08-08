@@ -9,8 +9,9 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, UserPlus, ShieldAlert, Edit3, X, Check, Eye, Trash2, Key, 
-  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus, FileText
+  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus, FileText, FileSpreadsheet
 } from 'lucide-react';
+import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
 import { 
   getIndianStates, 
   getDistrictsByState, 
@@ -459,6 +460,54 @@ export default function AdminUsersPage() {
     }
   };
 
+  const handleExportShareholdersCSV = () => {
+    const list = usersData?.users || [];
+    if (list.length === 0) {
+      toast({ title: "No Data", description: "No shareholders available to export.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'Shareholder ID', key: 'shareholderId' },
+      { header: 'Name', key: 'name' },
+      { header: 'Phone', key: 'phone' },
+      { header: 'Role', key: 'role' },
+      { header: 'Status', key: 'status' },
+      { header: 'Referral Code', key: 'referralCode' },
+      { header: 'Bank Name', key: 'bankName' },
+      { header: 'Bank Account', key: 'bankAccountNumber' },
+      { header: 'IFSC Code', key: 'bankIfsc' },
+    ];
+    exportToCSV('shareholders_directory', columns, list);
+    toast({ title: "CSV Downloaded", description: "Exported shareholder directory to CSV.", type: "success" });
+  };
+
+  const handleExportShareholdersPDF = () => {
+    const list = usersData?.users || [];
+    if (list.length === 0) {
+      toast({ title: "No Data", description: "No shareholders available to export.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'ID', key: 'shareholderId' },
+      { header: 'Name', key: 'name' },
+      { header: 'Phone', key: 'phone', formatter: (v) => v || '-' },
+      { header: 'Role', key: 'role' },
+      { header: 'Status', key: 'status' },
+      { header: 'Bank Name', key: 'bankName', formatter: (v) => v || '-' },
+      { header: 'Account No.', key: 'bankAccountNumber', formatter: (v) => v || '-' },
+      { header: 'IFSC Code', key: 'bankIfsc', formatter: (v) => v || '-' },
+    ];
+    exportToPDF(
+      'shareholders_directory',
+      'Shareholder Directory Report',
+      `Filter: ${roleFilter || 'All Roles'} | ${statusFilter || 'All Statuses'}`,
+      columns,
+      list,
+      [{ label: 'Total Shareholders', value: list.length }]
+    );
+    toast({ title: "PDF Generated", description: "Opened printable shareholder report.", type: "success" });
+  };
+
   return (
     <div className="space-y-8 max-w-7xl mx-auto">
       {/* Header */}
@@ -467,12 +516,26 @@ export default function AdminUsersPage() {
           <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">Shareholder Directory</h1>
           <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Manage shareholder lifecycle coordinates, bank details, and network links.</p>
         </div>
-        <button
-          onClick={() => setIsCreateOpen(true)}
-          className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
-        >
-          <UserPlus size={14} /> Creation Wizard
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={handleExportShareholdersCSV}
+            className="bg-brand-primary hover:bg-brand-primary/90 text-white font-bold px-4 py-2.5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <FileSpreadsheet size={14} /> CSV
+          </button>
+          <button
+            onClick={handleExportShareholdersPDF}
+            className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-4 py-2.5 rounded-2xl transition-all shadow-sm flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <FileText size={14} /> PDF
+          </button>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-5 py-2.5 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
+          >
+            <UserPlus size={14} /> Creation Wizard
+          </button>
+        </div>
       </div>
 
       {/* Filters Panel */}

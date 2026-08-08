@@ -289,18 +289,18 @@ export default function AdminAnnouncementsPage() {
             <table className="w-full text-left border-collapse">
               <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Title / Summary</th>
-                  <th className="px-6 py-4">Audience Target</th>
-                  <th className="px-6 py-4">Priority</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Scheduled For</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-6 py-4 align-middle whitespace-nowrap">Title / Summary</th>
+                  <th className="px-6 py-4 align-middle whitespace-nowrap">Audience Target</th>
+                  <th className="px-6 py-4 align-middle whitespace-nowrap">Priority</th>
+                  <th className="px-6 py-4 align-middle whitespace-nowrap">Status</th>
+                  <th className="px-6 py-4 align-middle whitespace-nowrap">Scheduled For</th>
+                  <th className="px-6 py-4 align-middle text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
                 {announcements?.map((a: any) => (
                   <tr key={a.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 align-middle">
                       <div className="flex items-center gap-2 select-none">
                         {a.pinned && (
                           <span className="bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 uppercase tracking-wide shrink-0">
@@ -311,13 +311,13 @@ export default function AdminAnnouncementsPage() {
                       </div>
                       <p className="text-[10px] text-muted-foreground truncate max-w-xs mt-1">{a.content.replace(/<[^>]*>/g, '')}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 align-middle whitespace-nowrap">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 border border-brand-primary/20">
                         <Users size={11} /> {formatAudienceLabel(a)}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase
+                    <td className="px-6 py-4 align-middle whitespace-nowrap">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase text-center
                         ${a.priority === 'HIGH' ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/40' : ''}
                         ${a.priority === 'MEDIUM' ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40' : ''}
                         ${a.priority === 'LOW' ? 'bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle' : ''}
@@ -325,24 +325,24 @@ export default function AdminAnnouncementsPage() {
                         {a.priority}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold border uppercase
-                        ${a.status === 'PUBLISHED' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' : ''}
+                    <td className="px-6 py-4 align-middle whitespace-nowrap">
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase text-center
+                        ${a.status === 'PUBLISHED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : ''}
                         ${a.status === 'DRAFT' ? 'bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle' : ''}
                         ${a.status === 'ARCHIVED' ? 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100' : ''}
                       `}>
                         {a.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground font-semibold">
-                      <span className="flex items-center gap-1.5">
+                    <td className="px-6 py-4 align-middle whitespace-nowrap text-muted-foreground font-semibold">
+                      <span className="inline-flex items-center gap-1.5">
                         <Calendar size={12} /> 
                         {a.scheduledFor ? new Date(a.scheduledFor).toLocaleDateString() : 'Immediate'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-1.5 select-none">
-                      <button onClick={() => handleEdit(a)} className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer" title="Edit"><Edit3 size={14} /></button>
-                      <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 hover:text-red-650 rounded-xl text-muted-foreground transition-all cursor-pointer" title="Archive"><Trash2 size={14} /></button>
+                    <td className="px-6 py-4 align-middle text-right whitespace-nowrap space-x-1 select-none">
+                      <button onClick={() => handleEdit(a)} className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer inline-flex items-center justify-center" title="Edit"><Edit3 size={14} /></button>
+                      <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 hover:text-red-650 rounded-xl text-muted-foreground transition-all cursor-pointer inline-flex items-center justify-center" title="Archive"><Trash2 size={14} /></button>
                     </td>
                   </tr>
                 ))}

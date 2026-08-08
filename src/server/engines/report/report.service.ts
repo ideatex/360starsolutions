@@ -294,4 +294,251 @@ export class ReportService {
       filename: `${type}_report_${date}.csv`,
     };
   }
+
+  async getShareholderSummaryReport(filters: any = {}) {
+    const where: Prisma.ShareholderWhereInput = {};
+    if (filters.status) where.status = filters.status as UserStatus;
+    if (filters.search) {
+      where.OR = [
+        { shareholderId: { contains: filters.search, mode: 'insensitive' } },
+        { name: { contains: filters.search, mode: 'insensitive' } },
+        { phone: { contains: filters.search, mode: 'insensitive' } },
+      ];
+    }
+    if (filters.agreementIssued === 'true' || filters.chequeIssued === 'true') {
+      where.contributions = { some: {} };
+      if (filters.agreementIssued === 'true') (where.contributions.some as any).issuedAgreement = true;
+      if (filters.chequeIssued === 'true') (where.contributions.some as any).issuedCheque = true;
+    }
+
+    const shareholders = await this.prisma.shareholder.findMany({
+      where,
+      include: {
+        investments: { where: { status: 'ACTIVE' } },
+        contributions: true,
+        profitLedgers: true,
+        commissionLedgers: true,
+      },
+    });
+
+    let result = shareholders.map((u) => {
+      const activeFund = u.investments.reduce((acc, inv) => acc + Number(inv.amount), 0);
+      const overallProfit = u.profitLedgers.reduce((acc, p) => acc + Number(p.amount), 0);
+      const overallCommission = u.commissionLedgers.reduce((acc, c) => acc + Number(c.amount), 0);
+      const overallPayout = overallProfit + overallCommission;
+      const chequeIssued = u.contributions.some((c) => c.issuedCheque) ? 'Yes' : 'No';
+      const agreementIssued = u.contributions.some((c) => c.issuedAgreement) ? 'Yes' : 'No';
+
+      const fullAddress = [
+        u.addressBuilding,
+        u.addressArea,
+        u.addressCity,
+        u.addressDistrict,
+        u.addressState,
+        u.addressPincode,
+      ].filter(Boolean).join(', ');
+
+      return {
+        id: u.id,
+        shareholderId: u.shareholderId,
+        name: u.name,
+        activeContributionFund: activeFund,
+        phone: u.phone || '-',
+        dob: u.dob ? new Date(u.dob).toLocaleDateString('en-IN') : '-',
+        address: fullAddress || '-',
+        bankName: u.bankName || '-',
+        bankAccountNumber: u.bankAccountNumber || '-',
+        bankBranch: u.bankBranch || '-',
+        bankIfsc: u.bankIfsc || '-',
+        chequeIssued,
+        agreementIssued,
+        status: u.status,
+        overallProfit,
+        overallCommission,
+        overallPayout,
+        createdAt: u.createdAt,
+      };
+    });
+
+    return this.sortResult(result, filters.sortBy, filters.sortOrder, 'shareholderId');
+  }
+
+  async getTransactionReport(filters: any = {}) {
+    const contrWhere: Prisma.ContributionWhereInput = { status: 'APPROVED' };
+    const withWhere: Prisma.WithdrawalWhereInput = {};
+
+    if (filters.search) {
+      const query = filters.search.trim();
+      contrWhere.shareholder = {
+        OR: [
+          { shareholderId: { contains: query, mode: 'insensitive' } },
+          { name: { contains: query, mode: 'insensitive' } },
+        ],
+      };
+      withWhere.OR = [
+        { withdrawalId: { contains: query, mode: 'insensitive' } },
+        { shareholder: { shareholderId: { contains: query, mode: 'insensitive' } } },
+        { shareholder: { name: { contains: query, mode: 'insensitive' } } },
+      ];
+    }
+
+    if (filters.startDate || filters.endDate) {
+      contrWhere.createdAt = {};
+      withWhere.createdAt = {};
+      if (filters.startDate) {
+        contrWhere.createdAt.gte = new Date(filters.startDate);
+        withWhere.createdAt.gte = new Date(filters.startDate);
+      }
+      if (filters.endDate) {
+        contrWhere.createdAt.lte = new Date(filters.endDate);
+        withWhere.createdAt.lte = new Date(filters.endDate);
+      }
+    }
+
+    let contributionsList: any[] = [];
+    let withdrawalsList: any[] = [];
+
+    if (!filters.type || filters.type === 'Contribution Fund') {
+      contributionsList = await this.prisma.contribution.findMany({
+        where: contrWhere,
+        include: { shareholder: { select: { shareholderId: true, name: true } } },
+      });
+    }
+
+    if (!filters.type || filters.type === 'Withdrawal') {
+      withdrawalsList = await this.prisma.withdrawal.findMany({
+        where: withWhere,
+        include: { shareholder: { select: { shareholderId: true, name: true } } },
+      });
+    }
+
+    const contrMapped = contributionsList.map((c) => ({
+      transactionId: `CON-${c.id.substring(0, 8).toUpperCase()}`,
+      shareholderId: c.shareholder?.shareholderId || '-',
+      shareholderName: c.shareholder?.name || '-',
+      type: 'Contribution Fund',
+      amount: Number(c.amount),
+      date: c.createdAt,
+      activeContributionFund: Number(c.amount),
+    }));
+
+    const withMapped = withdrawalsList.map((w) => ({
+      transactionId: w.withdrawalId,
+      shareholderId: w.shareholder?.shareholderId || '-',
+      shareholderName: w.shareholder?.name || '-',
+      type: 'Withdrawal',
+      amount: Number(w.amount),
+      date: w.createdAt,
+      activeContributionFund: Number(w.remainingActiveFund),
+    }));
+
+    let merged = [...contrMapped, ...withMapped];
+    return this.sortResult(merged, filters.sortBy || 'date', filters.sortOrder || 'desc', 'date');
+  }
+
+  async getPayoutCycleReport(filters: any = {}) {
+    const where: Prisma.PayoutDetailWhereInput = {};
+
+    if (filters.batchId) {
+      where.batchId = filters.batchId;
+    }
+
+    if (filters.search) {
+      where.shareholder = {
+        OR: [
+          { shareholderId: { contains: filters.search, mode: 'insensitive' } },
+          { name: { contains: filters.search, mode: 'insensitive' } },
+        ],
+      };
+    }
+
+    const details = await this.prisma.payoutDetail.findMany({
+      where,
+      include: {
+        shareholder: {
+          select: {
+            id: true,
+            shareholderId: true,
+            name: true,
+            bankName: true,
+            bankAccountNumber: true,
+            bankIfsc: true,
+          },
+        },
+        batch: {
+          select: {
+            id: true,
+            cycleStart: true,
+            cycleEnd: true,
+            status: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const shareholderIds = details.map((d) => d.shareholderId);
+    const batchIds = Array.from(new Set(details.map((d) => d.batchId)));
+
+    const levelCommissions = await this.prisma.commissionLedger.findMany({
+      where: {
+        shareholderId: { in: shareholderIds },
+        payoutBatchId: { in: batchIds },
+      },
+    });
+
+    const levelMap = new Map<string, Record<number, number>>();
+    for (const c of levelCommissions) {
+      const key = `${c.payoutBatchId}_${c.shareholderId}`;
+      if (!levelMap.has(key)) {
+        levelMap.set(key, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 });
+      }
+      const mapObj = levelMap.get(key)!;
+      if (c.level >= 1 && c.level <= 7) {
+        mapObj[c.level] = (mapObj[c.level] || 0) + Number(c.amount);
+      }
+    }
+
+    let result = details.map((d) => {
+      const key = `${d.batchId}_${d.shareholderId}`;
+      const levels = levelMap.get(key) || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+      const profit = Number(d.profitAmount);
+      const l1 = levels[1] || 0;
+      const l2 = levels[2] || 0;
+      const l3 = levels[3] || 0;
+      const l4 = levels[4] || 0;
+      const l5 = levels[5] || 0;
+      const l6 = levels[6] || 0;
+      const l7 = levels[7] || 0;
+
+      const totalCommission = l1 + l2 + l3 + l4 + l5 + l6 + l7;
+      const totalPayout = profit + totalCommission;
+
+      return {
+        id: d.id,
+        shareholderId: d.shareholder?.shareholderId || '-',
+        shareholderName: d.shareholder?.name || '-',
+        cycleRange: d.batch
+          ? `${new Date(d.batch.cycleStart).toLocaleDateString()} - ${new Date(d.batch.cycleEnd).toLocaleDateString()}`
+          : '-',
+        payoutDate: d.createdAt,
+        bankName: d.shareholder?.bankName || '-',
+        bankAccountNumber: d.shareholder?.bankAccountNumber || '-',
+        bankIfsc: d.shareholder?.bankIfsc || '-',
+        profitAmount: profit,
+        l1Commission: l1,
+        l2Commission: l2,
+        l3Commission: l3,
+        l4Commission: l4,
+        l5Commission: l5,
+        l6Commission: l6,
+        l7Commission: l7,
+        totalCommission,
+        totalPayout,
+        status: d.status,
+      };
+    });
+
+    return this.sortResult(result, filters.sortBy, filters.sortOrder, 'shareholderId');
+  }
 }

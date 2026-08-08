@@ -14,7 +14,9 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() body: any) {
-    return this.authService.login(body.shareholderId, body.password);
+    const shareholderId = body.shareholderId || body.id || body.username || body.phone || '';
+    const password = body.password || body.pass || '';
+    return this.authService.login(shareholderId, password);
   }
 
   @HttpCode(HttpStatus.OK)

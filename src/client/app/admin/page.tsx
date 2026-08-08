@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { motion } from 'framer-motion';
-import { BarChart3, Users, DollarSign, Wallet, FileDown, Database, Loader2, Search, Filter, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { BarChart3, Users, DollarSign, Wallet, FileDown, Database, Loader2, Search, Filter, ArrowUp, ArrowDown, X, FileText } from 'lucide-react';
+import { exportToPDF, exportToCSV, ExportColumn } from '@/lib/exportUtils';
 
 export default function AdminDashboardPage() {
   const { toast } = useToast();
@@ -94,6 +95,61 @@ export default function AdminDashboardPage() {
     }
   };
 
+  const handleExportPDF = (type: string) => {
+    if (!reportData || reportData.length === 0) {
+      toast({ title: "No Data", description: `No ${type} records to export to PDF.`, type: "warning" });
+      return;
+    }
+
+    let columns: ExportColumn[] = [];
+    if (type === 'shareholders') {
+      columns = [
+        { header: 'Shareholder ID', key: 'shareholderId' },
+        { header: 'Name', key: 'name' },
+        { header: 'Role', key: 'role' },
+        { header: 'Status', key: 'status' },
+        { header: 'Joined Date', key: 'createdAt', formatter: (v) => new Date(v).toLocaleDateString() },
+      ];
+    } else if (type === 'investments') {
+      columns = [
+        { header: 'Shareholder ID', key: 'shareholderId' },
+        { header: 'Name', key: 'name' },
+        { header: 'Amount ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Mode', key: 'mode' },
+        { header: 'Status', key: 'status' },
+        { header: 'Date', key: 'date', formatter: (v) => new Date(v).toLocaleDateString() },
+      ];
+    } else if (type === 'profits') {
+      columns = [
+        { header: 'Shareholder ID', key: 'shareholderId' },
+        { header: 'Name', key: 'name' },
+        { header: 'Monthly Profit ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Status', key: 'status' },
+        { header: 'Date', key: 'createdAt', formatter: (v) => new Date(v).toLocaleDateString() },
+      ];
+    } else if (type === 'commissions') {
+      columns = [
+        { header: 'Recipient ID', key: 'recipientShareholderId' },
+        { header: 'Recipient Name', key: 'recipientName' },
+        { header: 'Source ID', key: 'sourceShareholderId' },
+        { header: 'Level', key: 'level' },
+        { header: 'Commission ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Status', key: 'status' },
+      ];
+    }
+
+    exportToPDF(
+      `${type}_ledger_report`,
+      `${type.toUpperCase()} Master Report`,
+      `Applied Filters - Search: ${search || 'None'} | Month: ${month || 'All'}`,
+      columns,
+      reportData,
+      [{ label: 'Total Records', value: reportData.length }]
+    );
+
+    toast({ title: "PDF Report Generated", description: `Opened printable ${type} PDF report.`, type: "success" });
+  };
+
   const handleSort = (field: string) => {
     if (sortBy === field) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -129,71 +185,89 @@ export default function AdminDashboardPage() {
         <p className="text-sm text-muted-foreground mt-1">High-level financial diagnostics and audit reporting logs</p>
       </div>
 
-      {/* Metrics Widgets */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Sleek 6-Card Compact Admin Metrics Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* 1. Active Shareholders */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Shareholders</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">{metrics?.activeShareholders || 0}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-emerald-500/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active</span>
+            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
+              <Users size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-success/10 rounded-xl text-brand-success">
-            <Users size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-foreground tracking-tight">{metrics?.activeShareholders || 0}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Active Shareholders</p>
           </div>
         </div>
 
         {/* 2. Active Capital */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Capital</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.activeCapital?.toLocaleString() || '0'}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-brand-primary/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active Capital</span>
+            <div className="p-2 bg-brand-primary/10 rounded-xl text-brand-primary">
+              <BarChart3 size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-            <BarChart3 size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-brand-primary tracking-tight">₹{Number(metrics?.activeCapital || 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Active Capital Fund</p>
           </div>
         </div>
 
         {/* 3. Gross Payouts */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Gross Payouts</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.grossPayouts?.toLocaleString() || '0'}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-amber-500/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Payouts</span>
+            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-600 dark:text-amber-400">
+              <Wallet size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-warning/10 rounded-xl text-brand-warning">
-            <Wallet size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-foreground tracking-tight">₹{Number(metrics?.grossPayouts || 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Gross Profit Payouts</p>
           </div>
         </div>
 
         {/* 4. Total Shareholders */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Shareholders</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">{metrics?.totalShareholders || 0}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-blue-500/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</span>
+            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400">
+              <Users size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-info/10 rounded-xl text-brand-info">
-            <Users size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-foreground tracking-tight">{metrics?.totalShareholders || 0}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Total Accounts</p>
           </div>
         </div>
 
         {/* 5. Overall Capital */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overall Capital</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.overallCapital?.toLocaleString() || '0'}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-purple-500/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Overall</span>
+            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-600 dark:text-purple-400">
+              <Database size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-            <Database size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-purple-600 dark:text-purple-400 tracking-tight">₹{Number(metrics?.overallCapital || 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Overall Capital</p>
           </div>
         </div>
 
         {/* 6. Released Funds */}
-        <div className="bg-card p-6 rounded-2xl border border-border flex items-center justify-between shadow-sm hover:shadow-elevated transition-shadow">
-          <div>
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Released Funds</h3>
-            <p className="text-3xl font-bold text-foreground mt-1">${metrics?.releasedFunds?.toLocaleString() || '0'}</p>
+        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-emerald-500/30 transition-all flex flex-col justify-between space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Released</span>
+            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
+              <DollarSign size={16} />
+            </div>
           </div>
-          <div className="p-3 bg-brand-accent/10 rounded-xl text-brand-accent">
-            <DollarSign size={24} />
+          <div>
+            <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">₹{Number(metrics?.releasedFunds || 0).toLocaleString()}</p>
+            <p className="text-[10px] text-muted-foreground font-semibold">Released Batch Funds</p>
           </div>
         </div>
       </div>
@@ -229,9 +303,15 @@ export default function AdminDashboardPage() {
             </button>
             <button
               onClick={() => handleExport(activeTab)}
-              className="border border-border bg-card hover:bg-secondary font-semibold text-sm px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-sm text-foreground"
+              className="border border-emerald-600/30 bg-emerald-600 hover:bg-emerald-700 font-semibold text-xs text-white px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
             >
-              <FileDown size={16} /> Export CSV
+              <FileDown size={15} /> Export CSV
+            </button>
+            <button
+              onClick={() => handleExportPDF(activeTab)}
+              className="border border-slate-800 bg-slate-800 hover:bg-slate-900 font-semibold text-xs text-white px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <FileText size={15} /> Export PDF
             </button>
           </div>
         </div>

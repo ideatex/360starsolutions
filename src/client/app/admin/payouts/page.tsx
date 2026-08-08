@@ -10,8 +10,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Landmark, Calendar, DollarSign, Play, Loader2, Info, Users, 
   ChevronDown, ChevronUp, Search, Download, CheckCircle, Clock, 
-  FileSpreadsheet, Building, CreditCard, RefreshCw, Layers
+  FileSpreadsheet, FileText, Building, CreditCard, RefreshCw, Layers
 } from 'lucide-react';
+import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
 
 export default function AdminPayoutsPage() {
   const shareholder = useAuthStore((state) => state.shareholder);
@@ -139,7 +140,7 @@ export default function AdminPayoutsPage() {
       title: "Reprocess Payout Batch",
       description: "AUTHORIZED SUPER ADMIN ACTION: You are resetting this payout batch. All linked commissions will be unlinked and restored to PENDING status so they can be re-calculated in future batches. Do you wish to proceed?",
       confirmText: "Reset & Reprocess",
-      variant: "warning"
+      variant: "danger"
     });
     if (ok) {
       reprocessBatchMutation.mutate(id);
@@ -187,9 +188,9 @@ export default function AdminPayoutsPage() {
       "Bank Name",
       "Branch",
       "IFSC Code",
-      "Investor Profit ($)",
-      "Referral Commission ($)",
-      "Total Payout ($)",
+      "Profits ($)",
+      "Commissions ($)",
+      "Payouts ($)",
       "Cycle Range",
       "Status"
     ];
@@ -222,6 +223,140 @@ export default function AdminPayoutsPage() {
     link.click();
     link.remove();
     toast({ title: "CSV Report Downloaded", description: `Exported ${dataToExport.length} shareholder payout records.`, type: "success" });
+  };
+
+  const handleExportShareholderPayoutsPDF = () => {
+    const list = shareholderPayouts?.data || [];
+    if (list.length === 0) {
+      toast({ title: "No Data", description: "No shareholder payout records available.", type: "warning" });
+      return;
+    }
+
+    const columns: ExportColumn[] = [
+      { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
+      { header: 'Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
+      { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
+      { header: 'Account No.', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
+      { header: 'IFSC Code', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
+      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Status', key: 'status' },
+    ];
+
+    const totalPayout = list.reduce((acc: number, item: any) => acc + Number(item.totalAmount || 0), 0);
+
+    exportToPDF(
+      'shareholder_payouts_ledger',
+      'Shareholder Payouts Ledger Report',
+      `Filter Status: ${statusFilter || 'All Statuses'} | Search: ${search || 'None'}`,
+      columns,
+      list,
+      [
+        { label: 'Total Payout Records', value: list.length },
+        { label: 'Total Dispatched Payout', value: `$${totalPayout.toFixed(2)}` }
+      ]
+    );
+
+    toast({ title: "PDF Report Generated", description: `Opened printable shareholder payout report for ${list.length} records.`, type: "success" });
+  };
+
+  const handleExportBatchesCSV = () => {
+    const list = batches?.data || [];
+    if (list.length === 0) {
+      toast({ title: "No Data", description: "No payout batch cycles available.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'Batch ID', key: 'id' },
+      { header: 'Cycle Start Date', key: 'cycleStart', formatter: (v) => new Date(v).toLocaleDateString() },
+      { header: 'Cycle End Date', key: 'cycleEnd', formatter: (v) => new Date(v).toLocaleDateString() },
+      { header: 'Total Dispatched Amount ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Status', key: 'status' },
+    ];
+    exportToCSV('payout_batches_summary', columns, list);
+    toast({ title: "CSV Downloaded", description: "Exported payout batches summary to CSV.", type: "success" });
+  };
+
+  const handleExportBatchesPDF = () => {
+    const list = batches?.data || [];
+    if (list.length === 0) {
+      toast({ title: "No Data", description: "No payout batch cycles available.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'Batch ID', key: 'id' },
+      { header: 'Cycle Start', key: 'cycleStart', formatter: (v) => new Date(v).toLocaleDateString() },
+      { header: 'Cycle End', key: 'cycleEnd', formatter: (v) => new Date(v).toLocaleDateString() },
+      { header: 'Total Dispatched Amount ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Status', key: 'status' },
+    ];
+    const totalAmount = list.reduce((acc: number, item: any) => acc + Number(item.totalAmount || 0), 0);
+    exportToPDF(
+      'payout_batches_summary',
+      'Payout Batches Summary Report',
+      'Twice-Monthly Automatic Payout Cycle Records',
+      columns,
+      list,
+      [
+        { label: 'Total Batches Logged', value: list.length },
+        { label: 'Gross Dispatched Capital', value: `$${totalAmount.toFixed(2)}` }
+      ]
+    );
+    toast({ title: "PDF Generated", description: "Opened printable payout batches summary report.", type: "success" });
+  };
+
+  const handleExportSingleBatchCSV = (batch: any, details: any[]) => {
+    if (!details || details.length === 0) {
+      toast({ title: "No Data", description: "No payout items in this batch.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'Payout ID', key: 'id' },
+      { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
+      { header: 'Shareholder Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
+      { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
+      { header: 'Account Number', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
+      { header: 'IFSC Code', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
+      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Status', key: 'status' }
+    ];
+    exportToCSV(`payout_batch_${batch.id}`, columns, details);
+    toast({ title: "CSV Exported", description: `Downloaded CSV for Batch ${batch.id}`, type: "success" });
+  };
+
+  const handleExportSingleBatchPDF = (batch: any, details: any[]) => {
+    if (!details || details.length === 0) {
+      toast({ title: "No Data", description: "No payout items in this batch.", type: "warning" });
+      return;
+    }
+    const columns: ExportColumn[] = [
+      { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
+      { header: 'Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
+      { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
+      { header: 'Account No.', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
+      { header: 'IFSC', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
+      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Status', key: 'status' }
+    ];
+    const totalAmount = Number(batch.totalAmount || 0).toFixed(2);
+    exportToPDF(
+      `payout_batch_${batch.id}`,
+      `Payout Cycle Batch Report: ${batch.id}`,
+      `Cycle Range: ${new Date(batch.cycleStart).toLocaleDateString()} - ${new Date(batch.cycleEnd).toLocaleDateString()} | Batch Status: ${batch.status}`,
+      columns,
+      details,
+      [
+        { label: 'Batch ID', value: batch.id },
+        { label: 'Shareholders Count', value: details.length },
+        { label: 'Batch Net Total', value: `$${totalAmount}` }
+      ]
+    );
+    toast({ title: "PDF Report Generated", description: `Opened printable PDF for Batch ${batch.id}`, type: "success" });
   };
 
   const isSuperAdmin = shareholder?.role === 'SUPER_ADMIN';
@@ -380,6 +515,12 @@ export default function AdminPayoutsPage() {
               >
                 <FileSpreadsheet size={14} /> Export CSV
               </button>
+              <button 
+                onClick={handleExportShareholderPayoutsPDF}
+                className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+              >
+                <FileText size={14} /> Export PDF
+              </button>
             </div>
           </div>
 
@@ -390,9 +531,9 @@ export default function AdminPayoutsPage() {
                 <tr>
                   <th className="px-6 py-4">Shareholder</th>
                   <th className="px-6 py-4">Bank Account & IFSC</th>
-                  <th className="px-6 py-4 text-right">Contribution Fund Earnings</th>
-                  <th className="px-6 py-4 text-right">Referral Earnings</th>
-                  <th className="px-6 py-4 text-right">Total Earnings</th>
+                  <th className="px-6 py-4 text-right">Profits</th>
+                  <th className="px-6 py-4 text-right">Commissions</th>
+                  <th className="px-6 py-4 text-right">Payouts</th>
                   <th className="px-6 py-4">Cycle Range</th>
                   <th className="px-6 py-4">Status</th>
                 </tr>
@@ -492,7 +633,28 @@ export default function AdminPayoutsPage() {
 
       {/* TAB 2: PAYOUT BATCHES CYCLES */}
       {activeTab === 'batches' && (
-        <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden space-y-4">
+          <div className="p-5 border-b border-border-subtle bg-muted/10 flex items-center justify-between">
+            <div>
+              <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Payout Batch Cycles Summary</h3>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Summary of twice-monthly payout generation cycles.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportBatchesCSV}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+              >
+                <FileSpreadsheet size={14} /> Export CSV
+              </button>
+              <button
+                onClick={handleExportBatchesPDF}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+              >
+                <FileText size={14} /> Export PDF
+              </button>
+            </div>
+          </div>
+
           <table className="w-full text-left border-collapse">
             <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
               <tr>
@@ -587,14 +749,28 @@ export default function AdminPayoutsPage() {
                       {isExpanded && (
                         <tr>
                           <td colSpan={5} className="bg-brand-primary/5 p-6 border-y border-brand-primary/10">
-                            <div className="space-y-3">
+                        <div className="space-y-3">
                               <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-bold text-brand-primary uppercase tracking-wider flex items-center gap-1.5">
                                   <Users size={14} /> Itemized Shareholder Payouts for Batch: <span className="font-mono">{batch.id}</span>
                                 </h4>
-                                <span className="text-[10px] text-muted-foreground font-semibold">
-                                  {expandedBatchDetails?.length || 0} Shareholders Included
-                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-[10px] text-muted-foreground font-semibold">
+                                    {expandedBatchDetails?.length || 0} Shareholders Included
+                                  </span>
+                                  <button
+                                    onClick={() => handleExportSingleBatchCSV(batch, expandedBatchDetails)}
+                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer shadow-xs"
+                                  >
+                                    <FileSpreadsheet size={12} /> CSV
+                                  </button>
+                                  <button
+                                    onClick={() => handleExportSingleBatchPDF(batch, expandedBatchDetails)}
+                                    className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer shadow-xs"
+                                  >
+                                    <FileText size={12} /> PDF
+                                  </button>
+                                </div>
                               </div>
 
                               {loadingBatchDetails ? (
@@ -608,9 +784,9 @@ export default function AdminPayoutsPage() {
                                       <tr>
                                         <th className="px-4 py-3">Shareholder</th>
                                         <th className="px-4 py-3">Bank Details</th>
-                                        <th className="px-4 py-3 text-right">Contribution Fund Earnings</th>
-                                        <th className="px-4 py-3 text-right">Referral Earnings</th>
-                                        <th className="px-4 py-3 text-right">Total Earnings</th>
+                                        <th className="px-4 py-3 text-right">Profits</th>
+                                        <th className="px-4 py-3 text-right">Commissions</th>
+                                        <th className="px-4 py-3 text-right">Payouts</th>
                                         <th className="px-4 py-3">Status</th>
                                       </tr>
                                     </thead>

@@ -1,3 +1,29 @@
+const fs = require('fs');
+const path = require('path');
+
+// Auto-load .env file if DATABASE_URL is not set in environment
+if (!process.env.DATABASE_URL) {
+  try {
+    if (typeof process.loadEnvFile === 'function') {
+      process.loadEnvFile(path.join(__dirname, '.env'));
+    } else if (fs.existsSync(path.join(__dirname, '.env'))) {
+      const envConfig = fs.readFileSync(path.join(__dirname, '.env'), 'utf8');
+      for (const line of envConfig.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed && !trimmed.startsWith('#')) {
+          const [key, ...valueParts] = trimmed.split('=');
+          if (key && valueParts.length > 0) {
+            const val = valueParts.join('=').replace(/^["']|["']$/g, '');
+            process.env[key.trim()] = val;
+          }
+        }
+      }
+    }
+  } catch (e) {
+    // fallback ignore
+  }
+}
+
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
 

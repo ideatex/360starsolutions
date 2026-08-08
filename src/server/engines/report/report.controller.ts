@@ -73,6 +73,43 @@ export class ReportController {
     return this.reportService.getCommissionsReport({ search, sortBy, sortOrder, month, minAmount, maxAmount });
   }
 
+  @Get('shareholder-summary')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getShareholderSummaryReport(
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('status') status?: string,
+    @Query('agreementIssued') agreementIssued?: string,
+    @Query('chequeIssued') chequeIssued?: string,
+  ) {
+    return this.reportService.getShareholderSummaryReport({ search, sortBy, sortOrder, status, agreementIssued, chequeIssued });
+  }
+
+  @Get('transactions')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getTransactionReport(
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('type') type?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    return this.reportService.getTransactionReport({ search, sortBy, sortOrder, type, startDate, endDate });
+  }
+
+  @Get('payout-cycle-summary')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getPayoutCycleReport(
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('batchId') batchId?: string,
+  ) {
+    return this.reportService.getPayoutCycleReport({ search, sortBy, sortOrder, batchId });
+  }
+
   @Get('export')
   @Roles('ADMIN', 'SUPER_ADMIN')
   async exportReport(

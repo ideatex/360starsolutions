@@ -3,14 +3,15 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:next": "next dev src/client",
+    "sync-public": "node -e \"const fs=require('fs'); fs.mkdirSync('src/client/public', {recursive:true}); fs.cpSync('public', 'src/client/public', {recursive:true});\"",
+    "dev:next": "npm run sync-public && next dev src/client",
     "dev:nest": "node --env-file=.env node_modules/@nestjs/cli/bin/nest.js start --watch",
     "dev": "concurrently \"npm run dev:next\" \"npm run dev:nest\"",
-    "build:client": "next build src/client && node -e \"const fs=require('fs'); if(fs.existsSync('dist/client')) fs.rmSync('dist/client', {recursive:true, force:true}); fs.mkdirSync('dist', {recursive:true}); fs.cpSync('src/client/out', 'dist/client', {recursive:true});\"",
+    "build:client": "npm run sync-public && next build src/client && node -e \"const fs=require('fs'); if(fs.existsSync('dist/client')) fs.rmSync('dist/client', {recursive:true, force:true}); fs.mkdirSync('dist', {recursive:true}); fs.cpSync('src/client/out', 'dist/client', {recursive:true}); fs.cpSync('public', 'dist/client', {recursive:true});\"",
     "build:server": "nest build",
     "build": "npm run build:client && npm run build:server",
     "start": "node --env-file=.env dist/server/main.js",
-    "postinstall": "node -e \"if(require('fs').existsSync('postinstall.js')) require('./postinstall.js')\""
+    "postinstall": "npm run sync-public && node -e \"if(require('fs').existsSync('postinstall.js')) require('./postinstall.js')\""
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

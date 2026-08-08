@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -84,7 +84,7 @@ export default function MlmUserDashboardPage() {
     return (
       <div className="flex items-center justify-center min-h-[80vh]">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin"></div>
           <p className="text-gray-500 font-semibold text-sm">Assembling your Investor Profile...</p>
         </div>
       </div>
@@ -104,13 +104,13 @@ export default function MlmUserDashboardPage() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-3xl border border-gray-100 shadow-sm gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+            <span className="text-xs font-bold uppercase tracking-widest text-brand-primary bg-brand-primary/10 px-3 py-1 rounded-full">
               {profile.investorType || 'STANDARD'} INVESTOR
             </span>
             <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
               profile.status === 'ACTIVE' 
-                ? 'bg-green-50 text-green-700 border border-green-100' 
-                : 'bg-amber-50 text-amber-700 border border-amber-100'
+                ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' 
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
             }`}>
               {profile.status || 'INACTIVE'}
             </span>
@@ -178,8 +178,8 @@ export default function MlmUserDashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-3 rounded-xl">
-                    <Wallet className="w-6 h-6 text-emerald-600" />
+                  <div className="bg-brand-primary/10 p-3 rounded-xl">
+                    <Wallet className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Contribution Fund</span>
@@ -190,8 +190,8 @@ export default function MlmUserDashboardPage() {
 
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-3 rounded-xl">
-                    <TrendingUp className="w-6 h-6 text-emerald-600" />
+                  <div className="bg-brand-primary/10 p-3 rounded-xl">
+                    <TrendingUp className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Own ROI Profit</span>
@@ -202,8 +202,8 @@ export default function MlmUserDashboardPage() {
 
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-3 rounded-xl">
-                    <Coins className="w-6 h-6 text-emerald-600" />
+                  <div className="bg-brand-primary/10 p-3 rounded-xl">
+                    <Coins className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Referral Profit</span>
@@ -214,8 +214,8 @@ export default function MlmUserDashboardPage() {
 
               <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
                 <div className="flex items-center gap-3">
-                  <div className="bg-emerald-50 p-3 rounded-xl">
-                    <Network className="w-6 h-6 text-emerald-600" />
+                  <div className="bg-brand-primary/10 p-3 rounded-xl">
+                    <Network className="w-6 h-6 text-brand-primary" />
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Team Business Volume</span>

@@ -4,8 +4,9 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { motion } from 'framer-motion';
-import { FileText, Calendar, Clock, Database, Loader2, ArrowRight, Download, Filter } from 'lucide-react';
+import { FileText, Calendar, Clock, Database, Loader2, ArrowRight, Download, Filter, FileSpreadsheet } from 'lucide-react';
 import { useToast } from '@/components/ui/ToastProvider';
+import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
 
 type PeriodFilter = 'all' | 'this_week' | 'last_week' | 'this_month' | 'last_month';
 
@@ -20,7 +21,8 @@ const PERIOD_LABELS: Record<PeriodFilter, string> = {
 export default function AdminAuditPage() {
   const [page, setPage] = useState(1);
   const [period, setPeriod] = useState<PeriodFilter>('all');
-  const [isExporting, setIsExporting] = useState(false);
+  const [isExportingCSV, setIsExportingCSV] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
   const { toast } = useToast();
 
   const { data, isLoading } = useQuery({
@@ -42,9 +44,9 @@ export default function AdminAuditPage() {
     setPage(1);
   };
 
-  const handleExportReport = async () => {
+  const handleExportCSV = async () => {
     try {
-      setIsExporting(true);
+      setIsExportingCSV(true);
       const res = await api.get('/admin/audit-logs/export', {
         params: period !== 'all' ? { period } : {},
       });
@@ -61,18 +63,65 @@ export default function AdminAuditPage() {
       document.body.removeChild(link);
 
       toast({
-        title: "Report Exported",
-        description: `Exported ${PERIOD_LABELS[period]} audit log report successfully.`,
+        title: "CSV Exported",
+        description: `Exported ${PERIOD_LABELS[period]} audit log CSV report successfully.`,
         type: "success",
       });
     } catch (err) {
       toast({
         title: "Export Failed",
-        description: "Failed to generate audit log report.",
+        description: "Failed to generate audit log CSV report.",
         type: "error",
       });
     } finally {
-      setIsExporting(false);
+      setIsExportingCSV(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      setIsExportingPDF(true);
+      const res = await api.get('/admin/audit-logs/export', {
+        params: period !== 'all' ? { period } : {},
+      });
+
+      const { logs } = res.data;
+      const columns: ExportColumn[] = [
+        { header: 'ID', key: 'id' },
+        { 
+          header: 'Timestamp', 
+          key: 'createdAt',
+          formatter: (val) => new Date(val).toLocaleString('en-IN')
+        },
+        { header: 'Action', key: 'action' },
+        { header: 'Entity Type', key: 'entityType' },
+        { header: 'Shareholder ID', key: 'shareholderId', formatter: (val) => val || 'System' },
+        { header: 'Old Value', key: 'oldValue', formatter: (val) => val || '-' },
+        { header: 'New Value', key: 'newValue', formatter: (val) => val || '-' },
+        { header: 'IP Address', key: 'ipAddress', formatter: (val) => val || '-' },
+      ];
+
+      exportToPDF(
+        `audit_report_${period}`,
+        'System Audit Logs Report',
+        `Time Period: ${PERIOD_LABELS[period]}`,
+        columns,
+        logs || []
+      );
+
+      toast({
+        title: "PDF Exported",
+        description: `Generated ${PERIOD_LABELS[period]} audit log PDF report.`,
+        type: "success",
+      });
+    } catch (err) {
+      toast({
+        title: "Export Failed",
+        description: "Failed to generate audit log PDF report.",
+        type: "error",
+      });
+    } finally {
+      setIsExportingPDF(false);
     }
   };
 
@@ -91,19 +140,34 @@ export default function AdminAuditPage() {
           <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Immutable ledger of enterprise settings, payments, and account actions.</p>
         </div>
 
-        {/* Export Button */}
-        <button
-          onClick={handleExportReport}
-          disabled={isExporting}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-primary text-white hover:bg-brand-primary/90 text-xs font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
-        >
-          {isExporting ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
-          ) : (
-            <Download className="w-4 h-4" />
-          )}
-          Export Report ({PERIOD_LABELS[period]})
-        </button>
+        {/* Export Buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={isExportingCSV}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            {isExportingCSV ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="w-4 h-4" />
+            )}
+            Download CSV
+          </button>
+          
+          <button
+            onClick={handleExportPDF}
+            disabled={isExportingPDF}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+          >
+            {isExportingPDF ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <FileText className="w-4 h-4" />
+            )}
+            Download PDF
+          </button>
+        </div>
       </div>
 
       {/* Period Filter Selector */}

@@ -4,6 +4,7 @@ import { persist } from 'zustand/middleware';
 interface Shareholder {
   id: string;
   shareholderId: string;
+  name?: string;
   role: string;
   referralCode?: string;
   materializedPath?: string;

@@ -8,14 +8,15 @@ import { useSidebarStore } from '@/store/useSidebarStore';
 import { useConfirm } from '@/components/ui/ConfirmModal';
 import { useToast } from '@/components/ui/ToastProvider';
 import { 
-  LayoutDashboard, Wallet, TrendingUp, Network, ArrowRightLeft, 
+  Home, LayoutDashboard, Wallet, TrendingUp, Network, ArrowRightLeft, 
   ShieldCheck, ShieldAlert, LogOut, MessageSquare, BookOpen, Coins,
-  ChevronLeft, ChevronRight, Settings, Users, Landmark, FileText, Megaphone, Edit3, Award, BarChart3, Target, PieChart, FileDown, UserCircle, Key
+  ChevronLeft, ChevronRight, Settings, Users, Landmark, FileText, Megaphone, Edit3, Award, BarChart3, Target, PieChart, FileDown, UserCircle, Key, FileSpreadsheet
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const userLinks = [
+  { name: 'Home', href: '/dashboard/home', icon: Home },
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
   { name: 'Referral Tree', href: '/dashboard/referral-tree', icon: Network },
@@ -25,9 +26,12 @@ const userLinks = [
 ];
 
 const adminLinks = [
+  { name: 'Home', href: '/dashboard/home', icon: Home },
   { name: 'Dashboard', href: '/admin', icon: BarChart3 },
   { name: 'Shareholder Management', href: '/admin/shareholders', icon: Users },
   { name: 'Payout Batches', href: '/admin/payouts', icon: Landmark },
+  { name: 'Withdrawals', href: '/admin/withdrawals', icon: ArrowRightLeft },
+  { name: 'Reports', href: '/admin/reports', icon: FileSpreadsheet },
   { name: 'Audit Logs', href: '/admin/audit', icon: FileText },
   { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
   { name: 'Founder\'s Thoughts', href: '/admin/founder', icon: Edit3 },
@@ -70,20 +74,13 @@ export default function Sidebar() {
   const sidebarContent = (
     <div className="flex flex-col h-full bg-white dark:bg-sidebar text-foreground select-none relative">
       {/* Brand Header */}
-      <div className="h-16 flex items-center justify-between px-6 border-b border-border-subtle shrink-0">
-        <Link href={isAdminPath ? "/admin" : "/dashboard"} className="flex items-center gap-2.5 overflow-hidden">
-          <div className="bg-brand-primary p-2 rounded-xl text-white shrink-0 shadow-sm">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          {!isCollapsed && (
-            <motion.span 
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="font-extrabold text-lg tracking-tight text-gray-900 dark:text-white"
-            >
-              360 Star
-            </motion.span>
-          )}
+      <div className="h-16 flex items-center justify-between px-3.5 border-b border-border-subtle shrink-0">
+        <Link href={isAdminPath ? "/admin" : "/dashboard"} className="flex items-center gap-2 overflow-hidden py-1">
+          <img 
+            src="/logo-360.png" 
+            alt="360 Star Logo" 
+            className={`${isCollapsed ? 'h-9 max-w-[40px]' : 'h-12 max-w-[160px]'} w-auto object-contain transition-all duration-200`} 
+          />
         </Link>
         
         {/* Collapse button on desktop */}
@@ -98,7 +95,7 @@ export default function Sidebar() {
       {/* Navigation Links */}
       <div className="flex-1 overflow-y-auto py-6 px-4 space-y-1.5 custom-scrollbar">
         {currentLinks.map((link) => {
-          const isActive = link.href === '/admin' || link.href === '/dashboard'
+          const isActive = link.href === '/' || link.href === '/admin' || link.href === '/dashboard'
             ? pathname === link.href
             : pathname === link.href || pathname.startsWith(link.href + '/');
           const Icon = link.icon;
