@@ -1,18 +1,20 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { AuditService } from '@server/engines/audit/audit.service';
+import { ReferralTreeService } from '@server/engines/referral-tree/referral-tree.service';
+import { CommissionService } from '@server/engines/commission/commission.service';
+import { UserStatus } from '@prisma/client';
 
 @Injectable()
 export class ReferralProgressService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditService: AuditService
+    private readonly auditService: AuditService,
+    private readonly referralTreeService: ReferralTreeService,
   ) {}
 
   async getReferralProgress(shareholderId: string) {
-    const startTime = Date.now();
     const searchId = (shareholderId || '').trim();
-    // 1. Ensure shareholder exists
     const shareholder = await this.prisma.shareholder.findFirst({
       where: {
         OR: [
@@ -28,34 +30,23 @@ export class ReferralProgressService {
     }
 
     const actualId = shareholder.id;
+    const maxReferralLevels = 12;
 
-    // 2. Read from BusinessConfiguration
-    const config = await this.prisma.businessConfiguration.findFirst({
-      orderBy: { version: 'desc' },
-    });
+    // Get dynamic level unlock status
+    const unlockInfo = await this.referralTreeService.getUnlockedLevel(actualId);
+    const effectiveUnlockedLevel = unlockInfo.effectiveLevel;
 
-    if (!config) {
-       throw new NotFoundException('Business configuration not found');
-    }
+    // Gratitude rates for L1-L12
+    const rates = CommissionService.DEFAULT_GRATITUDE_RATES;
 
-    const maxReferralLevels = (config.referralLevelSettings as any)?.levels ?? 7;
-    const levelOpeningVolumes = (config.levelOpeningVolume as any) || {};
-    const levelPercentages = (config.levelWiseProfitSharing as any) || {};
-
-    // 3. Dynamic BFS calculation in-memory
-    const levelVolumes: { [level: number]: number } = {};
+    // Calculate level volumes across downline up to 12 levels
+    const levelVolumes: Record<number, number> = {};
+    const levelMembersCount: Record<number, number> = {};
     for (let l = 1; l <= maxReferralLevels; l++) {
       levelVolumes[l] = 0;
+      levelMembersCount[l] = 0;
     }
 
-    // Own approved contributions (Personal Investment)
-    const ownContributions = await this.prisma.contribution.aggregate({
-      where: { shareholderId: actualId, status: 'APPROVED' },
-      _sum: { amount: true },
-    });
-    const ownVolume = Number(ownContributions._sum.amount || 0);
-
-    // Downline levels: Level 1 = Direct Referrals, Level 2 = Level 1 Downline, etc.
     let currentParentIds = [actualId];
     let currentDepth = 1;
 
@@ -63,11 +54,12 @@ export class ReferralProgressService {
       const children = await this.prisma.shareholder.findMany({
         where: {
           parentId: { in: currentParentIds },
+          status: { notIn: [UserStatus.DELETED] },
         },
         include: {
           contributions: {
             where: { status: 'APPROVED' },
-            select: { amount: true }
+            select: { amount: true },
           },
         },
       });
@@ -77,95 +69,97 @@ export class ReferralProgressService {
       children.forEach((child) => {
         const sum = child.contributions.reduce((acc, c) => acc + Number(c.amount), 0);
         levelVolumes[currentDepth] += sum;
+        levelMembersCount[currentDepth]++;
       });
 
       currentParentIds = children.map((c) => c.id);
       currentDepth++;
     }
 
-    // 4. Determine progress and sequential locking
-    let previousUnlocked = true;
-    let totalQualifiedLevels = 0;
-    let overallBusinessVolume = ownVolume;
-    let currentActiveLevel = 0;
-    let nextUnlockTarget = 1;
+    // Own approved contributions
+    const ownContributions = await this.prisma.contribution.aggregate({
+      where: { shareholderId: actualId, status: 'APPROVED' },
+      _sum: { amount: true },
+    });
+    const ownVolume = Number(ownContributions._sum.amount || 0);
 
+    let overallBusinessVolume = ownVolume;
     const progress = [];
 
     for (let level = 1; level <= maxReferralLevels; level++) {
       const currentVolume = levelVolumes[level] || 0;
-      const requiredVolume = Number(levelOpeningVolumes[String(level)] || 0);
-      const profitPercentage = Number(levelPercentages[String(level)] || 0) * 100;
-      const remainingVolume = Math.max(0, requiredVolume - currentVolume);
-      
       overallBusinessVolume += currentVolume;
+      const rate = rates[level] || 0;
+      const profitPercentage = rate * 100;
+      const isUnlocked = level <= effectiveUnlockedLevel;
 
-      let status = 'LOCKED';
-
-      if (previousUnlocked && currentVolume >= requiredVolume) {
-        status = 'UNLOCKED';
-        totalQualifiedLevels++;
-        currentActiveLevel = level;
-      } else if (previousUnlocked && currentVolume < requiredVolume) {
-        status = 'IN PROGRESS';
-        nextUnlockTarget = level;
-        previousUnlocked = false;
-      } else {
-        status = 'LOCKED';
-        previousUnlocked = false;
-      }
-
-      if (level === maxReferralLevels && status === 'UNLOCKED') {
-        nextUnlockTarget = maxReferralLevels;
-      }
+      // Determine direct referrals requirement for this tier
+      let requiredDirects = 1;
+      if (level > 9) requiredDirects = 4;
+      else if (level > 6) requiredDirects = 3;
+      else if (level > 3) requiredDirects = 2;
 
       progress.push({
         level,
         levelName: `Level ${level}`,
-        requiredVolume,
-        currentVolume,
-        remainingVolume,
+        rate,
         profitPercentage,
-        status,
+        currentVolume,
+        membersCount: levelMembersCount[level] || 0,
+        requiredDirects,
+        status: isUnlocked ? 'UNLOCKED' : 'LOCKED',
       });
     }
 
-    let remainingVolumeToNextLevel = 0;
-    if (nextUnlockTarget <= maxReferralLevels && progress[nextUnlockTarget - 1].status === 'IN PROGRESS') {
-        remainingVolumeToNextLevel = progress[nextUnlockTarget - 1].remainingVolume;
+    // Next unlock target calculation
+    let nextUnlockTarget = 0;
+    let nextTargetLevelRange = '';
+    let additionalDirectsNeeded = 0;
+
+    if (effectiveUnlockedLevel < 3) {
+      nextUnlockTarget = 3;
+      nextTargetLevelRange = 'Levels 1 to 3';
+      additionalDirectsNeeded = Math.max(0, 1 - unlockInfo.directReferralsCount);
+    } else if (effectiveUnlockedLevel < 6) {
+      nextUnlockTarget = 6;
+      nextTargetLevelRange = 'Levels 4 to 6';
+      additionalDirectsNeeded = Math.max(0, 2 - unlockInfo.directReferralsCount);
+    } else if (effectiveUnlockedLevel < 9) {
+      nextUnlockTarget = 9;
+      nextTargetLevelRange = 'Levels 7 to 9';
+      additionalDirectsNeeded = Math.max(0, 3 - unlockInfo.directReferralsCount);
+    } else if (effectiveUnlockedLevel < 12) {
+      nextUnlockTarget = 12;
+      nextTargetLevelRange = 'Levels 10 to 12';
+      additionalDirectsNeeded = Math.max(0, 4 - unlockInfo.directReferralsCount);
     }
 
-    const overallProgressPercentage = (totalQualifiedLevels / maxReferralLevels) * 100;
-
-    const processingTimeMs = Date.now() - startTime;
+    const overallProgressPercentage = Math.round((effectiveUnlockedLevel / maxReferralLevels) * 10000) / 100;
 
     await this.auditService.logAction({
       shareholderId,
       action: 'VIEW_REFERRAL_PROGRESS',
       entityType: 'ReferralProgress',
       entityId: shareholderId,
-      newValue: JSON.stringify({
-        configVersion: config.version,
-        processingTimeMs,
-        overallBusinessVolume,
-        totalQualifiedLevels
-      })
+      newValue: `EffectiveUnlocked: ${effectiveUnlockedLevel}, Directs: ${unlockInfo.directReferralsCount}, TotalVolume: ₹${overallBusinessVolume}`,
     });
 
     return {
       summary: {
-        totalQualifiedLevels,
-        currentActiveLevel,
-        currentActiveLevelName: currentActiveLevel > 0 ? `Level ${currentActiveLevel}` : 'None',
+        totalQualifiedLevels: effectiveUnlockedLevel,
+        currentActiveLevel: effectiveUnlockedLevel,
+        currentActiveLevelName: `Unlocked up to Level ${effectiveUnlockedLevel}`,
         overallBusinessVolume,
-        overallProgressPercentage: Number(overallProgressPercentage.toFixed(2)),
+        overallProgressPercentage,
+        directReferralsCount: unlockInfo.directReferralsCount,
+        isOverridden: unlockInfo.isOverridden,
         nextUnlockTarget,
-        nextUnlockTargetName: nextUnlockTarget > 0 ? `Level ${nextUnlockTarget}` : 'Level 1',
-        remainingVolumeToNextLevel,
+        nextTargetLevelRange,
+        additionalDirectsNeeded,
         ownVolume,
       },
       progress,
-      configurationVersion: config.version,
+      configurationVersion: 1,
     };
   }
 }

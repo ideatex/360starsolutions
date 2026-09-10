@@ -10,7 +10,7 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { 
   Home, LayoutDashboard, Wallet, TrendingUp, Network, ArrowRightLeft, 
   ShieldCheck, ShieldAlert, LogOut, MessageSquare, BookOpen, Coins,
-  ChevronLeft, ChevronRight, Settings, Users, Landmark, FileText, Megaphone, Edit3, Award, BarChart3, Target, PieChart, FileDown, UserCircle, Key, FileSpreadsheet
+  ChevronLeft, ChevronRight, Settings, Users, Landmark, FileText, Megaphone, Edit3, Award, BarChart3, Target, PieChart, FileDown, UserCircle, Key, FileSpreadsheet, UserCheck
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -28,7 +28,9 @@ const userLinks = [
 const adminLinks = [
   { name: 'Home', href: '/dashboard/home', icon: Home },
   { name: 'Dashboard', href: '/admin', icon: BarChart3 },
+  { name: 'Registration Queue', href: '/admin/registrations', icon: UserCheck },
   { name: 'Shareholder Management', href: '/admin/shareholders', icon: Users },
+  { name: 'Rank Engine', href: '/admin/ranks', icon: Award },
   { name: 'Payout Batches', href: '/admin/payouts', icon: Landmark },
   { name: 'Withdrawals', href: '/admin/withdrawals', icon: ArrowRightLeft },
   { name: 'Reports', href: '/admin/reports', icon: FileSpreadsheet },

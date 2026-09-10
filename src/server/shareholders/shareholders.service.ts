@@ -635,9 +635,14 @@ export class UsersService {
         id: true,
         name: true,
         shareholderId: true,
-        
         role: true,
-        investorProfile: { select: { investorType: true, status: true } }
+        status: true,
+        accountType: true,
+        holdingBalance: true,
+        currentRank: true,
+        unlockedLevelOverride: true,
+        referralCode: true,
+        investorProfile: { select: { investorType: true, status: true } },
       },
     });
 
@@ -645,52 +650,76 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    const contributions = await this.prisma.contribution.aggregate({
-      where: { shareholderId, status: 'APPROVED' },
-      _sum: { amount: true },
-    });
-
-    const profits = await this.prisma.profitLedger.aggregate({
-      where: { shareholderId },
-      _sum: { amount: true },
-    });
-
-    const commissions = await this.prisma.commissionLedger.aggregate({
-      where: { shareholderId },
-      _sum: { amount: true },
-    });
+    const [contributions, profits, commissions, unlockInfo] = await Promise.all([
+      this.prisma.contribution.aggregate({
+        where: { shareholderId, status: 'APPROVED' },
+        _sum: { amount: true },
+      }),
+      this.prisma.profitLedger.aggregate({
+        where: { shareholderId },
+        _sum: { amount: true },
+      }),
+      this.prisma.commissionLedger.aggregate({
+        where: { shareholderId },
+        _sum: { amount: true },
+      }),
+      this.referralTreeService.getUnlockedLevel(shareholderId),
+    ]);
 
     const totalApprovedContribution = Number(contributions._sum.amount || 0);
     const profitSharingOwn = Number(profits._sum.amount || 0);
     const profitSharingReferral = Number(commissions._sum.amount || 0);
-    
-    // Calculate Distribution Dates
+    const holdingBalance = Number(shareholder.holdingBalance || 0);
+    const holdingShortfall = Math.max(0, 100000 - holdingBalance);
+    const holdingProgress = Math.min(100, Math.round((holdingBalance / 100000) * 10000) / 100);
+
+    // Product 360 Payout Calendar Distribution Dates (6th and 21st)
     const today = new Date();
-    let lastDistributionDate = new Date(today.getFullYear(), today.getMonth(), 1);
-    let nextDistributionDate = new Date(today.getFullYear(), today.getMonth(), 16);
-    
-    if (today.getDate() < 16) {
-      lastDistributionDate = new Date(today.getFullYear(), today.getMonth() - 1, 16);
-      nextDistributionDate = new Date(today.getFullYear(), today.getMonth(), 16);
+    const day = today.getDate();
+    const year = today.getFullYear();
+    const month = today.getMonth();
+
+    let lastDistributionDate: Date;
+    let nextDistributionDate: Date;
+
+    if (day < 6) {
+      lastDistributionDate = new Date(year, month - 1, 21);
+      nextDistributionDate = new Date(year, month, 6);
+    } else if (day < 21) {
+      lastDistributionDate = new Date(year, month, 6);
+      nextDistributionDate = new Date(year, month, 21);
     } else {
-      lastDistributionDate = new Date(today.getFullYear(), today.getMonth(), 16);
-      nextDistributionDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+      lastDistributionDate = new Date(year, month, 21);
+      nextDistributionDate = new Date(year, month + 1, 6);
     }
 
     return {
       shareholder: {
+        id: shareholder.id,
         name: shareholder.name || shareholder.shareholderId,
-        shareholderId: shareholder.shareholderId || shareholder.id.split('-')[0].toUpperCase(),
-        accountType: totalApprovedContribution > 0 ? 'Investor' : 'Non-Investor',
+        shareholderId: shareholder.shareholderId,
+        role: shareholder.role,
+        status: shareholder.status,
+        accountType: shareholder.accountType, // ZERO_CONTRIBUTION or CONTRIBUTION
+        referralCode: shareholder.referralCode,
+        currentRank: shareholder.currentRank || 'Unranked',
+        holdingBalance,
+        unlockedLevel: unlockInfo.effectiveLevel,
+        directReferralsCount: unlockInfo.directReferralsCount,
+        isLevelOverridden: unlockInfo.isOverridden,
       },
       metrics: {
         totalApprovedContribution,
         profitSharingOwn,
         profitSharingReferral,
         totalProfitReceived: profitSharingOwn + profitSharingReferral,
+        holdingBalance,
+        holdingShortfall,
+        holdingProgress,
+        isZeroContribution: shareholder.accountType === 'ZERO_CONTRIBUTION',
         lastDistributionDate: lastDistributionDate.toISOString(),
         nextDistributionDate: nextDistributionDate.toISOString(),
-      }
+      },
     };
   }
 

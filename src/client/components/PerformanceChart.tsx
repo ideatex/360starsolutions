@@ -114,7 +114,7 @@ export default function PerformanceChart() {
               axisLine={false}
               tickLine={false}
               className="fill-muted-foreground/80 text-[10px] font-semibold"
-              tickFormatter={(value) => `$${value}`}
+              tickFormatter={(value) => `₹${value}`}
               dx={-5}
             />
             <Tooltip 
@@ -127,8 +127,8 @@ export default function PerformanceChart() {
               labelStyle={{ fontWeight: 800, fontSize: 11, marginBottom: 4, color: 'var(--foreground)' }}
               itemStyle={{ fontSize: 11, fontWeight: 700 }}
               formatter={(value: any, name: any) => [
-                `$${Number(value).toLocaleString()}`, 
-                name === 'ROI' ? 'ROI Yield' : 'Referral Reward'
+                `₹${Number(value).toLocaleString('en-IN')}`, 
+                name === 'ROI' ? 'Profit Share' : 'Gratitude Share'
               ]}
             />
             <Area 

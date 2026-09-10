@@ -37,9 +37,13 @@ export default function LoginPage() {
       }
     },
     onError: (error: any) => {
+      const message = error.response?.data?.message 
+        || (error.code === 'ERR_NETWORK' || !error.response 
+            ? 'Unable to connect to authentication server. Please ensure the backend is running.' 
+            : 'Login failed. Please verify credentials.');
       toast({ 
-        title: "Access Denied", 
-        description: error.response?.data?.message || 'Login failed. Please verify credentials.', 
+        title: error.response?.data?.message ? "Access Denied" : "Connection Error", 
+        description: message, 
         type: "error" 
       });
     }
@@ -122,6 +126,17 @@ export default function LoginPage() {
           </button>
         </form>
 
+        <div className="mt-6 pt-5 border-t border-slate-100 text-center">
+          <p className="text-xs text-slate-500 font-medium">
+            New prospective applicant?{' '}
+            <Link 
+              href="/auth/signup" 
+              className="text-brand-primary hover:underline font-bold transition-colors inline-flex items-center gap-1"
+            >
+              Apply for Registration <ArrowRight size={12} />
+            </Link>
+          </p>
+        </div>
 
       </motion.div>
     </div>

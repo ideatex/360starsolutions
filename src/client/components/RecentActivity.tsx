@@ -123,7 +123,7 @@ export default function RecentActivity() {
           </div>
           <div className="text-right shrink-0">
             <p className={`text-xs font-extrabold ${activity.type === 'profit' ? 'text-brand-primary' : 'text-brand-accent'}`}>
-              +${activity.amount.toFixed(2)}
+              +₹{activity.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             <span className="text-[8px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40 mt-1 inline-block">
               {activity.status}

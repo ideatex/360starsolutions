@@ -65,7 +65,7 @@ const CustomNode = ({ data }: { data: any }) => {
           <div className="flex justify-between items-center">
             <span>Approved Amount:</span>
             <span className="text-brand-primary font-bold bg-brand-primary/10 px-2 py-0.5 rounded-md border border-brand-primary/20">
-              ${Number(data.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ₹{Number(data.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex justify-between items-center">
@@ -367,7 +367,7 @@ function ReferralTreeInner() {
                   <div>
                     <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Approved Contribution Amount</span>
                     <span className="text-brand-primary font-bold text-base block">
-                      ${Number(selectedNodeDetails.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      ₹{Number(selectedNodeDetails.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>

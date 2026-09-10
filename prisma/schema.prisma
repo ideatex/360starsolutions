@@ -14,6 +14,11 @@ enum Role {
   SUPER_ADMIN
 }
 
+enum AccountType {
+  ZERO_CONTRIBUTION
+  CONTRIBUTION
+}
+
 enum UserStatus {
   ACTIVE
   BLOCKED
@@ -21,6 +26,11 @@ enum UserStatus {
   DISABLED
   AUTO_ARCHIVED
   RESTORED
+  PENDING_APPROVAL
+  ZERO_ACTIVE
+  CONTRIBUTION_ACTIVE
+  SUSPENDED
+  CLOSED_EXPIRED
 }
 
 enum CommissionStatus {
@@ -56,6 +66,28 @@ enum WithdrawalType {
   FULL
 }
 
+enum HoldingLedgerType {
+  WITHHOLDING
+  AUTO_CONVERSION
+  ADJUSTMENT
+}
+
+enum RegistrationStatus {
+  DRAFT
+  PENDING_REVIEW
+  PENDING_ADMIN_REVIEW
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum SmsStatus {
+  PENDING
+  SENT
+  FAILED
+  DELIVERED
+}
+
 model Shareholder {
   id               String   @id @default(uuid())
   name             String   @default("")
@@ -64,12 +96,16 @@ model Shareholder {
   passwordHash     String
   role             Role     @default(SHAREHOLDER)
   status           UserStatus @default(ACTIVE)
+  accountType      AccountType @default(CONTRIBUTION)
   referralCode     String   @unique
   
   parentId         String?
   parent           Shareholder?    @relation("ReferralHierarchy", fields: [parentId], references: [id])
   children         Shareholder[]   @relation("ReferralHierarchy")
   
+  holdingBalance   Decimal  @default(0) @db.Decimal(19, 4)
+  unlockedLevelOverride Int?
+  currentRank      String?  // Bronze, Silver, Gold, Diamond
   
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
@@ -109,15 +145,26 @@ model Shareholder {
   commissionsSourced   CommissionLedger[]     @relation("CommissionSource")
   withdrawals          Withdrawal[]
   withdrawalsProcessed Withdrawal[]           @relation("WithdrawalProcessor")
+  
+  // Product 360 Relations
+  holdingLedgers           HoldingLedger[]
+  unlockOverridesReceived  AccountUnlockOverride[] @relation("OverrideUser")
+  unlockOverridesCreated   AccountUnlockOverride[] @relation("OverrideAdmin")
+  userRankHistories        UserRankHistory[]
+  referralRegistrations    RegistrationRequest[]   @relation("ReferrerRegistrations")
+  reviewedRegistrations    RegistrationRequest[]   @relation("ReviewedRegistrations")
+  smsLogs                  SmsLog[]
 
   @@map("User")
   @@index([parentId])
+  @@index([status])
+  @@index([accountType])
 }
 
 model Investment {
   id              String   @id @default(uuid())
-  shareholderId          String
-  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id])
+  shareholderId   String
+  shareholder     Shareholder     @relation(fields: [shareholderId], references: [id])
   amount          Decimal  @db.Decimal(19, 4)
   dailyProfitRate Decimal  @db.Decimal(5, 4)
   status          InvestmentStatus @default(PENDING)
@@ -132,6 +179,7 @@ model Investment {
   withdrawals     Withdrawal[]
 
   @@index([shareholderId])
+  @@index([status])
 }
 
 model Withdrawal {
@@ -162,11 +210,20 @@ model ProfitLedger {
   shareholder     Shareholder     @relation(fields: [shareholderId], references: [id])
   investmentId    String?
   investment      Investment? @relation(fields: [investmentId], references: [id])
+  contributionId  String?
+  contribution    Contribution? @relation(fields: [contributionId], references: [id])
   
   cycleStart      DateTime
   cycleEnd        DateTime
+  cycleIdentifier String?
   eligibleDays    Int
+  isFirstPayout   Boolean  @default(false)
+  activeDays      Int?
+  dailyRate       Decimal? @db.Decimal(9, 6)
+  rateBasis       String?  @default("MONTH_DAYS")
   amount          Decimal  @db.Decimal(19, 4)
+  profitShareRate Decimal? @db.Decimal(5, 4)
+  configVersionId String?
   status          PayoutStatus @default(PENDING)
   payoutBatchId   String?
   payoutBatch     PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
@@ -175,7 +232,10 @@ model ProfitLedger {
 
   @@index([shareholderId])
   @@index([investmentId])
+  @@index([contributionId])
   @@index([payoutBatchId])
+  @@index([cycleStart, cycleEnd])
+  @@index([cycleIdentifier])
 }
 
 model CommissionLedger {
@@ -184,10 +244,16 @@ model CommissionLedger {
   shareholder      Shareholder     @relation(fields: [shareholderId], references: [id])
   fromInvestmentId String?
   fromInvestment   Investment? @relation(fields: [fromInvestmentId], references: [id])
+  fromContributionId String?
+  fromContribution   Contribution? @relation(fields: [fromContributionId], references: [id])
   
+  cycleIdentifier  String?
   level            Int
   rate             Decimal  @db.Decimal(5, 4)
   amount           Decimal  @db.Decimal(19, 4)
+  gratitudeShareRate Decimal? @db.Decimal(5, 4)
+  calculationBase  Decimal? @db.Decimal(19, 4)
+  configVersionId  String?
   status           CommissionStatus @default(PENDING)
   payoutBatchId    String?
   payoutBatch      PayoutBatch? @relation(fields: [payoutBatchId], references: [id])
@@ -199,25 +265,48 @@ model CommissionLedger {
 
   @@index([shareholderId])
   @@index([fromInvestmentId])
+  @@index([fromContributionId])
   @@index([payoutBatchId])
+  @@index([level])
+  @@index([cycleIdentifier])
 }
 
 model PayoutBatch {
-  id              String   @id @default(uuid())
-  cycleStart      DateTime
-  cycleEnd        DateTime
-  status          BatchStatus @default(PENDING)
-  totalAmount     Decimal  @db.Decimal(19, 4)
+  id                  String       @id @default(uuid())
+  idempotencyKey      String?      @unique
+  cycleIdentifier     String?      @unique
+  cycleNumber         Int          @default(1)
+  cycleStart          DateTime
+  cycleEnd            DateTime
+  cutoffDate          DateTime?
+  payoutDate          DateTime?
+  status              BatchStatus  @default(PENDING)
+  totalAmount         Decimal      @db.Decimal(19, 4)
+  totalGrossProfit    Decimal      @default(0) @db.Decimal(19, 4)
+  totalGrossGratitude Decimal      @default(0) @db.Decimal(19, 4)
+  totalWithheld       Decimal      @default(0) @db.Decimal(19, 4)
+  totalNetPayable     Decimal      @default(0) @db.Decimal(19, 4)
+  totalBeneficiaries  Int          @default(0)
+  calculationVersion  Int          @default(1)
+  configVersionId     String?
+  reversalReason      String?
+  reversedAt          DateTime?
+  reversedById        String?
   
-  approvedAt      DateTime?
-  releasedAt      DateTime?
+  approvedAt          DateTime?
+  releasedAt          DateTime?
   
-  details         PayoutDetail[]
-  profitLedgers   ProfitLedger[]
-  commissions     CommissionLedger[]
+  details             PayoutDetail[]
+  profitLedgers       ProfitLedger[]
+  commissions         CommissionLedger[]
+  holdingLedgers      HoldingLedger[]
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([cycleStart, cycleEnd])
+  @@index([status])
+  @@index([cycleIdentifier])
 }
 
 enum BatchStatus {
@@ -226,32 +315,52 @@ enum BatchStatus {
   APPROVED
   RELEASED
   REJECTED
+  REVERSED
 }
 
 model PayoutDetail {
-  id              String   @id @default(uuid())
-  batchId         String
-  batch           PayoutBatch @relation(fields: [batchId], references: [id])
-  shareholderId          String
-  shareholder            Shareholder        @relation(fields: [shareholderId], references: [id])
+  id                  String   @id @default(uuid())
+  batchId             String
+  batch               PayoutBatch @relation(fields: [batchId], references: [id])
+  shareholderId       String
+  shareholder         Shareholder        @relation(fields: [shareholderId], references: [id])
   
-  profitAmount    Decimal  @db.Decimal(19, 4)
-  commissionAmount Decimal @db.Decimal(19, 4)
-  totalAmount     Decimal  @db.Decimal(19, 4)
+  // Backward compatibility fields
+  profitAmount        Decimal  @db.Decimal(19, 4)
+  commissionAmount    Decimal  @db.Decimal(19, 4)
+  totalAmount         Decimal  @db.Decimal(19, 4)
   
-  status          PayoutStatus @default(PENDING)
+  // Product 360 statement fields
+  isFirstPayout       Boolean  @default(false)
+  activeDays          Int?
+  dailyRate           Decimal? @db.Decimal(9, 6)
+  prorationBasis      String?
+  effectiveLevel      Int      @default(1)
+  grossProfitShare    Decimal  @default(0) @db.Decimal(19, 4)
+  grossGratitudeShare Decimal  @default(0) @db.Decimal(19, 4)
+  withheldAmount      Decimal  @default(0) @db.Decimal(19, 4)
+  deductions          Decimal  @default(0) @db.Decimal(19, 4)
+  netPayable          Decimal  @default(0) @db.Decimal(19, 4)
+  calculationVersion  Int      @default(1)
+  configVersionId     String?
   
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  status              PayoutStatus @default(PENDING)
+  
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
+  @@unique([batchId, shareholderId], name: "unique_batch_shareholder_detail")
   @@index([batchId])
   @@index([shareholderId])
+  @@index([status])
 }
 
 enum PayoutStatus {
   PENDING
   PROCESSED
+  PAID
   FAILED
+  REVERSED
 }
 
 model SystemSetting {
@@ -262,21 +371,28 @@ model SystemSetting {
 
 model AuditLog {
   id              String   @id @default(uuid())
-  shareholderId          String?
+  shareholderId   String?
+  role            String?
   action          String
   entityType      String
   entityId        String?
   oldValue        String?
   newValue        String?
+  reason          String?
   ipAddress       String?
   
   createdAt       DateTime @default(now())
+
+  @@index([shareholderId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
 }
 
 model Notification {
   id              String   @id @default(uuid())
-  shareholderId          String
-  shareholder            Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  shareholderId   String
+  shareholder     Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
   title           String
   message         String
   isRead          Boolean  @default(false)
@@ -286,23 +402,156 @@ model Notification {
   priority        NotificationPriority @default(MEDIUM)
   
   createdAt       DateTime @default(now())
+
+  @@index([shareholderId])
+  @@index([isRead])
 }
 
 model Contribution {
   id              String             @id @default(uuid())
-  shareholderId          String
-  shareholder            Shareholder               @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  shareholderId   String
+  shareholder     Shareholder        @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
   amount          Decimal            @db.Decimal(19, 4)
-  mode            String             // Cash, Bank Transfer, Cheque, etc.
+  mode            String             // Cash, Bank Transfer, Cheque, Holding Activation
   date            DateTime
   issuedAgreement Boolean            @default(false)
   issuedCheque    Boolean            @default(false)
   status          ContributionStatus @default(PENDING)
   validityMonths  Int                @default(12)
+  
+  // Product 360 fields
+  paymentProofUrl  String?
+  paymentProofFile String?
+  approvedById     String?
+  approvedAt       DateTime?
+  effectiveDate    DateTime?
+  activeDate       DateTime?
+  isAutoConverted  Boolean            @default(false)
+  rejectionReason  String?
+  
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  profitLedgers    ProfitLedger[]
+  commissionLedgers CommissionLedger[]
+
+  @@index([shareholderId])
+  @@index([status])
+  @@index([date])
+}
+
+model HoldingLedger {
+  id              String             @id @default(uuid())
+  shareholderId   String
+  shareholder     Shareholder        @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  payoutBatchId   String?
+  payoutBatch     PayoutBatch?       @relation(fields: [payoutBatchId], references: [id])
+  amount          Decimal            @db.Decimal(19, 4)
+  balanceBefore   Decimal            @db.Decimal(19, 4)
+  balanceAfter    Decimal            @db.Decimal(19, 4)
+  type            HoldingLedgerType
+  remarks         String?
+  createdAt       DateTime           @default(now())
+
+  @@index([shareholderId])
+  @@index([payoutBatchId])
+  @@index([type])
+}
+
+model AccountUnlockOverride {
+  id              String             @id @default(uuid())
+  shareholderId   String
+  shareholder     Shareholder        @relation("OverrideUser", fields: [shareholderId], references: [id], onDelete: Cascade)
+  previousLevel   Int
+  newLevel        Int
+  reason          String
+  remark          String?
+  createdById     String
+  createdBy       Shareholder        @relation("OverrideAdmin", fields: [createdById], references: [id])
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
   @@index([shareholderId])
+  @@index([createdById])
+}
+
+model RankConfiguration {
+  id                  String         @id @default(uuid())
+  name                String         @unique // Bronze, Silver, Gold, Diamond
+  requiredVolume      Decimal        @db.Decimal(19, 4)
+  maxStrongestLeg     Decimal        @db.Decimal(19, 4)
+  minOtherLegs        Decimal        @db.Decimal(19, 4)
+  orderIndex          Int            @default(1)
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+model UserRankHistory {
+  id                  String         @id @default(uuid())
+  shareholderId       String
+  shareholder         Shareholder    @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  rankName            String
+  teamVolume          Decimal        @db.Decimal(19, 4)
+  achievedAt          DateTime       @default(now())
+
+  @@index([shareholderId])
+}
+
+model RegistrationRequest {
+  id                  String             @id @default(uuid())
+  name                String
+  phone               String
+  accountType         AccountType        @default(CONTRIBUTION)
+  referrerId          String?
+  referrer            Shareholder?       @relation("ReferrerRegistrations", fields: [referrerId], references: [id])
+  contributionAmount  Decimal?           @db.Decimal(19, 4)
+  paymentProofUrl     String?
+  paymentProofFileName String?
+  status              RegistrationStatus @default(PENDING_REVIEW)
+  rejectionReason     String?
+  reviewedById        String?
+  reviewedBy          Shareholder?       @relation("ReviewedRegistrations", fields: [reviewedById], references: [id])
+  reviewedAt          DateTime?
+  createdShareholderId String?
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+
+  @@index([status])
+  @@index([referrerId])
+  @@index([phone])
+}
+
+model SmsLog {
+  id                  String             @id @default(uuid())
+  recipient           String
+  shareholderId       String?
+  shareholder         Shareholder?       @relation(fields: [shareholderId], references: [id])
+  message             String
+  template            String?
+  provider            String             @default("MOCK_GATEWAY")
+  providerResponse    String?
+  status              SmsStatus          @default(SENT)
+  retryCount          Int                @default(0)
+  createdAt           DateTime           @default(now())
+
+  @@index([recipient])
+  @@index([shareholderId])
+  @@index([status])
+}
+
+model ReconciliationLog {
+  id                  String             @id @default(uuid())
+  checkType           String             // CONTRIBUTIONS, PROFITS, GRATITUDE, HOLDING, PAYOUTS
+  expectedValue       Decimal            @db.Decimal(19, 4)
+  actualValue         Decimal            @db.Decimal(19, 4)
+  difference          Decimal            @db.Decimal(19, 4)
+  status              String             // BALANCED, DISCREPANCY
+  details             Json?
+  createdAt           DateTime           @default(now())
+
+  @@index([checkType])
+  @@index([status])
 }
 
 model BusinessConfiguration {
@@ -318,8 +567,18 @@ model BusinessConfiguration {
   referralLevelSettings     Json?
   systemDefaults            Json?
   futureBusinessParameters  Json?
+  
+  // Product 360 centralized configuration JSONs
+  gratitudeShareConfig      Json?    // L1-L12 percentages
+  levelUnlockConfig         Json?    // 1 direct -> L3, 2 -> L6, 3 -> L9, 4 -> L12
+  rankConfig                Json?    // Bronze, Silver, Gold, Diamond rules
+  payoutConfig              Json?    // Calendar cutoff dates
+  prorationConfig           Json?    // Pending client confirmation settings
+  
   createdById               String
   createdAt                 DateTime @default(now())
+
+  @@index([version])
 }
 
 model Announcement {
@@ -345,8 +604,8 @@ model AnnouncementRead {
   id             String       @id @default(uuid())
   announcementId String
   announcement   Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  shareholderId         String
-  shareholder           Shareholder         @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  shareholderId  String
+  shareholder    Shareholder  @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
   readAt         DateTime     @default(now())
 
   @@unique([announcementId, shareholderId])
@@ -355,9 +614,9 @@ model AnnouncementRead {
 model Message {
   id                   String              @id @default(uuid())
   senderId             String
-  sender               Shareholder                @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  sender               Shareholder         @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   recipientId          String
-  recipient            Shareholder                @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
+  recipient            Shareholder         @relation("ReceivedMessages", fields: [recipientId], references: [id], onDelete: Cascade)
   subject              String?
   content              String
   parentMessageId      String?
@@ -423,13 +682,12 @@ model JwtBlacklist {
   createdAt DateTime @default(now())
 }
 
-
 model BusinessVolume {
-  id          String   @id @default(uuid())
-  shareholderId      String
-  level       Int
-  totalVolume Decimal  @db.Decimal(19, 4)
-  updatedAt   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  shareholderId String
+  level         Int
+  totalVolume   Decimal  @db.Decimal(19, 4)
+  updatedAt     DateTime @updatedAt
 
   @@unique([shareholderId, level])
 }
@@ -457,15 +715,15 @@ enum CalculationStatus {
 }
 
 model ProfitCalculation {
-  id           String            @id @default(uuid())
-  shareholderId       String
-  level        Int
-  volume       Decimal           @db.Decimal(19, 4)
-  profitAmount Decimal           @db.Decimal(19, 4)
-  batchId      String?
-  status       CalculationStatus @default(PENDING)
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id            String            @id @default(uuid())
+  shareholderId String
+  level         Int
+  volume        Decimal           @db.Decimal(19, 4)
+  profitAmount  Decimal           @db.Decimal(19, 4)
+  batchId       String?
+  status        CalculationStatus @default(PENDING)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 }
 
 enum ContributionStatus {
@@ -484,8 +742,8 @@ enum InvestorStatus {
 
 model InvestorProfile {
   id           String         @id @default(uuid())
-  shareholderId       String         @unique
-  shareholder         Shareholder           @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  shareholderId String        @unique
+  shareholder   Shareholder   @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
   status       InvestorStatus @default(ACTIVE)
   activatedAt  DateTime       @default(now())
   investorType String         @default("STANDARD")
@@ -509,8 +767,8 @@ model ReferralRelationship {
 
 model ContributionSummary {
   id            String   @id @default(uuid())
-  shareholderId        String   @unique
-  shareholder          Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  shareholderId String   @unique
+  shareholder   Shareholder     @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
   totalApproved Decimal  @db.Decimal(19, 4) @default(0)
   totalPending  Decimal  @db.Decimal(19, 4) @default(0)
   totalRejected Decimal  @db.Decimal(19, 4) @default(0)
@@ -520,14 +778,13 @@ model ContributionSummary {
 model ProfitConfiguration {
   id                  String   @id @default(uuid())
   version             Int      @default(1)
-  maxReferralLevels   Int      @default(7)
+  maxReferralLevels   Int      @default(12)
   levelOpeningVolumes Json     // e.g. {"1": 10000, "2": 25000}
-  levelPercentages    Json     // e.g. {"1": 0.05, "2": 0.03}
+  levelPercentages    Json     // e.g. {"1": 0.01, "2": 0.005}
   effectiveDate       DateTime @default(now())
   status              String   @default("ACTIVE") // ACTIVE, INACTIVE, DRAFT
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 }
-
 
 

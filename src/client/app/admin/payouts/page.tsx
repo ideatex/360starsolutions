@@ -8,9 +8,11 @@ import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Landmark, Calendar, DollarSign, Play, Loader2, Info, Users, 
-  ChevronDown, ChevronUp, Search, Download, CheckCircle, Clock, 
-  FileSpreadsheet, FileText, Building, CreditCard, RefreshCw, Layers
+  Landmark, Calendar, Play, Loader2, Info, Users, 
+  ChevronDown, ChevronUp, Search, CheckCircle, Clock, 
+  FileSpreadsheet, FileText, Building, CreditCard, RefreshCw, 
+  ShieldCheck, Eye, AlertTriangle, ArrowRight, X, Printer,
+  FileCheck2, CheckCircle2, RotateCcw
 } from 'lucide-react';
 import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
 
@@ -23,16 +25,32 @@ export default function AdminPayoutsPage() {
   // Navigation Tabs
   const [activeTab, setActiveTab] = useState<'shareholders' | 'batches'>('shareholders');
 
-  // Batches state
-  const [cycleStart, setCycleStart] = useState('');
-  const [cycleEnd, setCycleEnd] = useState('');
+  // Selected Cycle for generation / preview
+  const [selectedCycleId, setSelectedCycleId] = useState<string>('');
   const [batchPage, setBatchPage] = useState(1);
   const [expandedBatchId, setExpandedBatchId] = useState<string | null>(null);
+
+  // Modals & Drawers state
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [previewData, setPreviewData] = useState<any>(null);
+  const [selectedStatementDetailId, setSelectedStatementDetailId] = useState<string | null>(null);
+  const [statementData, setStatementData] = useState<any>(null);
+  const [isStatementLoading, setIsStatementLoading] = useState(false);
+  const [reconciliationBatchId, setReconciliationBatchId] = useState<string | null>(null);
 
   // Shareholder Payouts Ledger state
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [shareholderPage, setShareholderPage] = useState(1);
+
+  // Fetch Available Canonical Cycles
+  const { data: availableCycles, isLoading: loadingCycles } = useQuery({
+    queryKey: ['adminPayoutCycles'],
+    queryFn: async () => {
+      const res = await api.get('/admin/payouts/cycles');
+      return res.data;
+    }
+  });
 
   // Fetch Payout Batches
   const { data: batches, isLoading: loadingBatches } = useQuery({
@@ -46,7 +64,7 @@ export default function AdminPayoutsPage() {
   });
 
   // Fetch Master Shareholder Payouts Ledger
-  const { data: shareholderPayouts, isLoading: loadingShareholderPayouts, refetch: refetchShareholders } = useQuery({
+  const { data: shareholderPayouts, isLoading: loadingShareholderPayouts } = useQuery({
     queryKey: ['adminShareholderPayouts', search, statusFilter, shareholderPage],
     queryFn: async () => {
       const res = await api.get('/admin/payouts/shareholder-payouts', {
@@ -67,17 +85,50 @@ export default function AdminPayoutsPage() {
     enabled: !!expandedBatchId,
   });
 
+  // Fetch Reconciliation for a batch
+  const { data: reconciliationData, isLoading: loadingReconciliation } = useQuery({
+    queryKey: ['adminBatchReconciliation', reconciliationBatchId],
+    queryFn: async () => {
+      if (!reconciliationBatchId) return null;
+      const res = await api.get(`/admin/payouts/batches/${reconciliationBatchId}/reconciliation`);
+      return res.data;
+    },
+    enabled: !!reconciliationBatchId,
+  });
+
+  // Preview Batch Mutation
+  const previewMutation = useMutation({
+    mutationFn: async (cycleIdentifier: string) => {
+      const res = await api.get('/admin/payouts/preview', {
+        params: { cycleIdentifier }
+      });
+      return res.data;
+    },
+    onSuccess: (data) => {
+      setPreviewData(data);
+      setIsPreviewOpen(true);
+    },
+    onError: (err: any) => {
+      toast({ title: "Preview Failed", description: err.response?.data?.message || 'Error generating preview', type: "error" });
+    }
+  });
+
   // Generate Batch Mutation
   const generateMutation = useMutation({
-    mutationFn: async () => {
-      await api.post('/admin/payouts/batches/generate', { cycleStart, cycleEnd });
+    mutationFn: async (cycleIdentifier: string) => {
+      const res = await api.post('/admin/payouts/batches/generate', { cycleIdentifier });
+      return res.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['adminBatches'] });
       queryClient.invalidateQueries({ queryKey: ['adminShareholderPayouts'] });
-      setCycleStart('');
-      setCycleEnd('');
-      toast({ title: "Cycle Batch Generated", description: "Payout parameters analyzed and cycle created with shareholder payouts.", type: "success" });
+      queryClient.invalidateQueries({ queryKey: ['adminPayoutCycles'] });
+      setIsPreviewOpen(false);
+      toast({ 
+        title: "Payout Batch Generated", 
+        description: `Batch for ${data.cycleIdentifier} generated successfully with ${data.totalBeneficiaries} beneficiaries totaling ₹${Number(data.totalNetPayable || data.totalAmount).toLocaleString('en-IN')}.`, 
+        type: "success" 
+      });
     },
     onError: (err: any) => {
       toast({ title: "Generation Error", description: err.response?.data?.message || 'Error generating batch', type: "error" });
@@ -92,10 +143,11 @@ export default function AdminPayoutsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminBatches'] });
       queryClient.invalidateQueries({ queryKey: ['adminShareholderPayouts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminPayoutCycles'] });
       toast({ title: "Batch Approved", description: "Cycle marked as Approved. Ready for fund release.", type: "success" });
     },
     onError: (err: any) => {
-      toast({ title: "Verification Failed", description: err.response?.data?.message || 'Error approving batch', type: "error" });
+      toast({ title: "Approval Failed", description: err.response?.data?.message || 'Error approving batch', type: "error" });
     },
   });
 
@@ -107,50 +159,66 @@ export default function AdminPayoutsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminBatches'] });
       queryClient.invalidateQueries({ queryKey: ['adminShareholderPayouts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminPayoutCycles'] });
       if (expandedBatchId) {
         queryClient.invalidateQueries({ queryKey: ['adminBatchDetails', expandedBatchId] });
       }
-      toast({ title: "Funds Dispatched", description: "All cycle ledger profits and commissions have been released to shareholders.", type: "success" });
+      toast({ title: "Funds Dispatched", description: "All cycle ledger profits and commissions have been released to shareholders in INR.", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Dispatch Failed", description: err.response?.data?.message || 'Error releasing batch', type: "error" });
     },
   });
 
-  // Reprocess Batch Mutation (Super Admin Only)
-  const reprocessBatchMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await api.post(`/admin/payouts/batches/${id}/reprocess`);
+  // Reverse Batch Mutation (Super Admin Only)
+  const reverseBatchMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason: string }) => {
+      await api.post(`/admin/payouts/batches/${id}/reverse`, { reason });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminBatches'] });
       queryClient.invalidateQueries({ queryKey: ['adminShareholderPayouts'] });
+      queryClient.invalidateQueries({ queryKey: ['adminPayoutCycles'] });
       if (expandedBatchId) {
         queryClient.invalidateQueries({ queryKey: ['adminBatchDetails', expandedBatchId] });
       }
-      toast({ title: "Batch Reset for Reprocessing", description: "Batch unlinked and commissions reset to pending eligibility.", type: "success" });
+      toast({ title: "Batch Reversed", description: "Payout batch and associated ledgers have been marked as REVERSED.", type: "success" });
     },
     onError: (err: any) => {
-      toast({ title: "Reprocess Failed", description: err.response?.data?.message || 'Error reprocessing batch', type: "error" });
+      toast({ title: "Reversal Failed", description: err.response?.data?.message || 'Error reversing batch', type: "error" });
     },
   });
 
-  const handleReprocessBatch = async (id: string) => {
+  const handleOpenStatement = async (detailId: string) => {
+    setSelectedStatementDetailId(detailId);
+    setIsStatementLoading(true);
+    try {
+      const res = await api.get(`/admin/payouts/statements/${detailId}`);
+      setStatementData(res.data);
+    } catch (e: any) {
+      toast({ title: "Statement Error", description: e.response?.data?.message || "Could not fetch statement.", type: "error" });
+      setSelectedStatementDetailId(null);
+    } finally {
+      setIsStatementLoading(false);
+    }
+  };
+
+  const handleReverseBatch = async (id: string) => {
     const ok = await confirm({
-      title: "Reprocess Payout Batch",
-      description: "AUTHORIZED SUPER ADMIN ACTION: You are resetting this payout batch. All linked commissions will be unlinked and restored to PENDING status so they can be re-calculated in future batches. Do you wish to proceed?",
-      confirmText: "Reset & Reprocess",
+      title: "Reverse Payout Batch",
+      description: "AUTHORIZED SUPER ADMIN ACTION: You are about to formally reverse this payout batch. All associated earnings will transition to REVERSED state. This action is recorded in the financial audit log. Do you wish to proceed?",
+      confirmText: "Confirm Reversal",
       variant: "danger"
     });
     if (ok) {
-      reprocessBatchMutation.mutate(id);
+      reverseBatchMutation.mutate({ id, reason: 'Super Admin initiated manual reversal' });
     }
   };
 
   const handleApprove = async (id: string) => {
     const ok = await confirm({
       title: "Approve Payout Batch",
-      description: "You are about to authorize this cycle's payouts. This action transitions the batch to approved status. Do you wish to continue?",
+      description: "You are about to authorize this cycle's payouts. This transitions the batch to APPROVED status. Do you wish to continue?",
       confirmText: "Approve Batch",
       variant: "success"
     });
@@ -162,7 +230,7 @@ export default function AdminPayoutsPage() {
   const handleRelease = async (id: string) => {
     const ok = await confirm({
       title: "Release Payout Funds",
-      description: "CRITICAL: You are about to initiate final bank transfers and credit ledger transactions for all shareholders in this cycle. This action is immutable. Do you wish to proceed?",
+      description: "CRITICAL: You are about to initiate final fund release and mark earnings as PAID for all shareholders in this cycle. This action is immutable. Do you wish to proceed?",
       confirmText: "Release Funds",
       variant: "danger"
     });
@@ -188,10 +256,11 @@ export default function AdminPayoutsPage() {
       "Bank Name",
       "Branch",
       "IFSC Code",
-      "Profits ($)",
-      "Commissions ($)",
-      "Payouts ($)",
-      "Cycle Range",
+      "Profit Share (₹)",
+      "Gratitude Share (₹)",
+      "Withheld (₹)",
+      "Net Payout (₹)",
+      "Cycle Identifier",
       "Status"
     ];
 
@@ -205,10 +274,11 @@ export default function AdminPayoutsPage() {
       item.shareholder?.bankName || '-',
       item.shareholder?.bankBranch || '-',
       item.shareholder?.bankIfsc || '-',
-      Number(item.profitAmount || 0).toFixed(2),
-      Number(item.commissionAmount || 0).toFixed(2),
-      Number(item.totalAmount || 0).toFixed(2),
-      item.batch ? `${new Date(item.batch.cycleStart).toLocaleDateString()} - ${new Date(item.batch.cycleEnd).toLocaleDateString()}` : '-',
+      Number(item.grossProfitShare || item.profitAmount || 0).toFixed(2),
+      Number(item.grossGratitudeShare || item.commissionAmount || 0).toFixed(2),
+      Number(item.withheldAmount || 0).toFixed(2),
+      Number(item.netPayable || item.totalAmount || 0).toFixed(2),
+      item.batch?.cycleIdentifier || `${new Date(item.batch?.cycleStart).toLocaleDateString()} - ${new Date(item.batch?.cycleEnd).toLocaleDateString()}`,
       item.status
     ]);
 
@@ -238,23 +308,23 @@ export default function AdminPayoutsPage() {
       { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
       { header: 'Account No.', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
       { header: 'IFSC Code', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
-      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Profit Share (₹)', key: 'grossProfitShare', formatter: (_, r) => Number(r.grossProfitShare || r.profitAmount || 0).toFixed(2) },
+      { header: 'Gratitude (₹)', key: 'grossGratitudeShare', formatter: (_, r) => Number(r.grossGratitudeShare || r.commissionAmount || 0).toFixed(2) },
+      { header: 'Net Payout (₹)', key: 'netPayable', formatter: (_, r) => Number(r.netPayable || r.totalAmount || 0).toFixed(2) },
       { header: 'Status', key: 'status' },
     ];
 
-    const totalPayout = list.reduce((acc: number, item: any) => acc + Number(item.totalAmount || 0), 0);
+    const totalPayout = list.reduce((acc: number, item: any) => acc + Number(item.netPayable || item.totalAmount || 0), 0);
 
     exportToPDF(
       'shareholder_payouts_ledger',
-      'Shareholder Payouts Ledger Report',
+      'Shareholder Payouts Ledger Report (INR)',
       `Filter Status: ${statusFilter || 'All Statuses'} | Search: ${search || 'None'}`,
       columns,
       list,
       [
         { label: 'Total Payout Records', value: list.length },
-        { label: 'Total Dispatched Payout', value: `$${totalPayout.toFixed(2)}` }
+        { label: 'Total Net Dispatched Payout', value: `₹${totalPayout.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` }
       ]
     );
 
@@ -269,134 +339,51 @@ export default function AdminPayoutsPage() {
     }
     const columns: ExportColumn[] = [
       { header: 'Batch ID', key: 'id' },
+      { header: 'Cycle Identifier', key: 'cycleIdentifier' },
       { header: 'Cycle Start Date', key: 'cycleStart', formatter: (v) => new Date(v).toLocaleDateString() },
       { header: 'Cycle End Date', key: 'cycleEnd', formatter: (v) => new Date(v).toLocaleDateString() },
-      { header: 'Total Dispatched Amount ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'Total Net Payable (₹)', key: 'totalNetPayable', formatter: (v, r) => Number(v || r.totalAmount || 0).toFixed(2) },
       { header: 'Status', key: 'status' },
     ];
     exportToCSV('payout_batches_summary', columns, list);
     toast({ title: "CSV Downloaded", description: "Exported payout batches summary to CSV.", type: "success" });
   };
 
-  const handleExportBatchesPDF = () => {
-    const list = batches?.data || [];
-    if (list.length === 0) {
-      toast({ title: "No Data", description: "No payout batch cycles available.", type: "warning" });
-      return;
-    }
-    const columns: ExportColumn[] = [
-      { header: 'Batch ID', key: 'id' },
-      { header: 'Cycle Start', key: 'cycleStart', formatter: (v) => new Date(v).toLocaleDateString() },
-      { header: 'Cycle End', key: 'cycleEnd', formatter: (v) => new Date(v).toLocaleDateString() },
-      { header: 'Total Dispatched Amount ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Status', key: 'status' },
-    ];
-    const totalAmount = list.reduce((acc: number, item: any) => acc + Number(item.totalAmount || 0), 0);
-    exportToPDF(
-      'payout_batches_summary',
-      'Payout Batches Summary Report',
-      'Twice-Monthly Automatic Payout Cycle Records',
-      columns,
-      list,
-      [
-        { label: 'Total Batches Logged', value: list.length },
-        { label: 'Gross Dispatched Capital', value: `$${totalAmount.toFixed(2)}` }
-      ]
-    );
-    toast({ title: "PDF Generated", description: "Opened printable payout batches summary report.", type: "success" });
-  };
-
-  const handleExportSingleBatchCSV = (batch: any, details: any[]) => {
-    if (!details || details.length === 0) {
-      toast({ title: "No Data", description: "No payout items in this batch.", type: "warning" });
-      return;
-    }
-    const columns: ExportColumn[] = [
-      { header: 'Payout ID', key: 'id' },
-      { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
-      { header: 'Shareholder Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
-      { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
-      { header: 'Account Number', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
-      { header: 'IFSC Code', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
-      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Status', key: 'status' }
-    ];
-    exportToCSV(`payout_batch_${batch.id}`, columns, details);
-    toast({ title: "CSV Exported", description: `Downloaded CSV for Batch ${batch.id}`, type: "success" });
-  };
-
-  const handleExportSingleBatchPDF = (batch: any, details: any[]) => {
-    if (!details || details.length === 0) {
-      toast({ title: "No Data", description: "No payout items in this batch.", type: "warning" });
-      return;
-    }
-    const columns: ExportColumn[] = [
-      { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
-      { header: 'Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
-      { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
-      { header: 'Account No.', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
-      { header: 'IFSC', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
-      { header: 'Profits ($)', key: 'profitAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Commissions ($)', key: 'commissionAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Payouts ($)', key: 'totalAmount', formatter: (v) => Number(v || 0).toFixed(2) },
-      { header: 'Status', key: 'status' }
-    ];
-    const totalAmount = Number(batch.totalAmount || 0).toFixed(2);
-    exportToPDF(
-      `payout_batch_${batch.id}`,
-      `Payout Cycle Batch Report: ${batch.id}`,
-      `Cycle Range: ${new Date(batch.cycleStart).toLocaleDateString()} - ${new Date(batch.cycleEnd).toLocaleDateString()} | Batch Status: ${batch.status}`,
-      columns,
-      details,
-      [
-        { label: 'Batch ID', value: batch.id },
-        { label: 'Shareholders Count', value: details.length },
-        { label: 'Batch Net Total', value: `$${totalAmount}` }
-      ]
-    );
-    toast({ title: "PDF Report Generated", description: `Opened printable PDF for Batch ${batch.id}`, type: "success" });
-  };
-
-  const isSuperAdmin = shareholder?.role === 'SUPER_ADMIN';
-
   return (
-    <motion.div 
-      initial={{ opacity: 0, y: 15 }} 
-      animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto pb-12"
-    >
-      {/* Title Header */}
-      <div className="border-b border-border-subtle pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+      {/* Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <Landmark className="w-7 h-7 text-brand-primary" /> Shareholder Payout Management
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <Landmark className="text-brand-primary w-7 h-7" />
+            Payout Batches & Financial Statements
           </h1>
-          <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Audit individual shareholder profit payouts, bank accounts, and twice-monthly batch release cycles.</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Authoritative Product 360 Fortnightly Engine • 5% Monthly Profit Share • L1–L12 Gratitude Share • Payouts on 6th & 21st
+          </p>
         </div>
 
-        {/* Tab Switcher */}
-        <div className="flex bg-muted/40 p-1 rounded-2xl border border-border-subtle select-none">
+        {/* Global Navigation Tabs */}
+        <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-2xl border border-border-subtle">
           <button
             onClick={() => setActiveTab('shareholders')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'shareholders'
-                ? 'bg-brand-primary text-white shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                ? 'bg-brand-primary text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Users size={14} /> Shareholder Payouts ({shareholderPayouts?.total || 0})
+            Shareholder Payouts Ledger
           </button>
           <button
             onClick={() => setActiveTab('batches')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
               activeTab === 'batches'
-                ? 'bg-brand-primary text-white shadow-md'
-                : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
+                ? 'bg-brand-primary text-white shadow-xs'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
           >
-            <Layers size={14} /> Payout Batches ({batches?.total || 0})
+            Fortnightly Batches
           </button>
         </div>
       </div>
@@ -415,21 +402,21 @@ export default function AdminPayoutsPage() {
 
         <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Contribution Fund Earnings</h3>
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Profit Share (5%)</h3>
             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
-              ${Number(shareholderPayouts?.summary?.totalProfit || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ₹{Number(shareholderPayouts?.summary?.totalProfit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
           <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-            <DollarSign size={22} />
+            <CheckCircle size={22} />
           </div>
         </div>
 
         <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Referral Earnings</h3>
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Gratitude Share</h3>
             <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
-              ${Number(shareholderPayouts?.summary?.totalCommission || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ₹{Number(shareholderPayouts?.summary?.totalCommission || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
           <div className="p-3 bg-blue-500/10 rounded-xl text-blue-600">
@@ -439,9 +426,9 @@ export default function AdminPayoutsPage() {
 
         <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gross Dispatched Payout</h3>
+            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Net Dispatched Payout</h3>
             <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
-              ${Number(shareholderPayouts?.summary?.totalPayout || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+              ₹{Number(shareholderPayouts?.summary?.totalPayout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
           <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600">
@@ -450,42 +437,69 @@ export default function AdminPayoutsPage() {
         </div>
       </div>
 
-      {/* Date Picker & Batch Generator Controls */}
+      {/* Canonical Cycle Engine Generator & Pre-Execution Preview Controls */}
       <div className="bg-white dark:bg-card p-6 rounded-3xl border border-border-subtle shadow-sm space-y-4">
-        <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-subtle pb-4 gap-2">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-brand-primary" />
-            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Generate Payout Batch Cycle</h2>
+            <h2 className="text-sm font-bold text-gray-900 dark:text-white">Authoritative Fortnightly Cycle Engine</h2>
           </div>
-          <span className="text-[10px] text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full border border-border-subtle font-semibold">
-            Twice-Monthly Automatic Payout Engine
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 font-semibold flex items-center gap-1">
+              <ShieldCheck size={12} /> Idempotent & Concurrency Safe
+            </span>
+            <span className="text-[10px] text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full border border-border-subtle font-semibold">
+              Payouts on 6th & 21st
+            </span>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row items-end gap-4">
           <div className="flex-1 space-y-1.5 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">Cycle Start Date</label>
-            <input type="date" value={cycleStart} onChange={e => setCycleStart(e.target.value)} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/40 text-muted-foreground" />
+            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+              Select Canonical Payout Cycle
+            </label>
+            <select
+              value={selectedCycleId}
+              onChange={(e) => setSelectedCycleId(e.target.value)}
+              className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/40 text-foreground"
+            >
+              <option value="">-- Choose Canonical Cycle --</option>
+              {availableCycles?.map((c: any) => (
+                <option key={c.cycleIdentifier} value={c.cycleIdentifier}>
+                  {c.label} {c.hasBatch ? `[Generated: ${c.batchStatus}]` : '[Not Generated]'}
+                </option>
+              ))}
+            </select>
           </div>
-          <div className="flex-1 space-y-1.5 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">Cycle End Date</label>
-            <input type="date" value={cycleEnd} onChange={e => setCycleEnd(e.target.value)} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/40 text-muted-foreground" />
+
+          <div className="flex items-center gap-3 w-full md:w-auto">
+            {/* Preview Button */}
+            <button
+              onClick={() => selectedCycleId && previewMutation.mutate(selectedCycleId)}
+              disabled={!selectedCycleId || previewMutation.isPending}
+              className="flex-1 md:flex-initial bg-secondary hover:bg-secondary/80 text-foreground font-bold px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 h-[38px] text-xs uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 border border-border-subtle"
+            >
+              {previewMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+              Preview Calculation
+            </button>
+
+            {/* Direct Generate Button */}
+            <button
+              onClick={() => selectedCycleId && generateMutation.mutate(selectedCycleId)}
+              disabled={!selectedCycleId || generateMutation.isPending}
+              className="flex-1 md:flex-initial bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50 h-[38px] text-xs uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 select-none shrink-0 shadow-sm"
+            >
+              {generateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+              Generate Batch
+            </button>
           </div>
-          <button
-            onClick={() => generateMutation.mutate()}
-            disabled={!cycleStart || !cycleEnd || generateMutation.isPending}
-            className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-6 py-3 rounded-xl transition-colors disabled:opacity-50 h-[38px] text-xs uppercase tracking-wider cursor-pointer flex items-center gap-1.5 select-none shrink-0 shadow-sm"
-          >
-            {generateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-            Generate Payout Batch
-          </button>
         </div>
       </div>
 
       {/* TAB 1: ALL SHAREHOLDER PAYOUTS LEDGER */}
       {activeTab === 'shareholders' && (
         <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden space-y-4">
-          {/* Table Toolbar & Search Filters */}
           <div className="p-5 border-b border-border-subtle bg-muted/10 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="relative w-full md:w-80">
               <Search className="absolute left-3.5 top-3 w-4 h-4 text-muted-foreground" />
@@ -498,108 +512,106 @@ export default function AdminPayoutsPage() {
               />
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
-              <select 
-                value={statusFilter} 
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              <select
+                value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setShareholderPage(1); }}
-                className="px-4 py-2 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none cursor-pointer"
+                className="px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-foreground"
               >
                 <option value="">All Statuses</option>
                 <option value="PENDING">PENDING</option>
-                <option value="PROCESSED">PROCESSED (RELEASED)</option>
+                <option value="PROCESSED">PROCESSED</option>
+                <option value="PAID">PAID</option>
+                <option value="REVERSED">REVERSED</option>
               </select>
 
-              <button 
+              <button
                 onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+                className="flex items-center gap-1.5 px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold bg-white dark:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
               >
-                <FileSpreadsheet size={14} /> Export CSV
+                <FileSpreadsheet size={14} className="text-emerald-600" />
+                CSV Export
               </button>
-              <button 
+
+              <button
                 onClick={handleExportShareholderPayoutsPDF}
-                className="flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
+                className="flex items-center gap-1.5 px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold bg-white dark:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
               >
-                <FileText size={14} /> Export PDF
+                <FileText size={14} className="text-brand-primary" />
+                PDF Report
               </button>
             </div>
           </div>
 
-          {/* Master Shareholder Payouts Data Table */}
+          {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
-                <tr>
-                  <th className="px-6 py-4">Shareholder</th>
-                  <th className="px-6 py-4">Bank Account & IFSC</th>
-                  <th className="px-6 py-4 text-right">Profits</th>
-                  <th className="px-6 py-4 text-right">Commissions</th>
-                  <th className="px-6 py-4 text-right">Payouts</th>
-                  <th className="px-6 py-4">Cycle Range</th>
-                  <th className="px-6 py-4">Status</th>
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="border-b border-border-subtle bg-muted/20 text-gray-500 font-bold uppercase tracking-wider text-[10px]">
+                  <th className="py-3 px-4">Shareholder</th>
+                  <th className="py-3 px-4">Bank Details</th>
+                  <th className="py-3 px-4 text-right">Profit Share (₹)</th>
+                  <th className="py-3 px-4 text-right">Gratitude Share (₹)</th>
+                  <th className="py-3 px-4 text-right">Withheld (₹)</th>
+                  <th className="py-3 px-4 text-right font-black text-gray-900 dark:text-white">Net Payable (₹)</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                  <th className="py-3 px-4 text-center">Statement</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
+              <tbody className="divide-y divide-border-subtle">
                 {loadingShareholderPayouts ? (
-                  <tr><td colSpan={7} className="text-center py-20 text-muted-foreground"><Loader2 size={20} className="animate-spin text-brand-primary mx-auto" /></td></tr>
+                  <tr>
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-primary mb-2" />
+                      Loading shareholder payouts ledger...
+                    </td>
+                  </tr>
                 ) : shareholderPayouts?.data?.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="text-center py-20 text-muted-foreground">
-                      <Users className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-primary" />
-                      <p className="text-xs font-bold">No Shareholder Payouts Found</p>
-                      <p className="text-[10px] text-muted-foreground/75 mt-0.5">No payouts recorded for the current search filter.</p>
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                      No payout records found matching criteria.
                     </td>
                   </tr>
                 ) : (
-                  shareholderPayouts?.data?.map((payout: any) => (
-                    <tr key={payout.id} className="hover:bg-muted/20 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="font-mono font-bold text-[11px] text-brand-primary">{payout.shareholder?.shareholderId}</div>
-                        <div className="font-semibold text-gray-900 dark:text-white mt-0.5">{payout.shareholder?.name || 'Shareholder'}</div>
-                        <div className="text-[10px] text-muted-foreground">{payout.shareholder?.phone || '-'}</div>
+                  shareholderPayouts?.data?.map((p: any) => (
+                    <tr key={p.id} className="hover:bg-muted/10 transition-colors">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-gray-900 dark:text-white">{p.shareholder?.shareholderId}</div>
+                        <div className="text-[11px] text-muted-foreground">{p.shareholder?.name}</div>
                       </td>
-
-                      <td className="px-6 py-4">
-                        <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1">
-                          <Building size={12} className="text-muted-foreground shrink-0" />
-                          {payout.shareholder?.bankName || 'Bank Not Set'}
-                        </div>
-                        <div className="font-mono text-[10px] text-muted-foreground mt-0.5">
-                          Acc: {payout.shareholder?.bankAccountNumber || '-'}
-                        </div>
-                        <div className="font-mono text-[9px] text-brand-primary/80 uppercase">
-                          IFSC: {payout.shareholder?.bankIfsc || '-'}
-                        </div>
+                      <td className="py-3 px-4 text-[11px]">
+                        <div className="font-semibold text-gray-800 dark:text-gray-200">{p.shareholder?.bankName || 'N/A'}</div>
+                        <div className="text-muted-foreground font-mono">{p.shareholder?.bankAccountNumber || 'No Account'}</div>
                       </td>
-
-                      <td className="px-6 py-4 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                        ${Number(payout.profitAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <td className="py-3 px-4 text-right font-semibold text-emerald-600">
+                        ₹{Number(p.grossProfitShare || p.profitAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-
-                      <td className="px-6 py-4 text-right font-semibold text-blue-600 dark:text-blue-400">
-                        ${Number(payout.commissionAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <td className="py-3 px-4 text-right font-semibold text-blue-600">
+                        ₹{Number(p.grossGratitudeShare || p.commissionAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-
-                      <td className="px-6 py-4 text-right font-extrabold text-gray-900 dark:text-white text-sm">
-                        ${Number(payout.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      <td className="py-3 px-4 text-right font-semibold text-amber-600">
+                        ₹{Number(p.withheldAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-
-                      <td className="px-6 py-4 font-semibold text-[11px] text-muted-foreground">
-                        {payout.batch ? (
-                          <>
-                            <div>{new Date(payout.batch.cycleStart).toLocaleDateString()} -</div>
-                            <div>{new Date(payout.batch.cycleEnd).toLocaleDateString()}</div>
-                          </>
-                        ) : '-'}
+                      <td className="py-3 px-4 text-right font-black text-gray-900 dark:text-white">
+                        ₹{Number(p.netPayable || p.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </td>
-
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border tracking-wider flex items-center gap-1 w-max
-                          ${payout.status === 'PENDING' ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-900/40' : ''}
-                          ${payout.status === 'PROCESSED' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-900/40' : ''}
-                        `}>
-                          {payout.status === 'PROCESSED' ? <CheckCircle size={10} /> : <Clock size={10} />}
-                          {payout.status === 'PROCESSED' ? 'RELEASED' : payout.status}
+                      <td className="py-3 px-4 text-center">
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          p.status === 'PAID' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                          p.status === 'PROCESSED' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
+                          p.status === 'REVERSED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' :
+                          'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        }`}>
+                          {p.status}
                         </span>
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={() => handleOpenStatement(p.id)}
+                          className="p-1.5 hover:bg-secondary rounded-lg text-brand-primary transition-all cursor-pointer inline-flex items-center gap-1 text-[11px] font-bold"
+                        >
+                          <FileText size={14} /> Statement
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -608,253 +620,540 @@ export default function AdminPayoutsPage() {
             </table>
           </div>
 
-          {/* Shareholder Pagination */}
+          {/* Pagination */}
           {shareholderPayouts?.lastPage > 1 && (
-            <div className="flex justify-between items-center bg-muted/10 p-4 border-t border-border-subtle">
-              <button
-                onClick={() => setShareholderPage(p => Math.max(1, p - 1))}
-                disabled={shareholderPage === 1}
-                className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-              >
-                Previous
-              </button>
-              <span className="text-[11px] font-bold text-muted-foreground">Page {shareholderPage} of {shareholderPayouts.lastPage}</span>
-              <button
-                onClick={() => setShareholderPage(p => Math.min(shareholderPayouts.lastPage, p + 1))}
-                disabled={shareholderPage >= shareholderPayouts.lastPage}
-                className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-              >
-                Next
-              </button>
+            <div className="p-4 border-t border-border-subtle flex items-center justify-between text-xs text-muted-foreground">
+              <span>Page {shareholderPage} of {shareholderPayouts.lastPage}</span>
+              <div className="flex gap-2">
+                <button
+                  disabled={shareholderPage <= 1}
+                  onClick={() => setShareholderPage(p => p - 1)}
+                  className="px-3 py-1 border border-border-subtle rounded-lg disabled:opacity-40 hover:bg-secondary cursor-pointer"
+                >
+                  Previous
+                </button>
+                <button
+                  disabled={shareholderPage >= shareholderPayouts.lastPage}
+                  onClick={() => setShareholderPage(p => p + 1)}
+                  className="px-3 py-1 border border-border-subtle rounded-lg disabled:opacity-40 hover:bg-secondary cursor-pointer"
+                >
+                  Next
+                </button>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* TAB 2: PAYOUT BATCHES CYCLES */}
+      {/* TAB 2: FORTNIGHTLY BATCHES VIEW */}
       {activeTab === 'batches' && (
         <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden space-y-4">
           <div className="p-5 border-b border-border-subtle bg-muted/10 flex items-center justify-between">
-            <div>
-              <h3 className="text-xs font-bold text-gray-900 dark:text-white uppercase tracking-wider">Payout Batch Cycles Summary</h3>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Summary of twice-monthly payout generation cycles.</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportBatchesCSV}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
-              >
-                <FileSpreadsheet size={14} /> Export CSV
-              </button>
-              <button
-                onClick={handleExportBatchesPDF}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer select-none"
-              >
-                <FileText size={14} /> Export PDF
-              </button>
-            </div>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white">Twice-Monthly Payout Batch Runs</h3>
+            <button
+              onClick={handleExportBatchesCSV}
+              className="flex items-center gap-1.5 px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold bg-white dark:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
+            >
+              <FileSpreadsheet size={14} className="text-emerald-600" /> Export Summary CSV
+            </button>
           </div>
 
-          <table className="w-full text-left border-collapse">
-            <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
-              <tr>
-                <th className="px-6 py-4">Batch ID</th>
-                <th className="px-6 py-4">Cycle Range</th>
-                <th className="px-6 py-4">Total Amount</th>
-                <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
-              {loadingBatches ? (
-                <tr><td colSpan={5} className="text-center py-20 text-muted-foreground"><Loader2 size={20} className="animate-spin text-brand-primary mx-auto" /></td></tr>
-              ) : batches?.data?.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-20 text-muted-foreground">
-                    <Landmark className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-primary" />
-                    <p className="text-xs font-bold">No Batches Logged</p>
-                    <p className="text-[10px] text-muted-foreground/75 mt-0.5">Please generate a batch range above to start a payout cycle.</p>
-                  </td>
-                </tr>
-              ) : (
-                batches?.data?.map((batch: any) => {
-                  const isExpanded = expandedBatchId === batch.id;
+          <div className="divide-y divide-border-subtle">
+            {loadingBatches ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-primary mb-2" />
+                Loading payout batches...
+              </div>
+            ) : batches?.data?.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">No payout batches generated yet.</div>
+            ) : (
+              batches?.data?.map((b: any) => (
+                <div key={b.id} className="p-5 hover:bg-muted/5 transition-colors">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2.5">
+                        <span className="font-mono text-xs font-bold text-brand-primary">{b.cycleIdentifier || b.id.substring(0, 8)}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                          b.status === 'RELEASED' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300' :
+                          b.status === 'APPROVED' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300' :
+                          b.status === 'REVERSED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' :
+                          'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                        }`}>
+                          {b.status}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground bg-secondary px-2 py-0.5 rounded font-semibold">
+                          Cycle {b.cycleNumber}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-3">
+                        <span>Period: {new Date(b.cycleStart).toLocaleDateString()} – {new Date(b.cycleEnd).toLocaleDateString()}</span>
+                        <span>•</span>
+                        <span>Beneficiaries: {b.totalBeneficiaries}</span>
+                      </div>
+                    </div>
 
-                  return (
-                    <React.Fragment key={batch.id}>
-                      <tr className="hover:bg-muted/20 transition-colors">
-                        <td className="px-6 py-4 font-mono text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-2">
+                    <div className="flex items-center gap-6">
+                      <div className="text-right">
+                        <div className="text-[10px] uppercase font-bold text-gray-400">Total Net Payable</div>
+                        <div className="text-base font-black text-gray-900 dark:text-white">
+                          ₹{Number(b.totalNetPayable || b.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-2">
+                        {/* Reconciliation Button */}
+                        <button
+                          onClick={() => setReconciliationBatchId(b.id)}
+                          title="Verify Balance & Reconciliation Checksum"
+                          className="px-3 py-1.5 border border-border-subtle bg-secondary hover:bg-secondary/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        >
+                          <ShieldCheck size={14} className="text-emerald-600" /> Audit
+                        </button>
+
+                        {/* Approve Button (Super Admin Only) */}
+                        {b.status === 'REVIEWED' && shareholder?.role === 'SUPER_ADMIN' && (
                           <button
-                            onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
-                            className="p-1 hover:bg-muted dark:hover:bg-secondary rounded-lg text-brand-primary transition-colors cursor-pointer"
-                            title="Expand Shareholders Payout List"
+                            onClick={() => handleApprove(b.id)}
+                            disabled={approveMutation.isPending}
+                            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                           >
-                            {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <CheckCircle size={14} /> Approve
                           </button>
-                          {batch.id}
-                        </td>
-                        <td className="px-6 py-4 font-semibold">
-                          {new Date(batch.cycleStart).toLocaleDateString()} - {new Date(batch.cycleEnd).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 font-extrabold text-gray-950 dark:text-white">${Number(batch.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border tracking-wider
-                            ${batch.status === 'PENDING' ? 'bg-yellow-50 dark:bg-yellow-950/20 text-yellow-700 dark:text-yellow-400 border-yellow-100 dark:border-yellow-900/40' : ''}
-                            ${batch.status === 'REVIEWED' ? 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-100 dark:border-blue-900/40' : ''}
-                            ${batch.status === 'APPROVED' ? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/40' : ''}
-                            ${batch.status === 'RELEASED' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' : ''}
-                          `}>
-                            {batch.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right space-x-2 select-none">
+                        )}
+
+                        {/* Release Button (Super Admin Only) */}
+                        {b.status === 'APPROVED' && shareholder?.role === 'SUPER_ADMIN' && (
                           <button
-                            onClick={() => setExpandedBatchId(isExpanded ? null : batch.id)}
-                            className="bg-muted hover:bg-secondary text-foreground text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl transition-all cursor-pointer"
+                            onClick={() => handleRelease(b.id)}
+                            disabled={releaseMutation.isPending}
+                            className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
                           >
-                            {isExpanded ? 'Hide Shareholder List' : 'View Shareholder Payouts'}
+                            <CreditCard size={14} /> Release Funds
                           </button>
-                          {batch.status === 'REVIEWED' && isSuperAdmin && (
-                            <button 
-                              onClick={() => handleApprove(batch.id)}
-                              disabled={approveMutation.isPending}
-                              className="bg-brand-accent hover:bg-brand-accent/95 text-white text-[10px] uppercase font-bold px-4 py-2 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                            >
-                              {approveMutation.isPending ? 'Verifying...' : 'Approve'}
-                            </button>
-                          )}
-                          {batch.status === 'APPROVED' && isSuperAdmin && (
-                            <button 
-                              onClick={() => handleRelease(batch.id)}
-                              disabled={releaseMutation.isPending}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] uppercase font-bold px-4 py-2 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                            >
-                              {releaseMutation.isPending ? 'Releasing...' : 'Release Funds'}
-                            </button>
-                          )}
-                          {isSuperAdmin && batch.status !== 'RELEASED' && batch.status !== 'REJECTED' && (
-                            <button 
-                              onClick={() => handleReprocessBatch(batch.id)}
-                              disabled={reprocessBatchMutation.isPending}
-                              className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] uppercase font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50 cursor-pointer shadow-xs"
-                              title="Reset & Reprocess Batch (Super Admin Only)"
-                            >
-                              {reprocessBatchMutation.isPending ? 'Resetting...' : 'Reprocess Batch'}
-                            </button>
-                          )}
-                        </td>
-                      </tr>
+                        )}
 
-                      {/* Expandable Shareholders Payout Table */}
-                      {isExpanded && (
-                        <tr>
-                          <td colSpan={5} className="bg-brand-primary/5 p-6 border-y border-brand-primary/10">
-                        <div className="space-y-3">
-                              <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-bold text-brand-primary uppercase tracking-wider flex items-center gap-1.5">
-                                  <Users size={14} /> Itemized Shareholder Payouts for Batch: <span className="font-mono">{batch.id}</span>
-                                </h4>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-[10px] text-muted-foreground font-semibold">
-                                    {expandedBatchDetails?.length || 0} Shareholders Included
-                                  </span>
-                                  <button
-                                    onClick={() => handleExportSingleBatchCSV(batch, expandedBatchDetails)}
-                                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer shadow-xs"
-                                  >
-                                    <FileSpreadsheet size={12} /> CSV
-                                  </button>
-                                  <button
-                                    onClick={() => handleExportSingleBatchPDF(batch, expandedBatchDetails)}
-                                    className="bg-slate-800 hover:bg-slate-900 text-white font-bold px-2.5 py-1 rounded-lg text-[10px] uppercase flex items-center gap-1 cursor-pointer shadow-xs"
-                                  >
-                                    <FileText size={12} /> PDF
-                                  </button>
-                                </div>
-                              </div>
+                        {/* Reverse Button (Super Admin Only) */}
+                        {b.status !== 'REVERSED' && shareholder?.role === 'SUPER_ADMIN' && (
+                          <button
+                            onClick={() => handleReverseBatch(b.id)}
+                            disabled={reverseBatchMutation.isPending}
+                            className="px-3 py-1.5 border border-red-200 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            <RotateCcw size={14} /> Reverse
+                          </button>
+                        )}
 
-                              {loadingBatchDetails ? (
-                                <div className="py-8 text-center text-muted-foreground"><Loader2 size={16} className="animate-spin mx-auto text-brand-primary" /></div>
-                              ) : expandedBatchDetails?.length === 0 ? (
-                                <p className="text-xs text-muted-foreground py-4 text-center">No individual shareholder payout items recorded in this batch.</p>
-                              ) : (
-                                <div className="bg-white dark:bg-card rounded-2xl border border-border-subtle overflow-hidden shadow-xs">
-                                  <table className="w-full text-left text-xs">
-                                    <thead className="bg-muted/30 border-b border-border-subtle text-[9px] font-bold uppercase text-muted-foreground tracking-wider">
-                                      <tr>
-                                        <th className="px-4 py-3">Shareholder</th>
-                                        <th className="px-4 py-3">Bank Details</th>
-                                        <th className="px-4 py-3 text-right">Profits</th>
-                                        <th className="px-4 py-3 text-right">Commissions</th>
-                                        <th className="px-4 py-3 text-right">Payouts</th>
-                                        <th className="px-4 py-3">Status</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border-subtle font-medium">
-                                      {expandedBatchDetails?.map((detail: any) => (
-                                        <tr key={detail.id} className="hover:bg-muted/10">
-                                          <td className="px-4 py-3">
-                                            <div className="font-mono font-bold text-brand-primary text-[10px]">{detail.shareholder?.shareholderId}</div>
-                                            <div className="font-semibold text-gray-900 dark:text-white">{detail.shareholder?.name || 'Shareholder'}</div>
-                                          </td>
-                                          <td className="px-4 py-3 text-[10px]">
-                                            <div className="font-semibold text-gray-900 dark:text-white">{detail.shareholder?.bankName || '-'}</div>
-                                            <div className="font-mono text-muted-foreground">Acc: {detail.shareholder?.bankAccountNumber || '-'}</div>
-                                            <div className="font-mono text-brand-primary/80 uppercase">IFSC: {detail.shareholder?.bankIfsc || '-'}</div>
-                                          </td>
-                                          <td className="px-4 py-3 text-right font-semibold text-emerald-600 dark:text-emerald-400">
-                                            ${Number(detail.profitAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                          </td>
-                                          <td className="px-4 py-3 text-right font-semibold text-blue-600 dark:text-blue-400">
-                                            ${Number(detail.commissionAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                          </td>
-                                          <td className="px-4 py-3 text-right font-extrabold text-gray-900 dark:text-white">
-                                            ${Number(detail.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                          </td>
-                                          <td className="px-4 py-3">
-                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold uppercase ${detail.status === 'PROCESSED' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400'}`}>
-                                              {detail.status === 'PROCESSED' ? 'RELEASED' : detail.status}
-                                            </span>
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
+                        {/* Expand Details Button */}
+                        <button
+                          onClick={() => setExpandedBatchId(expandedBatchId === b.id ? null : b.id)}
+                          className="p-1.5 hover:bg-secondary rounded-lg transition-all cursor-pointer text-muted-foreground hover:text-foreground"
+                        >
+                          {expandedBatchId === b.id ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Expanded Batch Items Details */}
+                  {expandedBatchId === b.id && (
+                    <div className="mt-4 pt-4 border-t border-border-subtle bg-muted/10 p-4 rounded-2xl">
+                      <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-1.5">
+                        <Users size={14} /> Batch Beneficiary Breakdown
+                      </h4>
+                      {loadingBatchDetails ? (
+                        <div className="py-4 text-center text-xs text-muted-foreground">Loading details...</div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-[11px]">
+                            <thead>
+                              <tr className="border-b border-border-subtle text-gray-400 font-bold uppercase tracking-wider text-[9px]">
+                                <th className="py-2 px-3">Shareholder</th>
+                                <th className="py-2 px-3">Account Type</th>
+                                <th className="py-2 px-3 text-right">Profit Share (₹)</th>
+                                <th className="py-2 px-3 text-right">Gratitude (₹)</th>
+                                <th className="py-2 px-3 text-right">Withheld (₹)</th>
+                                <th className="py-2 px-3 text-right font-black text-gray-900 dark:text-white">Net Payable (₹)</th>
+                                <th className="py-2 px-3 text-center">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border-subtle">
+                              {expandedBatchDetails?.map((item: any) => (
+                                <tr key={item.id} className="hover:bg-muted/20">
+                                  <td className="py-2 px-3 font-semibold">{item.shareholder?.shareholderId} – {item.shareholder?.name}</td>
+                                  <td className="py-2 px-3">
+                                    <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-secondary">
+                                      {item.shareholder?.accountType}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-emerald-600 font-semibold">
+                                    ₹{Number(item.grossProfitShare || item.profitAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-blue-600 font-semibold">
+                                    ₹{Number(item.grossGratitudeShare || item.commissionAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2 px-3 text-right text-amber-600 font-semibold">
+                                    ₹{Number(item.withheldAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2 px-3 text-right font-black text-gray-900 dark:text-white">
+                                    ₹{Number(item.netPayable || item.totalAmount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  </td>
+                                  <td className="py-2 px-3 text-center">
+                                    <button
+                                      onClick={() => handleOpenStatement(item.id)}
+                                      className="text-brand-primary hover:underline font-bold text-[10px] cursor-pointer"
+                                    >
+                                      Statement
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       )}
-                    </React.Fragment>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-
-          {/* Batch Pagination */}
-          {batches?.lastPage > 1 && (
-            <div className="flex justify-between items-center bg-muted/10 p-4 border-t border-border-subtle">
-              <button
-                onClick={() => setBatchPage(p => Math.max(1, p - 1))}
-                disabled={batchPage === 1}
-                className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-              >
-                Previous
-              </button>
-              <span className="text-[11px] font-bold text-muted-foreground">Page {batchPage} of {batches.lastPage}</span>
-              <button
-                onClick={() => setBatchPage(p => Math.min(batches.lastPage, p + 1))}
-                disabled={batchPage >= batches.lastPage}
-                className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-              >
-                Next
-              </button>
-            </div>
-          )}
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         </div>
       )}
-    </motion.div>
+
+      {/* PRE-EXECUTION PREVIEW MODAL / DRAWER */}
+      <AnimatePresence>
+        {isPreviewOpen && previewData && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-card border border-border-subtle rounded-3xl max-w-4xl w-full p-6 shadow-2xl space-y-5 my-8 max-h-[90vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between border-b border-border-subtle pb-4 shrink-0">
+                <div>
+                  <h3 className="text-base font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <Eye className="text-brand-primary" size={18} />
+                    Pre-Execution Payout Batch Preview
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Canonical Cycle: <span className="font-bold text-foreground">{previewData.cycle?.cycleIdentifier}</span> ({previewData.cycle?.label})
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="p-2 hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Summary Stats Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+                <div className="p-3 bg-secondary/40 rounded-xl border border-border-subtle">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Gross Profit (5%)</span>
+                  <div className="text-sm font-black text-emerald-600 mt-0.5">
+                    ₹{Number(previewData.summary?.totalGrossProfit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="p-3 bg-secondary/40 rounded-xl border border-border-subtle">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Gross Gratitude</span>
+                  <div className="text-sm font-black text-blue-600 mt-0.5">
+                    ₹{Number(previewData.summary?.totalGrossGratitude || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="p-3 bg-secondary/40 rounded-xl border border-border-subtle">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase">Withheld (20%)</span>
+                  <div className="text-sm font-black text-amber-600 mt-0.5">
+                    ₹{Number(previewData.summary?.totalWithheld || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="p-3 bg-brand-primary/10 rounded-xl border border-brand-primary/20">
+                  <span className="text-[10px] font-bold text-brand-primary uppercase">Total Net Payable</span>
+                  <div className="text-sm font-black text-brand-primary mt-0.5">
+                    ₹{Number(previewData.summary?.totalNetPayable || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Beneficiaries Table */}
+              <div className="flex-1 overflow-y-auto border border-border-subtle rounded-2xl">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 bg-secondary text-gray-500 text-[10px] font-bold uppercase tracking-wider">
+                    <tr>
+                      <th className="py-2.5 px-3">Shareholder</th>
+                      <th className="py-2.5 px-3">Type</th>
+                      <th className="py-2.5 px-3">Proration / Active Days</th>
+                      <th className="py-2.5 px-3 text-right">Profit (₹)</th>
+                      <th className="py-2.5 px-3 text-right">Gratitude (₹)</th>
+                      <th className="py-2.5 px-3 text-right">Withheld (₹)</th>
+                      <th className="py-2.5 px-3 text-right font-black text-gray-900 dark:text-white">Net Payable (₹)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-subtle text-[11px]">
+                    {previewData.beneficiaries?.map((b: any) => (
+                      <tr key={b.shareholderId} className="hover:bg-muted/10">
+                        <td className="py-2.5 px-3 font-semibold">
+                          <div>{b.shareholderCode}</div>
+                          <div className="text-[10px] text-muted-foreground">{b.name}</div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-secondary">
+                            {b.accountType}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {b.isFirstPayout ? (
+                            <span className="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                              First Payout ({b.activeDays} days)
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground text-[10px]">Full Fortnightly (2.5%)</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-emerald-600 font-semibold">
+                          ₹{Number(b.grossProfitShare).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-blue-600 font-semibold">
+                          ₹{Number(b.grossGratitudeShare).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-amber-600 font-semibold">
+                          ₹{Number(b.withheldAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-black text-gray-900 dark:text-white">
+                          ₹{Number(b.netPayable).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Excluded Accounts Notice if any */}
+              {previewData.excludedAccounts?.length > 0 && (
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/40 rounded-xl border border-amber-200 dark:border-amber-800 text-xs shrink-0">
+                  <div className="font-bold text-amber-800 dark:text-amber-300 flex items-center gap-1.5 mb-1">
+                    <AlertTriangle size={14} /> Excluded Accounts ({previewData.excludedAccounts.length})
+                  </div>
+                  <div className="text-[11px] text-amber-700 dark:text-amber-400 space-y-0.5 max-h-20 overflow-y-auto">
+                    {previewData.excludedAccounts.map((ex: any) => (
+                      <div key={ex.shareholderId}>
+                        • <span className="font-semibold">{ex.shareholderCode} ({ex.name}):</span> {ex.details}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Footer */}
+              <div className="flex items-center justify-end gap-3 pt-2 border-t border-border-subtle shrink-0">
+                <button
+                  onClick={() => setIsPreviewOpen(false)}
+                  className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold hover:bg-secondary cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => generateMutation.mutate(previewData.cycle?.cycleIdentifier)}
+                  disabled={generateMutation.isPending}
+                  className="px-6 py-2 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                >
+                  {generateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                  Confirm & Generate Batch
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* FORMAL FINANCIAL STATEMENT MODAL */}
+      <AnimatePresence>
+        {selectedStatementDetailId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-card border border-border-subtle rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-6"
+            >
+              {isStatementLoading ? (
+                <div className="py-12 text-center text-muted-foreground">
+                  <Loader2 className="w-8 h-8 animate-spin mx-auto text-brand-primary mb-2" />
+                  Generating official statement...
+                </div>
+              ) : statementData ? (
+                <>
+                  <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                    <div>
+                      <div className="text-[10px] font-bold text-brand-primary uppercase tracking-widest">360 Star Solutions • Official Payout Statement</div>
+                      <h3 className="text-lg font-black text-gray-900 dark:text-white mt-0.5">
+                        Cycle: {statementData.cycleIdentifier}
+                      </h3>
+                    </div>
+                    <button
+                      onClick={() => setSelectedStatementDetailId(null)}
+                      className="p-2 hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Shareholder & Bank Details Card */}
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-secondary/30 rounded-2xl text-xs">
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Beneficiary</span>
+                      <div className="font-bold text-gray-900 dark:text-white mt-0.5">{statementData.shareholder?.name}</div>
+                      <div className="text-[11px] text-muted-foreground font-mono">{statementData.shareholder?.code}</div>
+                      <div className="text-[11px] text-muted-foreground">{statementData.shareholder?.phone}</div>
+                    </div>
+                    <div>
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">Verified Bank Details</span>
+                      <div className="font-bold text-gray-900 dark:text-white mt-0.5">{statementData.shareholder?.bankName || 'N/A'}</div>
+                      <div className="text-[11px] text-muted-foreground font-mono">A/C: {statementData.shareholder?.accountNumber || 'N/A'}</div>
+                      <div className="text-[11px] text-muted-foreground">IFSC: {statementData.shareholder?.ifsc || 'N/A'} • {statementData.shareholder?.branch || ''}</div>
+                    </div>
+                  </div>
+
+                  {/* Calculation Details */}
+                  <div className="space-y-2 text-xs border border-border-subtle p-4 rounded-2xl">
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Proration Status:</span>
+                      <span className="font-bold text-foreground">
+                        {statementData.breakdown?.isFirstPayout
+                          ? `First Payout (${statementData.breakdown?.activeDays} active days @ ₹${statementData.breakdown?.dailyRate?.toFixed(6)}/day)`
+                          : 'Full Fortnightly Share (2.50%)'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Gross Profit Share (5%):</span>
+                      <span className="font-bold text-emerald-600">
+                        ₹{Number(statementData.breakdown?.grossProfitShare).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-muted-foreground">
+                      <span>Gross Gratitude Share:</span>
+                      <span className="font-bold text-blue-600">
+                        ₹{Number(statementData.breakdown?.grossGratitudeShare).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    {statementData.breakdown?.withheldAmount > 0 && (
+                      <div className="flex items-center justify-between text-amber-600">
+                        <span>Zero-Contribution Withholding (20%):</span>
+                        <span className="font-bold">
+                          -₹{Number(statementData.breakdown?.withheldAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t border-border-subtle flex items-center justify-between text-sm font-black text-gray-900 dark:text-white">
+                      <span>Net Payable Amount:</span>
+                      <span className="text-brand-primary text-base">
+                        ₹{Number(statementData.breakdown?.netPayable).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-2">
+                    <span>Generated on: {new Date(statementData.generatedAt).toLocaleString()}</span>
+                    <button
+                      onClick={() => window.print()}
+                      className="px-3 py-1.5 bg-secondary hover:bg-secondary/80 rounded-lg font-bold text-foreground flex items-center gap-1 cursor-pointer"
+                    >
+                      <Printer size={12} /> Print Statement
+                    </button>
+                  </div>
+                </>
+              ) : null}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* RECONCILIATION AUDIT MODAL */}
+      <AnimatePresence>
+        {reconciliationBatchId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-card border border-border-subtle rounded-3xl max-w-lg w-full p-6 shadow-2xl space-y-5"
+            >
+              <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                <div>
+                  <h3 className="text-base font-black text-gray-900 dark:text-white flex items-center gap-2">
+                    <ShieldCheck className="text-emerald-600" size={18} />
+                    Financial Reconciliation Audit
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                    Batch: {reconciliationData?.cycleIdentifier || reconciliationBatchId}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setReconciliationBatchId(null)}
+                  className="p-2 hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {loadingReconciliation ? (
+                <div className="py-8 text-center text-muted-foreground">
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-brand-primary mb-2" />
+                  Verifying ledger checksums...
+                </div>
+              ) : reconciliationData ? (
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-2xl border flex items-center gap-3 ${
+                    reconciliationData.isBalanced 
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300'
+                      : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-950/40 dark:border-red-800 dark:text-red-300'
+                  }`}>
+                    {reconciliationData.isBalanced ? <CheckCircle2 size={24} /> : <AlertTriangle size={24} />}
+                    <div>
+                      <div className="font-black text-sm">
+                        {reconciliationData.isBalanced ? '100% RECONCILED & BALANCED' : 'RECONCILIATION EXCEPTION DETECTED'}
+                      </div>
+                      <div className="text-[11px] mt-0.5">
+                        Discrepancy: ₹{reconciliationData.discrepancy.toFixed(2)} (Threshold &le; ₹0.05)
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs border border-border-subtle p-4 rounded-2xl">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Summed Gross Profit:</span>
+                      <span className="font-bold">₹{reconciliationData.detailsSummed?.grossProfit?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Summed Gross Gratitude:</span>
+                      <span className="font-bold">₹{reconciliationData.detailsSummed?.grossGratitude?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Summed Withheld (20%):</span>
+                      <span className="font-bold">₹{reconciliationData.detailsSummed?.withheld?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                    <div className="pt-2 border-t border-border-subtle flex justify-between font-black text-sm text-gray-900 dark:text-white">
+                      <span>Batch Net Payable:</span>
+                      <span className="text-brand-primary">₹{reconciliationData.batchReported?.totalNetPayable?.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <button
+                      onClick={() => setReconciliationBatchId(null)}
+                      className="px-5 py-2 bg-brand-primary text-white rounded-xl text-xs font-bold cursor-pointer"
+                    >
+                      Dismiss Audit
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

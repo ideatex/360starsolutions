@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -139,7 +139,7 @@ export default function ProfitHistoryPage() {
                             {new Date(p.cycleStart).toLocaleDateString()} - {new Date(p.cycleEnd).toLocaleDateString()}
                           </td>
                           <td className="px-6 py-4 font-semibold">{p.eligibleDays} days</td>
-                          <td className="px-6 py-4 font-extrabold text-brand-primary">+${Number(p.amount).toFixed(2)}</td>
+                          <td className="px-6 py-4 font-extrabold text-brand-primary">+₹{Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                           <td className="px-6 py-4 text-muted-foreground font-semibold">{new Date(p.createdAt).toLocaleDateString()}</td>
                         </tr>
                       ))}
@@ -152,26 +152,26 @@ export default function ProfitHistoryPage() {
                     <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
                       <tr>
                         <th className="px-6 py-4">Transaction ID</th>
-                        <th className="px-6 py-4">Source Investor</th>
+                        <th className="px-6 py-4">Source Contributor</th>
                         <th className="px-6 py-4">Referral Level</th>
                         <th className="px-6 py-4">Placement Size</th>
                         <th className="px-6 py-4">Rate</th>
-                        <th className="px-6 py-4">Earnings</th>
+                        <th className="px-6 py-4">Gratitude Share</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
                       {commissions?.data?.map((c: any) => (
                         <tr key={c.id} className="hover:bg-muted/20 transition-colors">
                           <td className="px-6 py-4 font-mono text-[10px] text-gray-400 dark:text-gray-500">{c.id}</td>
-                          <td className="px-6 py-4 truncate max-w-[150px] font-semibold">{c.fromInvestment?.shareholder?.shareholderId || 'N/A'}</td>
+                          <td className="px-6 py-4 truncate max-w-[150px] font-semibold">{c.sourceShareholder?.shareholderId || c.fromInvestment?.shareholder?.shareholderId || 'N/A'}</td>
                           <td className="px-6 py-4 font-semibold">
                             <span className="px-2 py-0.5 rounded-md bg-indigo-500/10 text-indigo-550 border border-indigo-500/20 text-[9px] font-bold uppercase">
                               Level {c.level}
                             </span>
                           </td>
-                          <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">${Number(c.fromInvestment?.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                          <td className="px-6 py-4 font-semibold">{(Number(c.rate) * 100).toFixed(1)}%</td>
-                          <td className="px-6 py-4 font-extrabold text-brand-primary">+${Number(c.amount).toFixed(2)}</td>
+                          <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{Number(c.calculationBase || c.fromInvestment?.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-6 py-4 font-semibold">{(Number(c.rate) * 100).toFixed(2)}%</td>
+                          <td className="px-6 py-4 font-extrabold text-brand-primary">+₹{Number(c.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -184,9 +184,9 @@ export default function ProfitHistoryPage() {
                       <tr>
                         <th className="px-6 py-4">Payout ID</th>
                         <th className="px-6 py-4">Cycle Period</th>
-                        <th className="px-6 py-4">ROI Amount</th>
-                        <th className="px-6 py-4">Referral Earnings</th>
-                        <th className="px-6 py-4">Total Released</th>
+                        <th className="px-6 py-4">Profit Share</th>
+                        <th className="px-6 py-4">Gratitude Share</th>
+                        <th className="px-6 py-4">Total Net Released</th>
                         <th className="px-6 py-4">Status</th>
                       </tr>
                     </thead>
@@ -197,9 +197,9 @@ export default function ProfitHistoryPage() {
                           <td className="px-6 py-4 font-semibold">
                             {new Date(p.batch?.cycleStart).toLocaleDateString()} - {new Date(p.batch?.cycleEnd).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-250">${Number(p.profitAmount).toFixed(2)}</td>
-                          <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-250">${Number(p.commissionAmount).toFixed(2)}</td>
-                          <td className="px-6 py-4 font-extrabold text-gray-950 dark:text-white">${Number(p.totalAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                          <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-250">₹{Number(p.profitAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-250">₹{Number(p.commissionAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
+                          <td className="px-6 py-4 font-extrabold text-emerald-600 dark:text-emerald-400">₹{Number(p.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase tracking-wider border 
                               ${p.status === 'PROCESSED' 

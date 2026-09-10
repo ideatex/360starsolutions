@@ -22,6 +22,12 @@ import { MlmModule } from '@server/engines/mlm/mlm.module';
 import { InvestorsModule } from '@server/engines/investors/investors.module';
 import { ReferralProgressModule } from '@server/engines/referral-progress/referral-progress.module';
 import { WithdrawalsModule } from '@server/withdrawals/withdrawals.module';
+import { ContributionModule } from '@server/engines/contribution/contribution.module';
+import { HoldingBalanceModule } from '@server/engines/holding-balance/holding-balance.module';
+import { RankModule } from '@server/engines/rank/rank.module';
+import { RegistrationModule } from '@server/registration/registration.module';
+import { SmsModule } from '@server/sms/sms.module';
+import { ReconciliationModule } from '@server/engines/reconciliation/reconciliation.module';
 
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { join } from 'path';
@@ -63,6 +69,12 @@ import { join } from 'path';
     InvestorsModule,
     ReferralProgressModule,
     WithdrawalsModule,
+    ContributionModule,
+    HoldingBalanceModule,
+    RankModule,
+    RegistrationModule,
+    SmsModule,
+    ReconciliationModule,
   ],
   controllers: [AppController],
   providers: [AppService],

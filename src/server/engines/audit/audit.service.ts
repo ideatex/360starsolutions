@@ -7,11 +7,13 @@ export class AuditService {
 
   async logAction(data: {
     shareholderId?: string;
+    role?: string;
     action: string;
     entityType: string;
     entityId?: string;
     oldValue?: string;
     newValue?: string;
+    reason?: string;
     ipAddress?: string;
   }) {
     return this.prisma.auditLog.create({
