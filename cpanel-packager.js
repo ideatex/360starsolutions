@@ -56,17 +56,26 @@ console.log('✅ Prisma client backed up.');
 const postinstallScript = `
 const fs = require('fs');
 const path = require('path');
-if (fs.existsSync('prisma-backup')) {
-  try {
-    const prismaClientPackagePath = require.resolve('@prisma/client/package.json');
-    const prismaClientPath = path.dirname(prismaClientPackagePath);
-    const dotPrismaPath = path.join(prismaClientPath, '../../.prisma');
-    
-    fs.cpSync('prisma-backup/.prisma', dotPrismaPath, { recursive: true });
-    fs.cpSync('prisma-backup/@prisma/client', prismaClientPath, { recursive: true });
-    console.log('✅ Successfully restored Prisma client binaries to:', prismaClientPath);
-  } catch(e) {
-    console.error('❌ Failed to restore Prisma client:', e);
+const { execSync } = require('child_process');
+
+try {
+  console.log('🔄 Generating Prisma client on cPanel server...');
+  execSync('npx prisma generate', { stdio: 'inherit' });
+  console.log('✅ Successfully generated Prisma client for server OS');
+} catch (err) {
+  console.warn('⚠️ npx prisma generate skipped or failed on server:', err.message);
+  if (fs.existsSync('prisma-backup')) {
+    try {
+      const prismaClientPackagePath = require.resolve('@prisma/client/package.json');
+      const prismaClientPath = path.dirname(prismaClientPackagePath);
+      const dotPrismaPath = path.join(prismaClientPath, '../../.prisma');
+      
+      fs.cpSync('prisma-backup/.prisma', dotPrismaPath, { recursive: true });
+      fs.cpSync('prisma-backup/@prisma/client', prismaClientPath, { recursive: true });
+      console.log('✅ Successfully restored Prisma client binaries from backup to:', prismaClientPath);
+    } catch(e) {
+      console.error('❌ Failed to restore Prisma client:', e);
+    }
   }
 }
 `;
@@ -105,16 +114,31 @@ JWT_SECRET="generate_a_strong_secret_here"
 fs.writeFileSync(path.join(deployDir, '.env.example'), envTemplate);
 console.log(`✅ Created .env.example`);
 
+// 6. Zip the deploy folder into cpanel-deploy.zip
+try {
+  console.log('🤐 Zipping cpanel-deploy folder into cpanel-deploy.zip...');
+  const zipPath = path.join(__dirname, 'cpanel-deploy.zip');
+  if (fs.existsSync(zipPath)) {
+    fs.rmSync(zipPath, { force: true });
+  }
+  execSync(`powershell -Command "Compress-Archive -Path '${deployDir}\\*' -DestinationPath '${zipPath}' -Force"`, { stdio: 'inherit' });
+  console.log('✅ Created cpanel-deploy.zip successfully!');
+} catch (e) {
+  console.warn('⚠️ Could not automatically zip cpanel-deploy directory:', e.message);
+}
+
 console.log('\n🎉 cPanel build complete!');
 console.log('----------------------------------------------------');
 console.log('To deploy to cPanel:');
-console.log('1. Zip the contents of the "cpanel-deploy" folder (not the folder itself).');
-console.log('2. Upload and extract it to your cPanel File Manager.');
-console.log('3. In cPanel, go to "Setup Node.js App".');
+console.log('1. Upload "cpanel-deploy.zip" directly to your cPanel File Manager in your app directory.');
+console.log('2. Extract "cpanel-deploy.zip".');
+console.log('3. In cPanel, navigate to "Setup Node.js App".');
 console.log('4. Create a new app:');
+console.log('   - Node.js Version: 18.x or 20.x+');
+console.log('   - Application Mode: Production');
 console.log('   - Application root: [your uploaded folder]');
 console.log('   - Application startup file: server.js');
-console.log('5. Copy .env.example to .env and configure your database credentials.');
-console.log('6. Run NPM Install from the cPanel Node.js interface.');
-console.log('7. Start the application!');
+console.log('5. Copy .env.example to .env and configure your DATABASE_URL, PORT, JWT_SECRET, etc.');
+console.log('6. Click "Run NPM Install" from the cPanel Node.js App interface.');
+console.log('7. Click "Restart" / "Start Application"!');
 console.log('----------------------------------------------------');

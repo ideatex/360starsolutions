@@ -2,10 +2,6 @@ import axios from 'axios';
 import { useAuthStore } from '@/store/useAuthStore';
 
 const getBaseUrl = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl) {
-    return envUrl;
-  }
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
@@ -13,6 +9,12 @@ const getBaseUrl = () => {
     }
     return '/api/v1';
   }
+  
+  const envUrl = process.env.NEXT_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl;
+  }
+  
   return 'http://localhost:3002/api/v1';
 };
 

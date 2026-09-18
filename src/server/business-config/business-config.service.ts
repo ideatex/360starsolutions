@@ -40,88 +40,100 @@ export class BusinessConfigService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Seed or update RankConfiguration
-    const rankCount = await this.prisma.rankConfiguration.count();
-    if (rankCount === 0) {
-      for (const rank of DEFAULT_RANKS) {
-        await this.prisma.rankConfiguration.create({
-          data: {
-            name: rank.name,
-            requiredVolume: new Prisma.Decimal(rank.requiredVolume),
-            maxStrongestLeg: new Prisma.Decimal(rank.maxStrongestLeg),
-            minOtherLegs: new Prisma.Decimal(rank.minOtherLegs),
-            orderIndex: rank.orderIndex,
-            isActive: true,
-          },
-        });
+    try {
+      // Seed or update RankConfiguration safely
+      if (this.prisma && (this.prisma as any).rankConfiguration) {
+        const rankCount = await (this.prisma as any).rankConfiguration.count();
+        if (rankCount === 0) {
+          for (const rank of DEFAULT_RANKS) {
+            await (this.prisma as any).rankConfiguration.create({
+              data: {
+                name: rank.name,
+                requiredVolume: new Prisma.Decimal(rank.requiredVolume),
+                maxStrongestLeg: new Prisma.Decimal(rank.maxStrongestLeg),
+                minOtherLegs: new Prisma.Decimal(rank.minOtherLegs),
+                orderIndex: rank.orderIndex,
+                isActive: true,
+              },
+            });
+          }
+          console.log('Seeded 4 default RankConfigurations (Bronze, Silver, Gold, Diamond)');
+        }
       }
-      console.log('Seeded 4 default RankConfigurations (Bronze, Silver, Gold, Diamond)');
+    } catch (err: any) {
+      console.warn('⚠️ RankConfiguration init warning:', err?.message || err);
     }
 
-    // Seed or ensure latest BusinessConfiguration has Product 360 values
-    const latestConfig = await this.prisma.businessConfiguration.findFirst({
-      orderBy: { version: 'desc' },
-    });
+    try {
+      // Seed or ensure latest BusinessConfiguration has Product 360 values
+      if (this.prisma && (this.prisma as any).businessConfiguration) {
+        const latestConfig = await (this.prisma as any).businessConfiguration.findFirst({
+          orderBy: { version: 'desc' },
+        });
 
-    if (!latestConfig) {
-      await this.prisma.businessConfiguration.create({
-        data: {
-          version: 1,
-          userIdPrefix: 'SH',
-          userIdStartingNumber: 100001,
-          userIdNextNumber: 100001,
-          userIdLength: 6,
-          profitSharingPercentage: new Prisma.Decimal('0.0500'), // 5% monthly
-          gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
-          levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
-          rankConfig: DEFAULT_RANKS,
-          payoutConfig: {
-            cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
-            cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
-          },
-          prorationConfig: {
-            status: 'PENDING_CLIENT_CONFIRMATION',
-            basis: 'CALENDAR_DAYS',
-          },
-          systemDefaults: {
-            minContribution: 100000,
-            contributionMultiple: 100000,
-            zeroContributionWithholding: 0.20,
-            zeroContributionActivationThreshold: 100000,
-            monthlyProfitRate: 0.05,
-          },
-          createdById: 'system',
-        },
-      });
-      console.log('Seeded initial Product 360 BusinessConfiguration (version 1)');
-    } else if (!latestConfig.gratitudeShareConfig) {
-      // Upgrade existing config record with Product 360 defaults
-      await this.prisma.businessConfiguration.update({
-        where: { id: latestConfig.id },
-        data: {
-          profitSharingPercentage: new Prisma.Decimal('0.0500'),
-          gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
-          levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
-          rankConfig: DEFAULT_RANKS,
-          payoutConfig: {
-            cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
-            cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
-          },
-          prorationConfig: {
-            status: 'PENDING_CLIENT_CONFIRMATION',
-            basis: 'CALENDAR_DAYS',
-          },
-          systemDefaults: {
-            ...(latestConfig.systemDefaults as any || {}),
-            minContribution: 100000,
-            contributionMultiple: 100000,
-            zeroContributionWithholding: 0.20,
-            zeroContributionActivationThreshold: 100000,
-            monthlyProfitRate: 0.05,
-          },
-        },
-      });
-      console.log(`Updated BusinessConfiguration v${latestConfig.version} with Product 360 parameters.`);
+        if (!latestConfig) {
+          await (this.prisma as any).businessConfiguration.create({
+            data: {
+              version: 1,
+              userIdPrefix: 'SH',
+              userIdStartingNumber: 100001,
+              userIdNextNumber: 100001,
+              userIdLength: 6,
+              profitSharingPercentage: new Prisma.Decimal('0.0500'), // 5% monthly
+              gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
+              levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
+              rankConfig: DEFAULT_RANKS,
+              payoutConfig: {
+                cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
+                cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
+              },
+              prorationConfig: {
+                status: 'PENDING_CLIENT_CONFIRMATION',
+                basis: 'CALENDAR_DAYS',
+              },
+              systemDefaults: {
+                minContribution: 100000,
+                contributionMultiple: 100000,
+                zeroContributionWithholding: 0.20,
+                zeroContributionActivationThreshold: 100000,
+                monthlyProfitRate: 0.05,
+              },
+              createdById: 'system',
+            },
+          });
+          console.log('Seeded initial Product 360 BusinessConfiguration (version 1)');
+        } else if (!latestConfig.gratitudeShareConfig) {
+          // Upgrade existing config record with Product 360 defaults
+          await (this.prisma as any).businessConfiguration.update({
+            where: { id: latestConfig.id },
+            data: {
+              profitSharingPercentage: new Prisma.Decimal('0.0500'),
+              gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
+              levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
+              rankConfig: DEFAULT_RANKS,
+              payoutConfig: {
+                cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
+                cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
+              },
+              prorationConfig: {
+                status: 'PENDING_CLIENT_CONFIRMATION',
+                basis: 'CALENDAR_DAYS',
+              },
+              systemDefaults: {
+                ...(latestConfig.systemDefaults as any || {}),
+                minContribution: 100000,
+                contributionMultiple: 100000,
+                zeroContributionWithholding: 0.20,
+                zeroContributionActivationThreshold: 100000,
+                monthlyProfitRate: 0.05,
+              },
+            },
+          });
+          console.log(`Updated BusinessConfiguration v${latestConfig.version} with Product 360 parameters.`);
+        }
+      }
+    } catch (err: any) {
+      console.warn('⚠️ BusinessConfiguration init warning:', err?.message || err);
     }
   }
 
