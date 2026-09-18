@@ -8,9 +8,10 @@ import { AuditModule } from '@server/engines/audit/audit.module';
 import { BusinessConfigModule } from '@server/business-config/business-config.module';
 import { MlmModule } from '@server/engines/mlm/mlm.module';
 import { InvestorsModule } from '@server/engines/investors/investors.module';
+import { SmsModule } from '@server/sms/sms.module';
 
 @Module({
-  imports: [PrismaModule, ReferralTreeModule, AuditModule, BusinessConfigModule, MlmModule, InvestorsModule],
+  imports: [PrismaModule, ReferralTreeModule, AuditModule, BusinessConfigModule, MlmModule, InvestorsModule, SmsModule],
   controllers: [UsersController],
   providers: [UsersService, UsersScheduler],
   exports: [UsersService],

@@ -32,6 +32,56 @@ export const DEFAULT_RANKS = [
   { name: 'Diamond', requiredVolume: 50000000, maxStrongestLeg: 25000000, minOtherLegs: 25000000, orderIndex: 4 },
 ];
 
+export const DEFAULT_LEVEL_OPENING_VOLUMES: Record<number, number> = {
+  1: 10000,
+  2: 25000,
+  3: 50000,
+  4: 100000,
+  5: 200000,
+  6: 500000,
+  7: 1000000,
+  8: 2000000,
+  9: 3000000,
+  10: 5000000,
+  11: 7500000,
+  12: 10000000,
+};
+
+export const DEFAULT_LEVEL_WISE_PROFIT_SHARING: Record<number, number> = {
+  1: 0.05,
+  2: 0.03,
+  3: 0.02,
+  4: 0.015,
+  5: 0.01,
+  6: 0.005,
+  7: 0.0025,
+  8: 0.0025,
+  9: 0.0025,
+  10: 0.0025,
+  11: 0.0025,
+  12: 0.0025,
+};
+
+export const DEFAULT_REFERRAL_ACTIVE_MAP: Record<number, boolean> = {
+  1: true, 2: true, 3: true, 4: true, 5: true, 6: true,
+  7: true, 8: true, 9: true, 10: true, 11: true, 12: true,
+};
+
+export const DEFAULT_REFERRAL_DESCRIPTIONS: Record<number, string> = {
+  1: 'Direct Referral',
+  2: 'Referral of Level 1',
+  3: 'Referral of Level 2',
+  4: 'Referral of Level 3',
+  5: 'Referral of Level 4',
+  6: 'Referral of Level 5',
+  7: 'Referral of Level 6',
+  8: 'Referral of Level 7',
+  9: 'Referral of Level 8',
+  10: 'Referral of Level 9',
+  11: 'Referral of Level 10',
+  12: 'Referral of Level 11',
+};
+
 @Injectable()
 export class BusinessConfigService implements OnModuleInit {
   constructor(
@@ -40,88 +90,99 @@ export class BusinessConfigService implements OnModuleInit {
   ) {}
 
   async onModuleInit() {
-    // Seed or update RankConfiguration
-    const rankCount = await this.prisma.rankConfiguration.count();
-    if (rankCount === 0) {
-      for (const rank of DEFAULT_RANKS) {
-        await this.prisma.rankConfiguration.create({
-          data: {
-            name: rank.name,
-            requiredVolume: new Prisma.Decimal(rank.requiredVolume),
-            maxStrongestLeg: new Prisma.Decimal(rank.maxStrongestLeg),
-            minOtherLegs: new Prisma.Decimal(rank.minOtherLegs),
-            orderIndex: rank.orderIndex,
-            isActive: true,
-          },
-        });
+    try {
+      // Seed or update RankConfiguration
+      const rankCount = await this.prisma.rankConfiguration.count();
+      if (rankCount === 0) {
+        for (const rank of DEFAULT_RANKS) {
+          await this.prisma.rankConfiguration.create({
+            data: {
+              name: rank.name,
+              requiredVolume: new Prisma.Decimal(rank.requiredVolume),
+              maxStrongestLeg: new Prisma.Decimal(rank.maxStrongestLeg),
+              minOtherLegs: new Prisma.Decimal(rank.minOtherLegs),
+              orderIndex: rank.orderIndex,
+              isActive: true,
+            },
+          });
+        }
+        console.log('Seeded 4 default RankConfigurations (Bronze, Silver, Gold, Diamond)');
       }
-      console.log('Seeded 4 default RankConfigurations (Bronze, Silver, Gold, Diamond)');
+    } catch (err: any) {
+      console.warn(`RankConfiguration seeding skipped: ${err.message}`);
     }
 
-    // Seed or ensure latest BusinessConfiguration has Product 360 values
-    const latestConfig = await this.prisma.businessConfiguration.findFirst({
-      orderBy: { version: 'desc' },
-    });
+    try {
+      // Seed or ensure latest BusinessConfiguration has 12 levels and Product 360 values
+      const latestConfig = await this.prisma.businessConfiguration.findFirst({
+        orderBy: { version: 'desc' },
+      });
 
-    if (!latestConfig) {
-      await this.prisma.businessConfiguration.create({
-        data: {
-          version: 1,
-          userIdPrefix: 'SH',
-          userIdStartingNumber: 100001,
-          userIdNextNumber: 100001,
-          userIdLength: 6,
-          profitSharingPercentage: new Prisma.Decimal('0.0500'), // 5% monthly
-          gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
-          levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
-          rankConfig: DEFAULT_RANKS,
-          payoutConfig: {
-            cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
-            cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
+      if (!latestConfig) {
+        await this.prisma.businessConfiguration.create({
+          data: {
+            version: 1,
+            userIdPrefix: 'SH',
+            userIdStartingNumber: 100001,
+            userIdNextNumber: 100001,
+            userIdLength: 6,
+            profitSharingPercentage: new Prisma.Decimal('0.0500'), // 5% monthly
+            gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
+            levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
+            rankConfig: DEFAULT_RANKS,
+            levelOpeningVolume: DEFAULT_LEVEL_OPENING_VOLUMES,
+            levelWiseProfitSharing: DEFAULT_LEVEL_WISE_PROFIT_SHARING,
+            referralLevelSettings: {
+              levels: 12,
+              active: DEFAULT_REFERRAL_ACTIVE_MAP,
+              descriptions: DEFAULT_REFERRAL_DESCRIPTIONS,
+            },
+            payoutConfig: {
+              cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
+              cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
+            },
+            prorationConfig: {
+              status: 'PENDING_CLIENT_CONFIRMATION',
+              basis: 'CALENDAR_DAYS',
+            },
+            systemDefaults: {
+              minContribution: 100000,
+              contributionMultiple: 100000,
+              zeroContributionWithholding: 0.20,
+              zeroContributionActivationThreshold: 100000,
+              monthlyProfitRate: 0.05,
+              sequentialLevelQualification: true,
+            },
+            createdById: 'system',
           },
-          prorationConfig: {
-            status: 'PENDING_CLIENT_CONFIRMATION',
-            basis: 'CALENDAR_DAYS',
-          },
-          systemDefaults: {
-            minContribution: 100000,
-            contributionMultiple: 100000,
-            zeroContributionWithholding: 0.20,
-            zeroContributionActivationThreshold: 100000,
-            monthlyProfitRate: 0.05,
-          },
-          createdById: 'system',
-        },
-      });
-      console.log('Seeded initial Product 360 BusinessConfiguration (version 1)');
-    } else if (!latestConfig.gratitudeShareConfig) {
-      // Upgrade existing config record with Product 360 defaults
-      await this.prisma.businessConfiguration.update({
-        where: { id: latestConfig.id },
-        data: {
-          profitSharingPercentage: new Prisma.Decimal('0.0500'),
-          gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
-          levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
-          rankConfig: DEFAULT_RANKS,
-          payoutConfig: {
-            cycle1: { startDay: 5, cutoffDay: 19, payoutDay: 21 },
-            cycle2: { startDay: 20, cutoffDay: 4, payoutDay: 6 },
-          },
-          prorationConfig: {
-            status: 'PENDING_CLIENT_CONFIRMATION',
-            basis: 'CALENDAR_DAYS',
-          },
-          systemDefaults: {
-            ...(latestConfig.systemDefaults as any || {}),
-            minContribution: 100000,
-            contributionMultiple: 100000,
-            zeroContributionWithholding: 0.20,
-            zeroContributionActivationThreshold: 100000,
-            monthlyProfitRate: 0.05,
-          },
-        },
-      });
-      console.log(`Updated BusinessConfiguration v${latestConfig.version} with Product 360 parameters.`);
+        });
+        console.log('Seeded initial Product 360 BusinessConfiguration with 12 fixed levels (version 1)');
+      } else {
+        const existingRefSettings = (latestConfig.referralLevelSettings as any) || {};
+        const currentLevels = existingRefSettings.levels || 0;
+        if (currentLevels < 12) {
+          const mergedOpening = { ...DEFAULT_LEVEL_OPENING_VOLUMES, ...((latestConfig.levelOpeningVolume as any) || {}) };
+          const mergedSharing = { ...DEFAULT_LEVEL_WISE_PROFIT_SHARING, ...((latestConfig.levelWiseProfitSharing as any) || {}) };
+          const mergedActive = { ...DEFAULT_REFERRAL_ACTIVE_MAP, ...(existingRefSettings.active || {}) };
+          const mergedDescs = { ...DEFAULT_REFERRAL_DESCRIPTIONS, ...(existingRefSettings.descriptions || {}) };
+
+          await this.prisma.businessConfiguration.update({
+            where: { id: latestConfig.id },
+            data: {
+              levelOpeningVolume: mergedOpening,
+              levelWiseProfitSharing: mergedSharing,
+              referralLevelSettings: {
+                levels: 12,
+                active: mergedActive,
+                descriptions: mergedDescs,
+              },
+            },
+          });
+          console.log(`Updated BusinessConfiguration v${latestConfig.version} to 12 fixed referral levels.`);
+        }
+      }
+    } catch (err: any) {
+      console.warn(`BusinessConfiguration seeding skipped: ${err.message}`);
     }
   }
 

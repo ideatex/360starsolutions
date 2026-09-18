@@ -26,4 +26,41 @@ export class AuthController {
     const rawToken = req.headers.authorization?.split(' ')[1];
     return this.authService.logout(rawToken);
   }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password/send-otp')
+  async sendForgotPasswordOtp(@Body() body: { identifier: string }) {
+    return this.authService.sendForgotPasswordOtp(body.identifier);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password/verify-otp')
+  async verifyForgotPasswordOtp(@Body() body: { shareholderId: string; otp: string }) {
+    return this.authService.verifyForgotPasswordOtp(body.shareholderId, body.otp);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('forgot-password/reset')
+  async resetPasswordWithToken(@Body() body: { resetToken: string; newPassword: string }) {
+    return this.authService.resetPasswordWithToken(body.resetToken, body.newPassword);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password-otp/send')
+  @UseGuards(JwtAuthGuard)
+  async sendChangePasswordOtp(@Request() req: any) {
+    return this.authService.sendChangePasswordOtp(req.shareholder.id);
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Post('change-password-otp/verify')
+  @UseGuards(JwtAuthGuard)
+  async changePasswordWithOtp(@Request() req: any, @Body() body: any) {
+    return this.authService.changePasswordWithOtp(
+      req.shareholder.id,
+      body.currentPassword,
+      body.newPassword,
+      body.otp
+    );
+  }
 }

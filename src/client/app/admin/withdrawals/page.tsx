@@ -270,98 +270,100 @@ export default function AdminWithdrawalsPage() {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 15 }} 
+      initial={{ opacity: 0, y: 12 }} 
       animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto pb-12"
+      className="space-y-6 max-w-7xl mx-auto pb-12 font-sans"
     >
       {/* Header */}
-      <div className="border-b border-border-subtle pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="border-b border-gray-200 dark:border-gray-800 pb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <ArrowRightLeft className="w-7 h-7 text-brand-primary" /> Contribution Fund Withdrawal Module
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white flex items-center gap-2">
+            <ArrowRightLeft className="w-6 h-6 text-brand-500" />
+            <span>Contribution Fund Withdrawals</span>
           </h1>
-          <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">
-            Process shareholder Partial or Full Withdrawals with automatic adjustments to Active Contribution Funds, Profit Sharing, and Business Volume.
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Process shareholder Partial or Full Withdrawals with automatic adjustments to Active Contribution Funds and Profit Sharing.
           </p>
         </div>
 
         <button
           onClick={handleOpenProcessModal}
-          className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider shrink-0"
+          className="bg-brand-500 hover:bg-brand-600 text-white font-bold px-4 py-2.5 rounded-xl transition-all shadow-theme-xs flex items-center justify-center gap-1.5 cursor-pointer text-xs uppercase tracking-wider shrink-0"
         >
-          <Plus size={16} /> Process Withdrawal
+          <Plus size={15} /> 
+          <span>Process Withdrawal</span>
         </button>
       </div>
 
       {/* Summary KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle shadow-xs flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Transactions</h3>
-            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total Transactions</span>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1 tracking-tight">
               {withdrawalsResponse?.total || 0}
             </p>
           </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-            <ArrowRightLeft size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
+            <ArrowRightLeft size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle shadow-xs flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Capital Withdrawn</h3>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total Capital Withdrawn</span>
+            <p className="text-2xl font-bold text-success-600 dark:text-success-400 mt-1 tracking-tight">
               ₹{Number(withdrawalsResponse?.summary?.totalWithdrawnAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-            <Wallet size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
+            <Wallet size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle shadow-xs flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Partial Withdrawals</h3>
-            <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Partial Withdrawals</span>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1 tracking-tight">
               {withdrawalsList.filter((w: any) => w.type === 'PARTIAL').length}
             </p>
           </div>
-          <div className="p-3 bg-blue-500/10 rounded-xl text-blue-600">
-            <RefreshCw size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">
+            <RefreshCw size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle shadow-xs flex items-center justify-between">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Full Withdrawals</h3>
-            <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Full Withdrawals</span>
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1 tracking-tight">
               {withdrawalsList.filter((w: any) => w.type === 'FULL').length}
             </p>
           </div>
-          <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600">
-            <ShieldAlert size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400">
+            <ShieldAlert size={20} />
           </div>
         </div>
       </div>
 
       {/* Toolbar: Search, Filters & Export */}
-      <div className="bg-white dark:bg-card p-4 rounded-3xl border border-border-subtle shadow-sm flex flex-col md:flex-row gap-4 items-center justify-between select-none">
+      <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 flex flex-col md:flex-row gap-3 items-center justify-between select-none">
         <div className="relative flex-1 w-full">
-          <Search className="absolute left-4 top-3 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-3.5 top-2.5 text-gray-400 w-4 h-4" />
           <input
             type="text"
             placeholder="Search Withdrawal ID, Shareholder ID, Name, or Remarks..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            className="w-full pl-11 pr-4 py-2.5 rounded-2xl border border-border-subtle focus:outline-none focus:ring-1 focus:ring-brand-primary text-xs font-semibold dark:bg-secondary/35"
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 text-xs font-medium text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs"
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
           <select
             value={typeFilter}
             onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-            className="px-4 py-2.5 rounded-2xl border border-border-subtle text-xs bg-white dark:bg-card font-bold text-muted-foreground focus:outline-none cursor-pointer"
+            className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-white dark:bg-gray-900 font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-brand-500 cursor-pointer shadow-theme-xs"
           >
             <option value="">All Withdrawal Types</option>
             <option value="PARTIAL">Partial Withdrawal</option>
@@ -372,7 +374,7 @@ export default function AdminWithdrawalsPage() {
             type="date"
             value={startDate}
             onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            className="px-3 py-2 rounded-2xl border border-border-subtle text-xs bg-white dark:bg-card font-semibold text-muted-foreground focus:outline-none"
+            className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-white dark:bg-gray-900 font-semibold text-gray-700 dark:text-gray-300 focus:outline-none shadow-theme-xs"
             title="Start Date"
           />
           <input
@@ -517,7 +519,7 @@ export default function AdminWithdrawalsPage() {
               initial={{ opacity: 0, scale: 0.95, y: 15 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 15 }}
-              className="bg-card text-card-foreground border border-border-subtle w-full max-w-xl rounded-3xl p-6 shadow-2xl space-y-6 relative"
+              className="bg-card text-card-foreground border border-border-subtle w-full max-w-xl max-h-[90vh] overflow-y-auto rounded-3xl p-6 shadow-2xl space-y-6 relative"
             >
               <button
                 onClick={() => setIsProcessModalOpen(false)}

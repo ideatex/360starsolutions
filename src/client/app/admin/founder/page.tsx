@@ -146,72 +146,76 @@ export default function AdminFounderArticlesPage() {
     <motion.div 
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto"
+      className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border-subtle pb-6">
+      <div className="app-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <BookOpen className="w-7 h-7 text-purple-650" /> Founder's Bulletin Editor
+          <div className="flex items-center gap-2">
+            <span className="badge-brand">
+              Corporate Vision
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-2 flex items-center gap-2.5">
+            <BookOpen className="w-7 h-7 text-brand-600 dark:text-brand-400" /> Founder's Bulletin Editor
           </h1>
-          <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Compose and publish letters, announcements, and vision statement documents.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Compose and publish letters, announcements, and vision statement documents.</p>
         </div>
         <button
           onClick={() => { resetForm(); setIsOpen(true); }}
-          className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
+          className="bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-semibold px-5 py-2.5 rounded-lg transition-all shadow-theme-xs flex items-center justify-center gap-2 cursor-pointer text-xs"
         >
-          <Plus size={14} /> Write Bulletin Letter
+          <Plus size={16} /> Write Bulletin Letter
         </button>
       </div>
 
       {/* Grid of Articles Table */}
-      <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden">
+      <div className="app-card p-0 overflow-hidden">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-            <Loader2 className="w-6 h-6 animate-spin text-brand-primary" />
-            <p className="text-xs font-semibold">Loading bulletin archives...</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
+            <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
+            <p className="text-sm font-medium">Loading bulletin archives...</p>
           </div>
         ) : articles?.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30 text-purple-550" />
-            <p className="text-xs font-bold">No Letters Written</p>
-            <p className="text-[10px] text-muted-foreground/75 mt-0.5">Click "Write Bulletin Letter" to record your first vision post.</p>
+          <div className="text-center py-20 text-gray-500">
+            <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-600" />
+            <p className="text-sm font-semibold">No Letters Written</p>
+            <p className="text-xs text-gray-400 mt-0.5">Click "Write Bulletin Letter" to record your first vision post.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+              <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4">Title / Slug</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Publication Period</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
+                  <th className="px-5 py-3.5">Title / Slug</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Publication Period</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
+              <tbody className="divide-y divide-gray-150 dark:divide-gray-800 text-xs text-gray-700 dark:text-gray-300 font-medium">
                 {articles?.map((a: any) => (
-                  <tr key={a.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-extrabold text-gray-900 dark:text-white">{a.title}</div>
-                      <p className="text-[10px] text-muted-foreground font-mono mt-0.5">/{a.slug}</p>
+                  <tr key={a.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <div className="font-bold text-gray-900 dark:text-white text-sm">{a.title}</div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 font-mono mt-0.5">/{a.slug}</p>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border tracking-wider
-                        ${a.status === 'PUBLISHED' ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' : ''}
-                        ${a.status === 'DRAFT' ? 'bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle' : ''}
-                      `}>
+                    <td className="px-5 py-3.5">
+                      <span className={`badge ${
+                        a.status === 'PUBLISHED' ? 'badge-success' : 'badge-neutral'
+                      }`}>
                         {a.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground font-semibold">
+                    <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400 font-medium">
                       <span className="flex items-center gap-1.5">
-                        <Calendar size={12} />
+                        <Calendar size={13} />
                         {new Date(a.createdAt).toLocaleDateString()}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right space-x-1.5 select-none">
-                      <button onClick={() => handleEdit(a)} className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer" title="Edit"><Edit3 size={14} /></button>
-                      <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 hover:text-red-650 rounded-xl text-muted-foreground transition-all cursor-pointer" title="Delete"><Trash2 size={14} /></button>
+                    <td className="px-5 py-3.5 text-right space-x-1 select-none">
+                      <button onClick={() => handleEdit(a)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer inline-flex items-center justify-center" title="Edit"><Edit3 size={15} /></button>
+                      <button onClick={() => handleDelete(a.id)} className="p-1.5 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 rounded-lg text-gray-500 transition-all cursor-pointer inline-flex items-center justify-center" title="Delete"><Trash2 size={15} /></button>
                     </td>
                   </tr>
                 ))}
@@ -224,52 +228,52 @@ export default function AdminFounderArticlesPage() {
       {/* Editor Modal Dialog */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }} 
               animate={{ opacity: 1, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95 }} 
-              className="bg-white dark:bg-card rounded-3xl max-w-2xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh] border border-border-subtle"
+              className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full shadow-theme-xl relative overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-800 my-auto"
             >
-              <div className="p-6 border-b border-border-subtle flex justify-between items-center bg-muted/10">
+              <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/80">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{selectedArticle ? 'Edit Bulletin Letter' : 'Write Bulletin Letter'}</h3>
-                  <p className="text-[10px] text-muted-foreground">Draft letter updates for all shareholder portals</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">{selectedArticle ? 'Edit Bulletin Letter' : 'Write Bulletin Letter'}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Draft letter updates for all shareholder portals</p>
                 </div>
-                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-muted dark:hover:bg-secondary rounded-lg text-muted-foreground transition-all cursor-pointer"><X size={16} /></button>
+                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all cursor-pointer"><X size={18} /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs custom-scrollbar">
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Letter Title *</label>
-                  <input type="text" value={form.title} onChange={e => handleTitleChange(e.target.value)} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Q3 Leadership Statement" />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Letter Title *</label>
+                  <input type="text" value={form.title} onChange={e => handleTitleChange(e.target.value)} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="Q3 Leadership Statement" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">URL Slug *</label>
-                    <input type="text" value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl font-mono text-xs font-semibold focus:outline-none dark:bg-secondary/35" placeholder="q3-leadership-statement" />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">URL Slug *</label>
+                    <input type="text" value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg font-mono text-xs font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="q3-leadership-statement" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Publication Status</label>
-                    <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none cursor-pointer">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Publication Status</label>
+                    <select value={form.status} onChange={e => setForm({...form, status: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
                       <option value="DRAFT">Draft</option>
                       <option value="PUBLISHED">Published</option>
                     </select>
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cover Image URL (Optional)</label>
-                  <input type="text" value={form.coverImage} onChange={e => setForm({...form, coverImage: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-secondary/35" placeholder="https://..." />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Cover Image URL (Optional)</label>
+                  <input type="text" value={form.coverImage} onChange={e => setForm({...form, coverImage: e.target.value})} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="https://..." />
                 </div>
                 <div className="space-y-1.5 font-sans">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Letter Body Content *</label>
-                  <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={10} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="Dear investors, write vision statements here..." />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Letter Body Content *</label>
+                  <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={10} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="Dear investors, write vision statements here..." />
                 </div>
               </div>
 
-              <div className="p-4 border-t border-border-subtle bg-muted/10 flex justify-end gap-3 select-none">
-                <button onClick={() => setIsOpen(false)} className="px-4 py-2.5 border border-border-subtle rounded-xl hover:bg-muted text-xs font-bold text-gray-500 cursor-pointer">Cancel</button>
-                <button onClick={handleSubmit} className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer uppercase tracking-wider">
+              <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/80 flex justify-end gap-2.5 select-none">
+                <button onClick={() => setIsOpen(false)} className="px-4 py-2 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSubmit} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-theme-xs cursor-pointer">
                   {selectedArticle ? 'Save Letter' : 'Publish Letter'}
                 </button>
               </div>

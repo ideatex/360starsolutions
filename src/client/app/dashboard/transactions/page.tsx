@@ -5,9 +5,12 @@ import RecentActivity from '@/components/RecentActivity';
 
 export default function TransactionsPage() {
   return (
-    <div className="p-4 md:p-8">
-      <h1 className="text-2xl font-bold text-gray-900 tracking-tight mb-6">Transactions</h1>
-      <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm max-w-4xl">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12 font-outfit">
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">Transactions</h1>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Audit log of your recent transactions and account events</p>
+      </div>
+      <div className="app-card p-6">
         <RecentActivity />
       </div>
     </div>

@@ -12,16 +12,20 @@ export class SystemSettingsService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    // Seed default settings if they do not exist
-    for (const [key, val] of Object.entries(this.DEFAULTS)) {
-      const setting = await this.prisma.systemSetting.findUnique({
-        where: { key },
-      });
-      if (!setting) {
-        await this.prisma.systemSetting.create({
-          data: { key, value: val },
+    try {
+      // Seed default settings if they do not exist
+      for (const [key, val] of Object.entries(this.DEFAULTS)) {
+        const setting = await this.prisma.systemSetting.findUnique({
+          where: { key },
         });
+        if (!setting) {
+          await this.prisma.systemSetting.create({
+            data: { key, value: val },
+          });
+        }
       }
+    } catch (err: any) {
+      console.warn(`SystemSettings seeding skipped: ${err.message}`);
     }
   }
 

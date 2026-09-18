@@ -296,19 +296,19 @@ export class ReportService {
   }
 
   async getShareholderSummaryReport(filters: any = {}) {
-    const where: Prisma.ShareholderWhereInput = {};
+    const where: Prisma.ShareholderWhereInput = {
+      role: 'SHAREHOLDER',
+    };
     if (filters.status) where.status = filters.status as UserStatus;
     if (filters.search) {
+      const q = filters.search.trim();
       where.OR = [
-        { shareholderId: { contains: filters.search, mode: 'insensitive' } },
-        { name: { contains: filters.search, mode: 'insensitive' } },
-        { phone: { contains: filters.search, mode: 'insensitive' } },
+        { shareholderId: { contains: q, mode: 'insensitive' } },
+        { name: { contains: q, mode: 'insensitive' } },
+        { phone: { contains: q, mode: 'insensitive' } },
+        { bankName: { contains: q, mode: 'insensitive' } },
+        { bankAccountNumber: { contains: q, mode: 'insensitive' } },
       ];
-    }
-    if (filters.agreementIssued === 'true' || filters.chequeIssued === 'true') {
-      where.contributions = { some: {} };
-      if (filters.agreementIssued === 'true') (where.contributions.some as any).issuedAgreement = true;
-      if (filters.chequeIssued === 'true') (where.contributions.some as any).issuedCheque = true;
     }
 
     const shareholders = await this.prisma.shareholder.findMany({
@@ -359,6 +359,33 @@ export class ReportService {
         createdAt: u.createdAt,
       };
     });
+
+    // Agreement and Cheque filters
+    if (filters.agreementIssued === 'true') {
+      result = result.filter((r) => r.agreementIssued === 'Yes');
+    } else if (filters.agreementIssued === 'false') {
+      result = result.filter((r) => r.agreementIssued === 'No');
+    }
+
+    if (filters.chequeIssued === 'true') {
+      result = result.filter((r) => r.chequeIssued === 'Yes');
+    } else if (filters.chequeIssued === 'false') {
+      result = result.filter((r) => r.chequeIssued === 'No');
+    }
+
+    // Capital and Payout value range filters
+    if (filters.minCapital) {
+      result = result.filter((r) => r.activeContributionFund >= Number(filters.minCapital));
+    }
+    if (filters.maxCapital) {
+      result = result.filter((r) => r.activeContributionFund <= Number(filters.maxCapital));
+    }
+    if (filters.minPayout) {
+      result = result.filter((r) => r.overallPayout >= Number(filters.minPayout));
+    }
+    if (filters.maxPayout) {
+      result = result.filter((r) => r.overallPayout <= Number(filters.maxPayout));
+    }
 
     return this.sortResult(result, filters.sortBy, filters.sortOrder, 'shareholderId');
   }
@@ -433,6 +460,14 @@ export class ReportService {
     }));
 
     let merged = [...contrMapped, ...withMapped];
+
+    if (filters.minAmount) {
+      merged = merged.filter((t) => t.amount >= Number(filters.minAmount));
+    }
+    if (filters.maxAmount) {
+      merged = merged.filter((t) => t.amount <= Number(filters.maxAmount));
+    }
+
     return this.sortResult(merged, filters.sortBy || 'date', filters.sortOrder || 'desc', 'date');
   }
 
@@ -443,11 +478,18 @@ export class ReportService {
       where.batchId = filters.batchId;
     }
 
+    if (filters.status) {
+      where.status = filters.status as any;
+    }
+
     if (filters.search) {
+      const q = filters.search.trim();
       where.shareholder = {
         OR: [
-          { shareholderId: { contains: filters.search, mode: 'insensitive' } },
-          { name: { contains: filters.search, mode: 'insensitive' } },
+          { shareholderId: { contains: q, mode: 'insensitive' } },
+          { name: { contains: q, mode: 'insensitive' } },
+          { bankName: { contains: q, mode: 'insensitive' } },
+          { bankAccountNumber: { contains: q, mode: 'insensitive' } },
         ],
       };
     }
@@ -468,6 +510,7 @@ export class ReportService {
         batch: {
           select: {
             id: true,
+            cycleIdentifier: true,
             cycleStart: true,
             cycleEnd: true,
             status: true,
@@ -491,17 +534,15 @@ export class ReportService {
     for (const c of levelCommissions) {
       const key = `${c.payoutBatchId}_${c.shareholderId}`;
       if (!levelMap.has(key)) {
-        levelMap.set(key, { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 });
+        levelMap.set(key, {});
       }
       const mapObj = levelMap.get(key)!;
-      if (c.level >= 1 && c.level <= 7) {
-        mapObj[c.level] = (mapObj[c.level] || 0) + Number(c.amount);
-      }
+      mapObj[c.level] = (mapObj[c.level] || 0) + Number(c.amount);
     }
 
     let result = details.map((d) => {
       const key = `${d.batchId}_${d.shareholderId}`;
-      const levels = levelMap.get(key) || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0 };
+      const levels = levelMap.get(key) || {};
       const profit = Number(d.profitAmount);
       const l1 = levels[1] || 0;
       const l2 = levels[2] || 0;
@@ -510,8 +551,13 @@ export class ReportService {
       const l5 = levels[5] || 0;
       const l6 = levels[6] || 0;
       const l7 = levels[7] || 0;
+      const l8 = levels[8] || 0;
+      const l9 = levels[9] || 0;
+      const l10 = levels[10] || 0;
+      const l11 = levels[11] || 0;
+      const l12 = levels[12] || 0;
 
-      const totalCommission = l1 + l2 + l3 + l4 + l5 + l6 + l7;
+      const totalCommission = Object.values(levels).reduce((sum, val) => sum + val, 0);
       const totalPayout = profit + totalCommission;
 
       return {
@@ -519,7 +565,7 @@ export class ReportService {
         shareholderId: d.shareholder?.shareholderId || '-',
         shareholderName: d.shareholder?.name || '-',
         cycleRange: d.batch
-          ? `${new Date(d.batch.cycleStart).toLocaleDateString()} - ${new Date(d.batch.cycleEnd).toLocaleDateString()}`
+          ? (d.batch.cycleIdentifier || `${new Date(d.batch.cycleStart).toLocaleDateString()} - ${new Date(d.batch.cycleEnd).toLocaleDateString()}`)
           : '-',
         payoutDate: d.createdAt,
         bankName: d.shareholder?.bankName || '-',
@@ -533,11 +579,23 @@ export class ReportService {
         l5Commission: l5,
         l6Commission: l6,
         l7Commission: l7,
+        l8Commission: l8,
+        l9Commission: l9,
+        l10Commission: l10,
+        l11Commission: l11,
+        l12Commission: l12,
         totalCommission,
         totalPayout,
         status: d.status,
       };
     });
+
+    if (filters.minPayout) {
+      result = result.filter((p) => p.totalPayout >= Number(filters.minPayout));
+    }
+    if (filters.maxPayout) {
+      result = result.filter((p) => p.totalPayout <= Number(filters.maxPayout));
+    }
 
     return this.sortResult(result, filters.sortBy, filters.sortOrder, 'shareholderId');
   }

@@ -23,7 +23,7 @@ export function PublicHeader() {
       <div className="max-w-7xl w-full mx-auto flex justify-between items-center px-6 py-4">
         <Link href="/" className="flex items-center gap-3">
           <img 
-            src="/logo-360.png" 
+            src="/logo-369.png" 
             alt="360 Star Logo" 
             className="h-10 w-auto object-contain max-h-11" 
           />

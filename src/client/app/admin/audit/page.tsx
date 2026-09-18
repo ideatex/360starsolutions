@@ -129,23 +129,28 @@ export default function AdminAuditPage() {
     <motion.div 
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto"
+      className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
     >
       {/* Title & Actions Bar */}
-      <div className="border-b border-border-subtle pb-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="app-card flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <FileText className="w-7 h-7 text-brand-primary" /> Audit Logs
+          <div className="flex items-center gap-2">
+            <span className="badge-brand">
+              Enterprise Governance
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-2 flex items-center gap-2.5">
+            <FileText className="w-7 h-7 text-brand-600 dark:text-brand-400" /> Audit Logs
           </h1>
-          <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Immutable ledger of enterprise settings, payments, and account actions.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Immutable ledger of enterprise settings, payments, and account actions.</p>
         </div>
 
         {/* Export Buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5 shrink-0">
           <button
             onClick={handleExportCSV}
             disabled={isExportingCSV}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold rounded-lg shadow-theme-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             {isExportingCSV ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -158,7 +163,7 @@ export default function AdminAuditPage() {
           <button
             onClick={handleExportPDF}
             disabled={isExportingPDF}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 cursor-pointer shrink-0"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white text-xs font-semibold rounded-lg shadow-theme-xs transition-all disabled:opacity-50 cursor-pointer"
           >
             {isExportingPDF ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -171,9 +176,9 @@ export default function AdminAuditPage() {
       </div>
 
       {/* Period Filter Selector */}
-      <div className="flex items-center justify-between flex-wrap gap-3 bg-white dark:bg-card p-4 rounded-3xl border border-border-subtle shadow-sm">
-        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground">
-          <Filter className="w-4 h-4 text-brand-primary" />
+      <div className="app-card flex items-center justify-between flex-wrap gap-3">
+        <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
+          <Filter className="w-4 h-4 text-brand-600 dark:text-brand-400" />
           <span>Filter Timeframe:</span>
         </div>
 
@@ -182,10 +187,10 @@ export default function AdminAuditPage() {
             <button
               key={p}
               onClick={() => handlePeriodChange(p)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 period === p
-                  ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
-                  : 'bg-muted/40 hover:bg-muted dark:bg-secondary/40 dark:hover:bg-secondary border-border-subtle text-muted-foreground hover:text-foreground'
+                  ? 'bg-brand-600 text-white shadow-theme-xs'
+                  : 'bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300'
               }`}
             >
               {PERIOD_LABELS[p]}
@@ -195,83 +200,85 @@ export default function AdminAuditPage() {
       </div>
 
       {/* Audit Log Grids */}
-      <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
-            <tr>
-              <th className="px-6 py-4">Timestamp</th>
-              <th className="px-6 py-4">Action</th>
-              <th className="px-6 py-4">Entity Type</th>
-              <th className="px-6 py-4">Entity ID</th>
-              <th className="px-6 py-4">Changes (Old Value → New Value)</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
-            {isLoading ? (
-              <tr><td colSpan={5} className="text-center py-20"><Loader2 size={20} className="animate-spin text-brand-primary mx-auto" /></td></tr>
-            ) : data?.data?.length === 0 ? (
+      <div className="app-card p-0 overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse">
+            <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-semibold uppercase tracking-wider">
               <tr>
-                <td colSpan={5} className="text-center py-20 text-muted-foreground">
-                  <Database className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-primary" />
-                  <p className="text-xs font-bold">No Logs Found</p>
-                  <p className="text-[10px] text-muted-foreground/75 mt-0.5">No audit log registers found for {PERIOD_LABELS[period]}.</p>
-                </td>
+                <th className="px-5 py-3.5">Timestamp</th>
+                <th className="px-5 py-3.5">Action</th>
+                <th className="px-5 py-3.5">Entity Type</th>
+                <th className="px-5 py-3.5">Entity ID</th>
+                <th className="px-5 py-3.5">Changes (Old Value → New Value)</th>
               </tr>
-            ) : (
-              data?.data?.map((log: any) => (
-                <tr key={log.id} className="hover:bg-muted/20 transition-colors">
-                  <td className="px-6 py-4 font-semibold text-muted-foreground whitespace-nowrap">
-                    <span className="flex items-center gap-1.5">
-                      <Clock size={12} />
-                      {new Date(log.createdAt).toLocaleString()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 font-extrabold text-gray-950 dark:text-white uppercase tracking-wide text-[10px]">
-                    <span className="px-2 py-0.5 rounded bg-muted dark:bg-secondary border border-border-subtle">
-                      {log.action}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-muted-foreground font-semibold">{log.entityType}</td>
-                  <td className="px-6 py-4 font-mono text-[10px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]" title={log.entityId}>
-                    {log.entityId}
-                  </td>
-                  <td className="px-6 py-4 font-semibold text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      {log.oldValue && (
-                        <span className="line-through text-red-500 dark:text-red-400 bg-red-500/5 px-2 py-0.5 rounded border border-red-500/10">
-                          {log.oldValue}
-                        </span>
-                      )}
-                      {log.oldValue && log.newValue && <ArrowRight size={12} className="text-muted-foreground/60" />}
-                      {log.newValue && (
-                        <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/10 font-bold">
-                          {log.newValue}
-                        </span>
-                      )}
-                    </div>
+            </thead>
+            <tbody className="divide-y divide-gray-150 dark:divide-gray-800 text-xs text-gray-700 dark:text-gray-300 font-medium">
+              {isLoading ? (
+                <tr><td colSpan={5} className="text-center py-20"><Loader2 size={20} className="animate-spin text-brand-600 mx-auto" /></td></tr>
+              ) : data?.data?.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center py-20 text-gray-500">
+                    <Database className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-600" />
+                    <p className="text-xs font-semibold">No Logs Found</p>
+                    <p className="text-[11px] text-gray-400 mt-0.5">No audit log registers found for {PERIOD_LABELS[period]}.</p>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ) : (
+                data?.data?.map((log: any) => (
+                  <tr key={log.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors">
+                    <td className="px-5 py-3.5 font-medium text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                      <span className="flex items-center gap-1.5">
+                        <Clock size={13} />
+                        {new Date(log.createdAt).toLocaleString()}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 font-bold text-gray-900 dark:text-white uppercase tracking-wide text-[10px]">
+                      <span className="badge-brand">
+                        {log.action}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300 font-semibold">{log.entityType}</td>
+                    <td className="px-5 py-3.5 font-mono text-xs text-gray-500 dark:text-gray-400 truncate max-w-[140px]" title={log.entityId}>
+                      {log.entityId}
+                    </td>
+                    <td className="px-5 py-3.5 font-medium text-gray-600 dark:text-gray-300">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {log.oldValue && (
+                          <span className="line-through text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 px-2 py-0.5 rounded border border-rose-200 dark:border-rose-900/50">
+                            {log.oldValue}
+                          </span>
+                        )}
+                        {log.oldValue && log.newValue && <ArrowRight size={12} className="text-gray-400" />}
+                        {log.newValue && (
+                          <span className="text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900/50 font-semibold">
+                            {log.newValue}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination Footer */}
       {!isLoading && data?.lastPage > 1 && (
-        <div className="flex justify-between items-center bg-white dark:bg-card p-4 rounded-xl shadow-sm border border-border-subtle mt-4">
+        <div className="flex justify-between items-center bg-gray-50/50 dark:bg-gray-900 p-4 rounded-xl border border-gray-200 dark:border-gray-800">
           <button
             onClick={() => setPage(p => Math.max(1, p - 1))}
             disabled={page === 1}
-            className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
+            className="px-3.5 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-semibold disabled:opacity-40 hover:bg-white dark:hover:bg-gray-800 cursor-pointer select-none"
           >
             Previous
           </button>
-          <span className="text-[11px] font-bold text-muted-foreground">Page {page} of {data.lastPage}</span>
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Page {page} of {data.lastPage}</span>
           <button
             onClick={() => setPage(p => Math.min(data.lastPage, p + 1))}
             disabled={page >= data.lastPage}
-            className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
+            className="px-3.5 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-semibold disabled:opacity-40 hover:bg-white dark:hover:bg-gray-800 cursor-pointer select-none"
           >
             Next
           </button>

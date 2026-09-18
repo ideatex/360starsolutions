@@ -331,6 +331,61 @@ export default function AdminPayoutsPage() {
     toast({ title: "PDF Report Generated", description: `Opened printable shareholder payout report for ${list.length} records.`, type: "success" });
   };
 
+  const [printingBatchId, setPrintingBatchId] = useState<string | null>(null);
+
+  const handlePrintBatch = async (b: any) => {
+    setPrintingBatchId(b.id);
+    try {
+      let details = expandedBatchId === b.id ? expandedBatchDetails : null;
+      if (!details || details.length === 0) {
+        const res = await api.get(`/admin/payouts/batches/${b.id}`);
+        details = res.data || [];
+      }
+
+      if (!details || details.length === 0) {
+        toast({ title: "No Records", description: "This batch does not contain any beneficiary records to print.", type: "warning" });
+        return;
+      }
+
+      const columns: ExportColumn[] = [
+        { header: 'Shareholder ID', key: 'shareholderId', formatter: (_, r) => r.shareholder?.shareholderId || '-' },
+        { header: 'Name', key: 'name', formatter: (_, r) => r.shareholder?.name || '-' },
+        { header: 'Account Type', key: 'accountType', formatter: (_, r) => r.shareholder?.accountType || '-' },
+        { header: 'Bank Name', key: 'bankName', formatter: (_, r) => r.shareholder?.bankName || '-' },
+        { header: 'Account No.', key: 'bankAccountNumber', formatter: (_, r) => r.shareholder?.bankAccountNumber || '-' },
+        { header: 'IFSC', key: 'bankIfsc', formatter: (_, r) => r.shareholder?.bankIfsc || '-' },
+        { header: 'Profit Share (₹)', key: 'grossProfitShare', formatter: (_, r) => Number(r.grossProfitShare || r.profitAmount || 0).toFixed(2) },
+        { header: 'Gratitude Share (₹)', key: 'grossGratitudeShare', formatter: (_, r) => Number(r.grossGratitudeShare || r.commissionAmount || 0).toFixed(2) },
+        { header: 'Withheld (₹)', key: 'withheldAmount', formatter: (_, r) => Number(r.withheldAmount || 0).toFixed(2) },
+        { header: 'Net Payable (₹)', key: 'netPayable', formatter: (_, r) => Number(r.netPayable || r.totalAmount || 0).toFixed(2) },
+        { header: 'Status', key: 'status' },
+      ];
+
+      const totalProfit = details.reduce((acc: number, r: any) => acc + Number(r.grossProfitShare || r.profitAmount || 0), 0);
+      const totalGratitude = details.reduce((acc: number, r: any) => acc + Number(r.grossGratitudeShare || r.commissionAmount || 0), 0);
+      const totalNet = details.reduce((acc: number, r: any) => acc + Number(r.netPayable || r.totalAmount || 0), 0);
+
+      exportToPDF(
+        `payout_batch_${b.cycleIdentifier || b.id.substring(0, 8)}`,
+        `Payout Batch Statement - ${b.cycleIdentifier || `Batch ${b.id.substring(0, 8)}`}`,
+        `Period: ${new Date(b.cycleStart).toLocaleDateString()} - ${new Date(b.cycleEnd).toLocaleDateString()} | Status: ${b.status} | Beneficiaries: ${b.totalBeneficiaries || details.length}`,
+        columns,
+        details,
+        [
+          { label: 'Total Beneficiaries', value: details.length },
+          { label: 'Total Profit Share (5%)', value: `₹${totalProfit.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+          { label: 'Total Gratitude Share', value: `₹${totalGratitude.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+          { label: 'Total Net Payable', value: `₹${totalNet.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        ]
+      );
+      toast({ title: "Print Statement Ready", description: `Generated printable statement for batch ${b.cycleIdentifier || b.id.substring(0, 8)}.`, type: "success" });
+    } catch (err: any) {
+      toast({ title: "Print Failed", description: err.response?.data?.message || "Could not fetch batch details for printing.", type: "error" });
+    } finally {
+      setPrintingBatchId(null);
+    }
+  };
+
   const handleExportBatchesCSV = () => {
     const list = batches?.data || [];
     if (list.length === 0) {
@@ -350,37 +405,37 @@ export default function AdminPayoutsPage() {
   };
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-border-subtle pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
-            <Landmark className="text-brand-primary w-7 h-7" />
-            Payout Batches & Financial Statements
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2.5">
+            <Landmark className="text-brand-500 w-6 h-6" />
+            Payout Batches & Statements
           </h1>
-          <p className="text-xs text-muted-foreground mt-1">
-            Authoritative Product 360 Fortnightly Engine • 5% Monthly Profit Share • L1–L12 Gratitude Share • Payouts on 6th & 21st
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Authoritative Fortnightly Engine • 5% Monthly Profit Share • L1–L12 Gratitude Share • Payouts on 6th & 21st
           </p>
         </div>
 
         {/* Global Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-2xl border border-border-subtle">
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800/70 p-1 rounded-xl border border-gray-200/80 dark:border-gray-700/80">
           <button
             onClick={() => setActiveTab('shareholders')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'shareholders'
-                ? 'bg-brand-primary text-white shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-gray-900 dark:text-white'
+                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
             }`}
           >
             Shareholder Payouts Ledger
           </button>
           <button
             onClick={() => setActiveTab('batches')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               activeTab === 'batches'
-                ? 'bg-brand-primary text-white shadow-xs'
-                : 'text-muted-foreground hover:text-foreground'
+                ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-gray-900 dark:text-white'
+                : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
             }`}
           >
             Fortnightly Batches
@@ -389,80 +444,80 @@ export default function AdminPayoutsPage() {
       </div>
 
       {/* Overview Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Payouts Logged</h3>
-            <p className="text-2xl font-black text-gray-900 dark:text-white mt-1">{shareholderPayouts?.total || 0}</p>
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total Payouts Logged</span>
+            <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1 tracking-tight">{shareholderPayouts?.total || 0}</p>
           </div>
-          <div className="p-3 bg-brand-primary/10 rounded-xl text-brand-primary">
-            <Users size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
+            <Users size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Profit Share (5%)</h3>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Profit Share (5%)</span>
+            <p className="text-2xl font-bold text-success-600 dark:text-success-400 mt-1 tracking-tight">
               ₹{Number(shareholderPayouts?.summary?.totalProfit || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="p-3 bg-emerald-500/10 rounded-xl text-emerald-600">
-            <CheckCircle size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
+            <CheckCircle size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Total Gratitude Share</h3>
-            <p className="text-2xl font-black text-blue-600 dark:text-blue-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Gratitude Share</span>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1 tracking-tight">
               ₹{Number(shareholderPayouts?.summary?.totalCommission || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="p-3 bg-blue-500/10 rounded-xl text-blue-600">
-            <Landmark size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">
+            <Landmark size={20} />
           </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-5 rounded-2xl border border-border-subtle flex items-center justify-between shadow-xs">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex items-center justify-between">
           <div>
-            <h3 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Net Dispatched Payout</h3>
-            <p className="text-2xl font-black text-purple-600 dark:text-purple-400 mt-1">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Net Dispatched</span>
+            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1 tracking-tight">
               ₹{Number(shareholderPayouts?.summary?.totalPayout || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="p-3 bg-purple-500/10 rounded-xl text-purple-600">
-            <CreditCard size={22} />
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400">
+            <CreditCard size={20} />
           </div>
         </div>
       </div>
 
       {/* Canonical Cycle Engine Generator & Pre-Execution Preview Controls */}
-      <div className="bg-white dark:bg-card p-6 rounded-3xl border border-border-subtle shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-border-subtle pb-4 gap-2">
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 md:p-6 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-200 dark:border-gray-800 pb-4 gap-2">
           <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-brand-primary" />
+            <Calendar className="w-5 h-5 text-brand-500" />
             <h2 className="text-sm font-bold text-gray-900 dark:text-white">Authoritative Fortnightly Cycle Engine</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1 rounded-full border border-emerald-200 dark:border-emerald-800 font-semibold flex items-center gap-1">
+            <span className="badge-success">
               <ShieldCheck size={12} /> Idempotent & Concurrency Safe
             </span>
-            <span className="text-[10px] text-muted-foreground bg-secondary/50 px-3 py-1 rounded-full border border-border-subtle font-semibold">
+            <span className="badge-brand">
               Payouts on 6th & 21st
             </span>
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row items-end gap-4">
+        <div className="flex flex-col md:flex-row items-end gap-3.5">
           <div className="flex-1 space-y-1.5 w-full">
-            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">
               Select Canonical Payout Cycle
             </label>
             <select
               value={selectedCycleId}
               onChange={(e) => setSelectedCycleId(e.target.value)}
-              className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/40 text-foreground"
+              className="w-full px-3.5 py-2.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 text-gray-900 dark:text-white shadow-theme-xs cursor-pointer"
             >
               <option value="">-- Choose Canonical Cycle --</option>
               {availableCycles?.map((c: any) => (
@@ -473,25 +528,25 @@ export default function AdminPayoutsPage() {
             </select>
           </div>
 
-          <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="flex items-center gap-2.5 w-full md:w-auto">
             {/* Preview Button */}
             <button
               onClick={() => selectedCycleId && previewMutation.mutate(selectedCycleId)}
               disabled={!selectedCycleId || previewMutation.isPending}
-              className="flex-1 md:flex-initial bg-secondary hover:bg-secondary/80 text-foreground font-bold px-5 py-2.5 rounded-xl transition-all disabled:opacity-50 h-[38px] text-xs uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 border border-border-subtle"
+              className="flex-1 md:flex-initial bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold px-4 py-2.5 rounded-xl transition-all disabled:opacity-50 text-xs shadow-theme-xs cursor-pointer flex items-center justify-center gap-1.5 border border-gray-200 dark:border-gray-700"
             >
               {previewMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-              Preview Calculation
+              <span>Preview</span>
             </button>
 
             {/* Direct Generate Button */}
             <button
               onClick={() => selectedCycleId && generateMutation.mutate(selectedCycleId)}
               disabled={!selectedCycleId || generateMutation.isPending}
-              className="flex-1 md:flex-initial bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-6 py-2.5 rounded-xl transition-colors disabled:opacity-50 h-[38px] text-xs uppercase tracking-wider cursor-pointer flex items-center justify-center gap-1.5 select-none shrink-0 shadow-sm"
+              className="flex-1 md:flex-initial bg-brand-500 hover:bg-brand-600 text-white font-bold px-5 py-2.5 rounded-xl transition-colors disabled:opacity-50 text-xs shadow-theme-xs cursor-pointer flex items-center justify-center gap-1.5 shrink-0"
             >
               {generateMutation.isPending ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-              Generate Batch
+              <span>Generate Batch</span>
             </button>
           </div>
         </div>
@@ -499,24 +554,24 @@ export default function AdminPayoutsPage() {
 
       {/* TAB 1: ALL SHAREHOLDER PAYOUTS LEDGER */}
       {activeTab === 'shareholders' && (
-        <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden space-y-4">
-          <div className="p-5 border-b border-border-subtle bg-muted/10 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 overflow-hidden space-y-4">
+          <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-white/[0.02] flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="relative w-full md:w-80">
-              <Search className="absolute left-3.5 top-3 w-4 h-4 text-muted-foreground" />
+              <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-400" />
               <input 
                 type="text" 
                 value={search} 
                 onChange={e => { setSearch(e.target.value); setShareholderPage(1); }}
-                placeholder="Search by Shareholder ID, Name, Bank Acc..." 
-                className="w-full pl-10 pr-4 py-2 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35"
+                placeholder="Search by ID, Name, Bank Acc..." 
+                className="w-full pl-10 pr-4 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:outline-none focus:border-brand-500 bg-white dark:bg-gray-900 dark:text-white shadow-theme-xs"
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+            <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
               <select
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setShareholderPage(1); }}
-                className="px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-foreground"
+                className="px-3.5 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl text-xs font-semibold focus:outline-none focus:border-brand-500 text-gray-700 dark:text-gray-300 shadow-theme-xs cursor-pointer"
               >
                 <option value="">All Statuses</option>
                 <option value="PENDING">PENDING</option>
@@ -527,18 +582,18 @@ export default function AdminPayoutsPage() {
 
               <button
                 onClick={handleExportCSV}
-                className="flex items-center gap-1.5 px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold bg-white dark:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer shadow-theme-xs"
               >
                 <FileSpreadsheet size={14} className="text-emerald-600" />
-                CSV Export
+                <span>CSV Export</span>
               </button>
 
               <button
                 onClick={handleExportShareholderPayoutsPDF}
-                className="flex items-center gap-1.5 px-3 py-2 border border-border-subtle rounded-xl text-xs font-semibold bg-white dark:bg-card text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-2xs"
+                className="flex items-center gap-1.5 px-3.5 py-2 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-semibold bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-all cursor-pointer shadow-theme-xs"
               >
-                <FileText size={14} className="text-brand-primary" />
-                PDF Report
+                <FileText size={14} className="text-brand-500" />
+                <span>PDF Report</span>
               </button>
             </div>
           </div>
@@ -702,6 +757,21 @@ export default function AdminPayoutsPage() {
 
                       {/* Action Buttons */}
                       <div className="flex items-center gap-2">
+                        {/* Print Batch Quick Link Button */}
+                        <button
+                          onClick={() => handlePrintBatch(b)}
+                          disabled={printingBatchId === b.id}
+                          title="Print / Export Batch Statement"
+                          className="px-3 py-1.5 border border-border-subtle bg-secondary hover:bg-secondary/80 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 text-foreground"
+                        >
+                          {printingBatchId === b.id ? (
+                            <Loader2 size={14} className="animate-spin text-brand-primary" />
+                          ) : (
+                            <Printer size={14} className="text-brand-primary" />
+                          )}
+                          Print Batch
+                        </button>
+
                         {/* Reconciliation Button */}
                         <button
                           onClick={() => setReconciliationBatchId(b.id)}
@@ -758,9 +828,18 @@ export default function AdminPayoutsPage() {
                   {/* Expanded Batch Items Details */}
                   {expandedBatchId === b.id && (
                     <div className="mt-4 pt-4 border-t border-border-subtle bg-muted/10 p-4 rounded-2xl">
-                      <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-1.5">
-                        <Users size={14} /> Batch Beneficiary Breakdown
-                      </h4>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
+                          <Users size={14} /> Batch Beneficiary Breakdown ({b.cycleIdentifier})
+                        </h4>
+                        <button
+                          onClick={() => handlePrintBatch(b)}
+                          disabled={printingBatchId === b.id}
+                          className="px-3 py-1 border border-border-subtle bg-white dark:bg-card hover:bg-secondary rounded-lg text-xs font-bold flex items-center gap-1.5 text-brand-primary cursor-pointer shadow-2xs"
+                        >
+                          <Printer size={13} /> Print Full Statement
+                        </button>
+                      </div>
                       {loadingBatchDetails ? (
                         <div className="py-4 text-center text-xs text-muted-foreground">Loading details...</div>
                       ) : (

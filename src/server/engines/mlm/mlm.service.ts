@@ -10,30 +10,41 @@ export class MlmService implements OnModuleInit {
   constructor(private readonly prisma: PrismaService) {}
 
   async onModuleInit() {
-    const count = await this.prisma.levelConfiguration.count();
-    if (count === 0) {
-      const defaults = [
-        { levelNumber: 1, volumeThreshold: 10000, profitType: 'PERCENT' as const, profitValue: 0.05 },
-        { levelNumber: 2, volumeThreshold: 25000, profitType: 'PERCENT' as const, profitValue: 0.03 },
-        { levelNumber: 3, volumeThreshold: 50000, profitType: 'PERCENT' as const, profitValue: 0.02 },
-        { levelNumber: 4, volumeThreshold: 100000, profitType: 'PERCENT' as const, profitValue: 0.015 },
-        { levelNumber: 5, volumeThreshold: 200000, profitType: 'PERCENT' as const, profitValue: 0.01 },
-        { levelNumber: 6, volumeThreshold: 500000, profitType: 'PERCENT' as const, profitValue: 0.005 },
-        { levelNumber: 7, volumeThreshold: 1000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
-      ];
+    try {
+      const count = await this.prisma.levelConfiguration.count();
+      if (count < 12) {
+        const defaults = [
+          { levelNumber: 1, volumeThreshold: 10000, profitType: 'PERCENT' as const, profitValue: 0.05 },
+          { levelNumber: 2, volumeThreshold: 25000, profitType: 'PERCENT' as const, profitValue: 0.03 },
+          { levelNumber: 3, volumeThreshold: 50000, profitType: 'PERCENT' as const, profitValue: 0.02 },
+          { levelNumber: 4, volumeThreshold: 100000, profitType: 'PERCENT' as const, profitValue: 0.015 },
+          { levelNumber: 5, volumeThreshold: 200000, profitType: 'PERCENT' as const, profitValue: 0.01 },
+          { levelNumber: 6, volumeThreshold: 500000, profitType: 'PERCENT' as const, profitValue: 0.005 },
+          { levelNumber: 7, volumeThreshold: 1000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+          { levelNumber: 8, volumeThreshold: 2000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+          { levelNumber: 9, volumeThreshold: 3000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+          { levelNumber: 10, volumeThreshold: 5000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+          { levelNumber: 11, volumeThreshold: 7500000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+          { levelNumber: 12, volumeThreshold: 10000000, profitType: 'PERCENT' as const, profitValue: 0.0025 },
+        ];
 
-      for (const def of defaults) {
-        await this.prisma.levelConfiguration.create({
-          data: {
-            levelNumber: def.levelNumber,
-            volumeThreshold: new Prisma.Decimal(def.volumeThreshold),
-            profitType: def.profitType,
-            profitValue: new Prisma.Decimal(def.profitValue),
-            isActive: true,
-          },
-        });
+        for (const def of defaults) {
+          await this.prisma.levelConfiguration.upsert({
+            where: { levelNumber: def.levelNumber },
+            create: {
+              levelNumber: def.levelNumber,
+              volumeThreshold: new Prisma.Decimal(def.volumeThreshold),
+              profitType: def.profitType,
+              profitValue: new Prisma.Decimal(def.profitValue),
+              isActive: true,
+            },
+            update: {},
+          });
+        }
+        this.logger.log('Seeded/Verified 12 fixed LevelConfigurations');
       }
-      this.logger.log('Seeded 7 default LevelConfigurations');
+    } catch (err: any) {
+      this.logger.warn(`LevelConfigurations seeding skipped: ${err.message}`);
     }
   }
 

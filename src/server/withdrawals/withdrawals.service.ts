@@ -153,6 +153,7 @@ export class WithdrawalsService {
       await tx.contributionSummary.upsert({
         where: { shareholderId: shareholder.id },
         update: {
+          totalApproved: new Prisma.Decimal(remainingActiveFund),
           lastUpdated: new Date(),
         },
         create: {
@@ -162,6 +163,21 @@ export class WithdrawalsService {
           totalRejected: new Prisma.Decimal(0),
         },
       });
+
+      // Section 7.2 Full Contribution Withdrawal Logic
+      if (type === WithdrawalType.FULL) {
+        // Step 2: Remove shareholder from active Shareholder Management list by setting status to CLOSED_EXPIRED
+        await tx.shareholder.update({
+          where: { id: shareholder.id },
+          data: { status: 'CLOSED_EXPIRED' },
+        });
+
+        // Step 5: Withdrawing shareholder no longer appears as active referral under their own referrer's active tree
+        await tx.referralRelationship.updateMany({
+          where: { childId: shareholder.id },
+          data: { status: 'INACTIVE' },
+        });
+      }
 
       return newWithdrawal;
     });

@@ -112,6 +112,12 @@ model Shareholder {
 
   dob               DateTime?
   
+  // PAN Details
+  pan               String?
+
+  // Admin Module-level Permissions (for role ADMIN)
+  permissions       Json?
+
   // Complete Address
   addressBuilding   String?
   addressArea       String?
@@ -154,6 +160,8 @@ model Shareholder {
   referralRegistrations    RegistrationRequest[]   @relation("ReferrerRegistrations")
   reviewedRegistrations    RegistrationRequest[]   @relation("ReviewedRegistrations")
   smsLogs                  SmsLog[]
+  financialChangeRequests  FinancialChangeRequest[]
+  reviewedFinancialRequests FinancialChangeRequest[] @relation("ReviewedFinancialRequests")
 
   @@map("User")
   @@index([parentId])
@@ -502,12 +510,34 @@ model RegistrationRequest {
   id                  String             @id @default(uuid())
   name                String
   phone               String
+  pan                 String?
   accountType         AccountType        @default(CONTRIBUTION)
   referrerId          String?
   referrer            Shareholder?       @relation("ReferrerRegistrations", fields: [referrerId], references: [id])
   contributionAmount  Decimal?           @db.Decimal(19, 4)
   paymentProofUrl     String?
   paymentProofFileName String?
+
+  // Complete Address details
+  dob                 DateTime?
+  addressBuilding     String?
+  addressArea         String?
+  addressCity         String?
+  addressDistrict     String?
+  addressPincode      String?
+  addressState        String?
+
+  // Bank Details
+  bankAccountName     String?
+  bankAccountNumber   String?
+  bankName            String?
+  bankBranch          String?
+  bankIfsc            String?
+
+  // Date of Investment & Credentials
+  contributionDate    DateTime?
+  initialPassword     String?
+
   status              RegistrationStatus @default(PENDING_REVIEW)
   rejectionReason     String?
   reviewedById        String?
@@ -520,6 +550,58 @@ model RegistrationRequest {
   @@index([status])
   @@index([referrerId])
   @@index([phone])
+}
+
+enum FinancialRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model FinancialChangeRequest {
+  id                String                 @id @default(uuid())
+  shareholderId     String
+  shareholder       Shareholder            @relation(fields: [shareholderId], references: [id], onDelete: Cascade)
+  
+  bankAccountName   String?
+  bankAccountNumber String?
+  bankName          String?
+  bankBranch        String?
+  bankIfsc          String?
+  pan               String?
+
+  status            FinancialRequestStatus @default(PENDING)
+  rejectionReason   String?
+  
+  reviewedById      String?
+  reviewedBy        Shareholder?           @relation("ReviewedFinancialRequests", fields: [reviewedById], references: [id])
+  reviewedAt        DateTime?
+
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([shareholderId])
+  @@index([status])
+}
+
+enum OtpPurpose {
+  FORGOT_PASSWORD
+  CHANGE_PASSWORD
+}
+
+model OtpVerification {
+  id          String      @id @default(uuid())
+  identifier  String      // phone or shareholderId
+  otp         String
+  purpose     OtpPurpose  @default(FORGOT_PASSWORD)
+  expiresAt   DateTime
+  isUsed      Boolean     @default(false)
+  resetToken  String?     @unique
+  createdAt   DateTime    @default(now())
+
+  @@index([identifier])
+  @@index([otp])
+  @@index([resetToken])
 }
 
 model SmsLog {

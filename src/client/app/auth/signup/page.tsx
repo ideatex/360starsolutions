@@ -7,7 +7,8 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { 
   User, Phone, ShieldCheck, ArrowRight, ArrowLeft, CheckCircle2, 
-  Upload, FileText, AlertCircle, Sparkles, Building2, Coins, HelpCircle, Loader2
+  Upload, FileText, AlertCircle, Sparkles, Building2, Coins, HelpCircle, Loader2,
+  Calendar, Key, Eye, EyeOff
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -23,8 +24,15 @@ export default function SignupPage() {
   const [referrerInfo, setReferrerInfo] = useState<{ valid: boolean; name?: string; shareholderId?: string; message?: string } | null>(null);
   const [isCheckingReferrer, setIsCheckingReferrer] = useState(false);
 
+  // Password State
+  const [passwordType, setPasswordType] = useState<'auto' | 'custom'>('auto');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+
   // Contribution State
   const [contributionAmount, setContributionAmount] = useState<number>(100000);
+  const [contributionDate, setContributionDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofUrl, setProofUrl] = useState<string | null>(null);
   const [proofFileName, setProofFileName] = useState<string | null>(null);
@@ -132,14 +140,30 @@ export default function SignupPage() {
       }
     }
 
+    if (passwordType === 'custom') {
+      if (!password || password.length < 6) {
+        toast({ title: 'Weak Password', description: 'Custom password must be at least 6 characters.', type: 'warning' });
+        return;
+      }
+      if (password !== confirmPassword) {
+        toast({ title: 'Password Mismatch', description: 'Password and Confirm Password do not match.', type: 'warning' });
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const payload: any = {
         name: name.trim(),
         phone: cleanPhone,
         accountType,
+        contributionDate,
         referrerId: referrerInfo?.valid ? referrerInfo.id || referrerCode.trim() : undefined,
       };
+
+      if (passwordType === 'custom' && password.trim()) {
+        payload.password = password.trim();
+      }
 
       if (accountType === 'CONTRIBUTION') {
         payload.contributionAmount = contributionAmount;
@@ -178,8 +202,8 @@ export default function SignupPage() {
         <div className="text-center mb-8">
           <Link href="/auth/login" className="inline-block">
             <img 
-              src="/logo-360.png" 
-              alt="Logo" 
+              src="/logo-369.png" 
+              alt="360 Star Logo" 
               className="h-16 sm:h-20 max-w-[200px] w-auto mx-auto object-contain mb-3 drop-shadow-xs" 
             />
           </Link>
@@ -352,6 +376,98 @@ export default function SignupPage() {
                   </div>
                 )}
               </div>
+
+              {/* Password Setting Option */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
+                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-brand-primary" /> Account Password Setup
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div
+                    onClick={() => { setPasswordType('auto'); setPassword(''); setConfirmPassword(''); }}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
+                      passwordType === 'auto'
+                        ? 'border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="authPasswordType"
+                      checked={passwordType === 'auto'}
+                      onChange={() => { setPasswordType('auto'); setPassword(''); setConfirmPassword(''); }}
+                      className="mt-0.5 accent-brand-primary"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white block">Auto-generate</span>
+                      <span className="text-[10px] text-slate-500 block">Temporary password sent via SMS</span>
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => setPasswordType('custom')}
+                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
+                      passwordType === 'custom'
+                        ? 'border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10'
+                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="authPasswordType"
+                      checked={passwordType === 'custom'}
+                      onChange={() => setPasswordType('custom')}
+                      className="mt-0.5 accent-brand-primary"
+                    />
+                    <div>
+                      <span className="text-xs font-bold text-slate-900 dark:text-white block">Set Custom Password</span>
+                      <span className="text-[10px] text-slate-500 block">Choose password now</span>
+                    </div>
+                  </div>
+                </div>
+
+                {passwordType === 'custom' && (
+                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Password * (Min 6 chars)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          required
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full pl-3 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:border-brand-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                        Confirm Password *
+                      </label>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:border-brand-primary"
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </div>
             </div>
 
             {/* Step 2: Account Type Selector */}
@@ -433,6 +549,23 @@ export default function SignupPage() {
                     <span className="w-5 h-5 rounded-full bg-brand-primary/20 text-brand-primary flex items-center justify-center text-[10px] font-black">3</span>
                     Contribution Amount & Payment Proof
                   </h3>
+
+                  {/* Date of Investment */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-brand-primary" /> Date of Investment / Deposit *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={contributionDate}
+                      onChange={(e) => setContributionDate(e.target.value)}
+                      className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-900 dark:text-white focus:outline-none focus:border-brand-primary"
+                    />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Synchronizes across system for profit cycles and calculation eligibility.
+                    </p>
+                  </div>
 
                   {/* Amount Selection */}
                   <div>

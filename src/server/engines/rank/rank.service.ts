@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { AuditService } from '@server/engines/audit/audit.service';
 import { NotificationService } from '@server/engines/notification/notification.service';
-import { ContributionStatus, UserStatus, Prisma } from '@prisma/client';
+import { ContributionStatus, UserStatus, Prisma, Role } from '@prisma/client';
 
 export interface DirectLegDetail {
   directChildId: string;
@@ -340,6 +340,235 @@ export class RankService {
     return {
       evaluatedCount: results.length,
       results,
+    };
+  }
+
+  /**
+   * Updates Rank Configurations (Allows Super Admin to rename ranks and configure volumes)
+   */
+  async updateRankConfigurations(
+    configs: Array<{ id?: string; name: string; requiredVolume: number; orderIndex?: number }>,
+    adminId: string,
+  ) {
+    const updatedList: any[] = [];
+
+    for (let i = 0; i < configs.length; i++) {
+      const cfg = configs[i];
+      const required = Number(cfg.requiredVolume);
+      const half = required * 0.50;
+      const order = cfg.orderIndex ?? (i + 1);
+
+      if (cfg.id) {
+        const updated = await this.prisma.rankConfiguration.update({
+          where: { id: cfg.id },
+          data: {
+            name: cfg.name.trim(),
+            requiredVolume: new Prisma.Decimal(required),
+            maxStrongestLeg: new Prisma.Decimal(half),
+            minOtherLegs: new Prisma.Decimal(half),
+            orderIndex: order,
+          },
+        });
+        updatedList.push(updated);
+      } else {
+        const upserted = await this.prisma.rankConfiguration.upsert({
+          where: { name: cfg.name.trim() },
+          create: {
+            name: cfg.name.trim(),
+            requiredVolume: new Prisma.Decimal(required),
+            maxStrongestLeg: new Prisma.Decimal(half),
+            minOtherLegs: new Prisma.Decimal(half),
+            orderIndex: order,
+            isActive: true,
+          },
+          update: {
+            requiredVolume: new Prisma.Decimal(required),
+            maxStrongestLeg: new Prisma.Decimal(half),
+            minOtherLegs: new Prisma.Decimal(half),
+            orderIndex: order,
+          },
+        });
+        updatedList.push(upserted);
+      }
+    }
+
+    await this.auditService.logAction({
+      shareholderId: adminId,
+      action: 'UPDATE_RANK_CONFIGURATIONS',
+      entityType: 'RankConfiguration',
+      newValue: JSON.stringify(configs),
+    });
+
+    return updatedList;
+  }
+
+  /**
+   * Lists all Shareholders with Current Business Volume, Required Volume, Current Rank, and Eligibility Status
+   */
+  async getMembersRankStatus(search?: string, page = 1, limit = 50) {
+    const skip = (page - 1) * limit;
+    const where: any = {
+      status: { notIn: [UserStatus.DELETED] },
+      role: Role.SHAREHOLDER,
+    };
+
+    if (search) {
+      where.OR = [
+        { shareholderId: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [shareholders, total] = await Promise.all([
+      this.prisma.shareholder.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, shareholderId: true, name: true, currentRank: true, phone: true },
+      }),
+      this.prisma.shareholder.count({ where }),
+    ]);
+
+    const rankConfigs = await this.getRankConfigurations();
+
+    const members: any[] = [];
+    for (const sh of shareholders) {
+      try {
+        const evalResult = await this.evaluateUserRank(sh.id);
+        const nextRankReq = evalResult.nextRank ? evalResult.nextRank.requiredVolume : (rankConfigs[0]?.requiredVolume ? Number(rankConfigs[0].requiredVolume) : 500000);
+        const nextRankName = evalResult.nextRank ? evalResult.nextRank.rankName : (rankConfigs[0]?.name || 'Bronze');
+        
+        // Determine rank eligibility/status
+        let eligibilityStatus = 'In Progress';
+        if (evalResult.nextRank) {
+          if (evalResult.nextRank.qualified) {
+            eligibilityStatus = `Qualified for ${evalResult.nextRank.rankName}`;
+          } else {
+            eligibilityStatus = `${evalResult.nextRank.progressPercentage}% to ${evalResult.nextRank.rankName}`;
+          }
+        } else if (evalResult.currentRank) {
+          eligibilityStatus = `Achieved ${evalResult.currentRank}`;
+        }
+
+        members.push({
+          id: sh.id,
+          shareholderId: sh.shareholderId,
+          name: sh.name || sh.shareholderId,
+          phone: sh.phone || 'N/A',
+          currentRank: sh.currentRank || 'Unranked',
+          currentBusinessVolume: evalResult.totalTeamVolume,
+          totalTeamVolume: evalResult.totalTeamVolume,
+          strongestLegVolume: evalResult.strongestLegVolume,
+          otherLegsVolume: evalResult.otherLegsVolume,
+          requiredVolume: nextRankReq,
+          volumeRequiredForNext: Math.max(0, nextRankReq - evalResult.totalTeamVolume),
+          nextRankName,
+          eligibilityStatus,
+          eligibleForNextRank: evalResult.nextRank ? evalResult.nextRank.qualified : false,
+          rankEvaluations: evalResult.rankEvaluations,
+        });
+      } catch (err: any) {
+        members.push({
+          id: sh.id,
+          shareholderId: sh.shareholderId,
+          name: sh.name || sh.shareholderId,
+          phone: sh.phone || 'N/A',
+          currentRank: sh.currentRank || 'Unranked',
+          currentBusinessVolume: 0,
+          totalTeamVolume: 0,
+          strongestLegVolume: 0,
+          otherLegsVolume: 0,
+          requiredVolume: 500000,
+          volumeRequiredForNext: 500000,
+          nextRankName: 'Bronze',
+          eligibilityStatus: 'Pending Calculation',
+          eligibleForNextRank: false,
+          rankEvaluations: [],
+        });
+      }
+    }
+
+    return {
+      data: members,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+      rankConfigurations: rankConfigs,
+    };
+  }
+
+  /**
+   * Super Admin: Manually Allot Rank to a Shareholder
+   */
+  async manuallyAllotRank(dto: { shareholderId: string; rankName: string; remarks?: string; adminId: string }) {
+    const { shareholderId, rankName, remarks, adminId } = dto;
+
+    const shareholder = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { id: shareholderId },
+          { shareholderId: shareholderId },
+          { shareholderId: shareholderId.toUpperCase() },
+        ],
+      },
+      select: { id: true, shareholderId: true, name: true, currentRank: true },
+    });
+
+    if (!shareholder) {
+      throw new NotFoundException('Shareholder not found');
+    }
+
+    // Calculate current business volume at allocation time
+    const subtree = await this.calculateSubtreeVolume(shareholder.id);
+    const previousRank = shareholder.currentRank || 'Unranked';
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shareholder.update({
+        where: { id: shareholder.id },
+        data: { currentRank: rankName },
+      });
+
+      await tx.userRankHistory.create({
+        data: {
+          shareholderId: shareholder.id,
+          rankName,
+          teamVolume: new Prisma.Decimal(subtree.totalVolume),
+          achievedAt: new Date(),
+        },
+      });
+    });
+
+    // Record Audit Log
+    await this.auditService.logAction({
+      shareholderId: adminId,
+      action: 'MANUAL_RANK_ALLOTMENT',
+      entityType: 'Shareholder',
+      entityId: shareholder.id,
+      oldValue: previousRank,
+      newValue: rankName,
+      reason: remarks || `Manually allotted ${rankName} rank by Super Admin. Team volume: ₹${subtree.totalVolume.toLocaleString('en-IN')}`,
+    });
+
+    // Send Notification to Shareholder
+    await this.notificationService.createNotification({
+      shareholderId: shareholder.id,
+      title: `Congratulations! You have achieved ${rankName} Rank`,
+      message: `Congratulations! You have achieved/been allotted the ${rankName} rank.`,
+      type: 'SYSTEM',
+      priority: 'HIGH',
+    });
+
+    return {
+      success: true,
+      message: `Rank "${rankName}" successfully allotted to ${shareholder.shareholderId}.`,
+      shareholder: {
+        id: shareholder.id,
+        shareholderId: shareholder.shareholderId,
+        previousRank,
+        newRank: rankName,
+        teamVolume: subtree.totalVolume,
+      },
     };
   }
 
