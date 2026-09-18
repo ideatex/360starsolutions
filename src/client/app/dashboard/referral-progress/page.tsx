@@ -71,26 +71,26 @@ export default function ReferralProgressPage() {
       initial={{ opacity: 0, y: 15 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: "easeOut" }}
-      className="max-w-7xl mx-auto space-y-8 p-4 sm:p-6 lg:p-8 font-sans"
+      className="max-w-7xl mx-auto space-y-6 pb-12 font-outfit"
     >
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 border-b border-border pb-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-black text-foreground tracking-tight">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">
               Dynamic Referral Unlock (L1–L12)
             </h1>
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+            <span className="badge-brand">
               Product 360
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-2 max-w-2xl leading-relaxed">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 max-w-2xl">
             Levels unlock dynamically based on your direct referral count: 1 Direct → L1-L3, 2 Directs → L1-L6, 3 Directs → L1-L9, 4 Directs → L1-L12.
           </p>
         </div>
-        <div className="px-4 py-2 bg-secondary/40 backdrop-blur-md rounded-xl border border-border flex items-center gap-2 shadow-xs shrink-0">
-          <ShieldCheck className="w-4 h-4 text-emerald-500" />
-          <span className="text-xs font-bold text-foreground">
+        <div className="px-3.5 py-1.5 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 flex items-center gap-2 shrink-0">
+          <ShieldCheck className="w-4 h-4 text-success-500" />
+          <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
             {summary.isOverridden ? 'Admin Level Override Active' : 'Dynamic Unlock Engine Active'}
           </span>
         </div>
@@ -98,48 +98,48 @@ export default function ReferralProgressPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-xs space-y-2">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Unlocked Levels</span>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+        <div className="app-card p-5 space-y-1.5">
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Unlocked Levels</span>
+          <p className="text-2xl font-bold text-success-600 dark:text-success-400">
             L1 to L{summary.totalQualifiedLevels}
           </p>
-          <p className="text-xs text-muted-foreground font-semibold">Of 12 Total Levels</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Of 12 Total Levels</p>
         </div>
 
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-xs space-y-2">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Direct Referrals</span>
-          <p className="text-2xl font-black text-brand-primary">
+        <div className="app-card p-5 space-y-1.5">
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Direct Referrals</span>
+          <p className="text-2xl font-bold text-brand-600 dark:text-brand-400">
             {summary.directReferralsCount}
           </p>
-          <p className="text-xs text-muted-foreground font-semibold">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
             {summary.directReferralsCount >= 4 ? 'Maximum tier achieved!' : `${summary.additionalDirectsNeeded} more needed for next tier`}
           </p>
         </div>
 
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-xs space-y-2">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Downline Business Volume</span>
-          <p className="text-2xl font-black text-foreground">
+        <div className="app-card p-5 space-y-1.5">
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Downline Business Volume</span>
+          <p className="text-2xl font-bold text-gray-900 dark:text-white">
             ₹{summary.overallBusinessVolume.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </p>
-          <p className="text-xs text-muted-foreground font-semibold">Cumulative Approved Funds</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">Cumulative Approved Funds</p>
         </div>
 
-        <div className="bg-card p-5 rounded-2xl border border-border shadow-xs space-y-2">
-          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">Next Unlock Target</span>
-          <p className="text-2xl font-black text-amber-500">
+        <div className="app-card p-5 space-y-1.5">
+          <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider block">Next Unlock Target</span>
+          <p className="text-2xl font-bold text-warning-600 dark:text-warning-400">
             {summary.nextTargetLevelRange || 'Max (L12)'}
           </p>
-          <p className="text-xs text-muted-foreground font-semibold">
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">
             {summary.additionalDirectsNeeded > 0 ? `Sponsor ${summary.additionalDirectsNeeded} more member(s)` : 'Fully Unlocked'}
           </p>
         </div>
       </div>
 
       {/* Dynamic Levels Table */}
-      <div className="bg-card rounded-2xl border border-border shadow-md overflow-hidden relative">
+      <div className="app-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs min-w-[700px]">
-            <thead className="bg-muted/40 text-muted-foreground text-[10px] font-extrabold uppercase tracking-wider border-b border-border">
+            <thead className="bg-gray-50 dark:bg-gray-800/40 text-gray-500 dark:text-gray-400 text-[11px] font-semibold uppercase tracking-wider border-b border-gray-100 dark:border-gray-800">
               <tr>
                 <th className="px-6 py-4">Level</th>
                 <th className="px-6 py-4">Gratitude Rate</th>
@@ -149,36 +149,36 @@ export default function ReferralProgressPage() {
                 <th className="px-6 py-4">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border text-foreground font-medium bg-card">
+            <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-gray-800 dark:text-gray-200 font-medium">
               {progressData.map((level: any) => {
                 const isUnlocked = level.status === 'UNLOCKED';
                 return (
-                  <tr key={level.level} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4 font-bold flex items-center gap-3">
+                  <tr key={level.level} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/40 transition-colors">
+                    <td className="px-6 py-4 font-semibold flex items-center gap-3">
                       <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs ${
-                        isUnlocked ? 'bg-emerald-500/15 text-emerald-600' : 'bg-secondary text-muted-foreground'
+                        isUnlocked ? 'bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-400'
                       }`}>
                         {isUnlocked ? <CheckCircle2 className="w-4 h-4" /> : <Lock className="w-4 h-4" />}
                       </div>
-                      <span>Level {level.level}</span>
+                      <span className="text-gray-900 dark:text-white">Level {level.level}</span>
                     </td>
-                    <td className="px-6 py-4 font-black text-brand-primary">
+                    <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">
                       {level.profitPercentage.toFixed(2)}%
                     </td>
-                    <td className="px-6 py-4 text-muted-foreground font-semibold">
+                    <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                       {level.requiredDirects} Direct Referral{level.requiredDirects > 1 ? 's' : ''}
                     </td>
-                    <td className="px-6 py-4 font-semibold text-foreground">
+                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
                       {level.membersCount} member{level.membersCount === 1 ? '' : 's'}
                     </td>
-                    <td className="px-6 py-4 font-bold text-foreground">
+                    <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">
                       ₹{level.currentVolume.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
+                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                         isUnlocked
-                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                          : 'bg-secondary text-muted-foreground border-border'
+                          ? 'badge-success'
+                          : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700'
                       }`}>
                         {level.status}
                       </span>

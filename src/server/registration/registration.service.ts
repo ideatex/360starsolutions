@@ -6,18 +6,33 @@ import { CommissionService } from '@server/engines/commission/commission.service
 import { BusinessConfigService } from '@server/business-config/business-config.service';
 import { ReferralTreeService } from '@server/engines/referral-tree/referral-tree.service';
 import { InvestorsService } from '@server/engines/investors/investors.service';
-import { Prisma, RegistrationStatus, AccountType, UserStatus, ContributionStatus } from '@prisma/client';
+import { Prisma, RegistrationStatus, AccountType, UserStatus, ContributionStatus, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
 export interface SubmitRegistrationDto {
   name: string;
   phone: string;
+  pan?: string;
   accountType?: AccountType;
   referrerId?: string;
   contributionAmount?: number;
+  contributionDate?: string;
+  password?: string;
   paymentProofUrl?: string;
   paymentProofFileName?: string;
   notes?: string;
+  dob?: string;
+  addressBuilding?: string;
+  addressArea?: string;
+  addressCity?: string;
+  addressDistrict?: string;
+  addressPincode?: string;
+  addressState?: string;
+  bankAccountName?: string;
+  bankAccountNumber?: string;
+  bankName?: string;
+  bankBranch?: string;
+  bankIfsc?: string;
 }
 
 @Injectable()
@@ -72,6 +87,16 @@ export class RegistrationService {
 
     const phone = this.normalizePhone(dto.phone);
     const accountType = dto.accountType || AccountType.CONTRIBUTION;
+
+    // Validate PAN Card if provided
+    let panClean: string | null = null;
+    if (dto.pan && dto.pan.trim()) {
+      panClean = dto.pan.trim().toUpperCase();
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panClean)) {
+        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
+      }
+    }
 
     // Check if phone number is already registered to an active shareholder account
     const existingUser = await this.prisma.shareholder.findFirst({
@@ -157,11 +182,26 @@ export class RegistrationService {
       data: {
         name,
         phone,
+        pan: panClean,
         accountType,
         referrerId: verifiedReferrerId,
         contributionAmount: contribDecimal,
         paymentProofUrl,
         paymentProofFileName,
+        dob: dto.dob ? new Date(dto.dob) : null,
+        contributionDate: dto.contributionDate ? new Date(dto.contributionDate) : new Date(),
+        initialPassword: dto.password && dto.password.trim().length >= 6 ? dto.password.trim() : null,
+        addressBuilding: dto.addressBuilding || '',
+        addressArea: dto.addressArea || '',
+        addressCity: dto.addressCity || '',
+        addressDistrict: dto.addressDistrict || '',
+        addressPincode: dto.addressPincode || '',
+        addressState: dto.addressState || '',
+        bankAccountName: dto.bankAccountName || '',
+        bankAccountNumber: dto.bankAccountNumber || '',
+        bankName: dto.bankName || '',
+        bankBranch: dto.bankBranch || '',
+        bankIfsc: dto.bankIfsc ? dto.bankIfsc.trim().toUpperCase() : '',
         status: RegistrationStatus.PENDING_ADMIN_REVIEW,
       },
       include: {
@@ -171,12 +211,31 @@ export class RegistrationService {
       },
     });
 
+    // Notify Super Admins
+    try {
+      const admins = await this.prisma.shareholder.findMany({
+        where: { role: { in: [Role.SUPER_ADMIN, Role.ADMIN] } },
+        select: { id: true },
+      });
+      for (const admin of admins) {
+        await this.prisma.notification.create({
+          data: {
+            shareholderId: admin.id,
+            title: 'New Shareholder Registration',
+            message: 'New shareholder registration requires approval.',
+            type: 'SYSTEM',
+            priority: 'HIGH',
+          },
+        });
+      }
+    } catch (e) {}
+
     await this.auditService.logAction({
       shareholderId: actorId || verifiedReferrerId || 'PUBLIC',
       action: 'SUBMIT_REGISTRATION_REQUEST',
       entityType: 'RegistrationRequest',
       entityId: request.id,
-      newValue: `Name: ${name}, Phone: ${phone}, Type: ${accountType}, Amount: ${dto.contributionAmount || 0}, Referrer: ${verifiedReferrerId || 'NONE'}`,
+      newValue: `Name: ${name}, Phone: ${phone}, PAN: ${panClean || 'N/A'}, Type: ${accountType}, Amount: ${dto.contributionAmount || 0}, Referrer: ${verifiedReferrerId || 'NONE'}`,
     });
 
     this.logger.log(`Registration request #${request.id} submitted for ${name} (${phone}) [PENDING_ADMIN_REVIEW].`);
@@ -416,9 +475,12 @@ export class RegistrationService {
     // Generate sequential Shareholder ID via BusinessConfigService
     const shareholderId = await this.businessConfigService.generateNextUserId();
     const referralCode = shareholderId; // Standard: referralCode equals shareholderId
-    const tempPassword = this.generateTempPassword();
-    const passwordHash = await bcrypt.hash(tempPassword, 10);
+    const finalPassword = request.initialPassword && request.initialPassword.trim().length >= 6
+      ? request.initialPassword.trim()
+      : this.generateTempPassword();
+    const passwordHash = await bcrypt.hash(finalPassword, 10);
     const now = new Date();
+    const investmentDate = request.contributionDate ? new Date(request.contributionDate) : now;
 
     const isZeroContribution = request.accountType === AccountType.ZERO_CONTRIBUTION;
     const initialStatus = isZeroContribution ? UserStatus.ZERO_ACTIVE : UserStatus.CONTRIBUTION_ACTIVE;
@@ -473,6 +535,19 @@ export class RegistrationService {
           shareholderId,
           name: request.name,
           phone: request.phone,
+          pan: request.pan,
+          dob: request.dob,
+          addressBuilding: request.addressBuilding,
+          addressArea: request.addressArea,
+          addressCity: request.addressCity,
+          addressDistrict: request.addressDistrict,
+          addressPincode: request.addressPincode,
+          addressState: request.addressState,
+          bankAccountName: request.bankAccountName,
+          bankAccountNumber: request.bankAccountNumber,
+          bankName: request.bankName,
+          bankBranch: request.bankBranch,
+          bankIfsc: request.bankIfsc,
           passwordHash,
           referralCode,
           parentId: request.referrerId,
@@ -507,9 +582,10 @@ export class RegistrationService {
             shareholderId: newShareholder.id,
             amount: request.contributionAmount,
             mode: 'BANK_TRANSFER',
-            date: now,
-            effectiveDate: now,
-            activeDate: now,
+            date: investmentDate,
+            effectiveDate: investmentDate,
+            activeDate: investmentDate,
+            createdAt: investmentDate,
             status: ContributionStatus.APPROVED,
             approvedById: adminId,
             approvedAt: now,
@@ -525,7 +601,8 @@ export class RegistrationService {
             amount: request.contributionAmount,
             dailyProfitRate: new Prisma.Decimal('0.001667'),
             status: 'ACTIVE',
-            startDate: now,
+            startDate: investmentDate,
+            createdAt: investmentDate,
             validityMonths: 12,
           },
         });
@@ -603,7 +680,7 @@ export class RegistrationService {
     // 7. SMS dispatch with provider failure isolation (account creation remains successful if SMS fails)
     let smsStatus = 'PENDING';
     try {
-      await this.smsService.sendCredentialsSms(request.phone, shareholderId, tempPassword, result.newShareholder.id);
+      await this.smsService.sendCredentialsSms(request.phone, shareholderId, finalPassword, result.newShareholder.id);
       smsStatus = 'SENT';
       if (result.contributionRecord) {
         await this.smsService.sendPaymentReceiptSms(

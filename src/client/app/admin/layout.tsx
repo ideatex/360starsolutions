@@ -25,11 +25,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
       <Sidebar />
       <div 
         className={`flex flex-col flex-1 transition-all duration-300 ${
-          isCollapsed ? 'lg:pl-20' : 'lg:pl-64'
+          isCollapsed ? 'lg:pl-20' : 'lg:pl-68'
         }`}
       >
         <Topbar />

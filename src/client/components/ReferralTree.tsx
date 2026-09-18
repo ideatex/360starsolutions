@@ -26,33 +26,33 @@ const CustomNode = ({ data }: { data: any }) => {
   const isHighlighted = data.isHighlighted;
 
   return (
-    <div className="relative font-sans select-none">
+    <div className="relative font-outfit select-none">
       {/* Handles for connections */}
       {!isRoot && (
         <Handle
           type="target"
           position={Position.Top}
-          className="!bg-brand-primary !w-2 !h-2"
+          className="!bg-brand-500 !w-2 !h-2"
         />
       )}
       
       <div 
-        className={`p-4 rounded-2xl bg-white dark:bg-card border-2 shadow-sm transition-all duration-300 w-56 text-left ${
+        className={`p-3.5 rounded-2xl bg-white dark:bg-gray-900 border-2 shadow-theme-xs transition-all duration-300 w-56 text-left ${
           isHighlighted 
-            ? 'border-brand-primary ring-4 ring-brand-primary/10 scale-105 shadow-md' 
-            : 'border-border-subtle hover:border-gray-300 dark:hover:border-gray-700'
+            ? 'border-brand-500 ring-4 ring-brand-500/10 scale-105 shadow-theme-md' 
+            : 'border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700'
         }`}
       >
-        <div className="flex items-center gap-2.5 pb-2.5 border-b border-border-subtle mb-2.5">
-          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-extrabold text-xs shrink-0 select-none ${
+        <div className="flex items-center gap-2.5 pb-2.5 border-b border-gray-100 dark:border-gray-800 mb-2.5">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 select-none ${
             isRoot 
-              ? 'bg-brand-primary/15 text-brand-primary' 
-              : 'bg-brand-accent/15 text-brand-accent'
+              ? 'bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400' 
+              : 'bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400'
           }`}>
             {(data.name || data.shareholderId || 'U').charAt(0).toUpperCase()}
           </div>
           <div className="overflow-hidden min-w-0 flex-1">
-            <span className="text-[9px] font-extrabold text-muted-foreground uppercase tracking-widest block font-mono truncate">
+            <span className="text-[9px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider block font-mono truncate">
               {data.shareholderId}
             </span>
             <span className="text-xs font-bold text-gray-900 dark:text-white truncate block" title={data.name}>
@@ -61,16 +61,16 @@ const CustomNode = ({ data }: { data: any }) => {
           </div>
         </div>
 
-        <div className="space-y-1.5 text-[10px] text-muted-foreground font-semibold">
+        <div className="space-y-1.5 text-[10px] text-gray-500 dark:text-gray-400 font-medium">
           <div className="flex justify-between items-center">
             <span>Approved Amount:</span>
-            <span className="text-brand-primary font-bold bg-brand-primary/10 px-2 py-0.5 rounded-md border border-brand-primary/20">
+            <span className="text-brand-600 dark:text-brand-400 font-bold bg-brand-50 dark:bg-brand-500/15 px-2 py-0.5 rounded-md">
               ₹{Number(data.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </span>
           </div>
           <div className="flex justify-between items-center">
             <span>Referral Level:</span>
-            <span className="text-foreground bg-secondary px-2 py-0.5 rounded-md border border-border">
+            <span className="text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md">
               {data.depth === 0 ? 'Root' : `Level ${data.depth}`}
             </span>
           </div>
@@ -80,7 +80,7 @@ const CustomNode = ({ data }: { data: any }) => {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="!bg-brand-primary !w-2 !h-2"
+        className="!bg-brand-500 !w-2 !h-2"
       />
     </div>
   );
@@ -228,7 +228,7 @@ function ReferralTreeInner() {
           target: u.id,
           animated: edgeIsHighlighted,
           style: { 
-            stroke: edgeIsHighlighted ? 'var(--brand-primary)' : 'var(--border-subtle)', 
+            stroke: edgeIsHighlighted ? 'var(--color-brand-500, #465fff)' : '#e4e7ec', 
             strokeWidth: edgeIsHighlighted ? 2.5 : 1.5 
           },
         });
@@ -245,11 +245,11 @@ function ReferralTreeInner() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-card rounded-2xl border border-border p-12 text-center space-y-4">
-        <Loader2 className="w-10 h-10 text-brand-primary animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-12 text-center space-y-4 font-outfit">
+        <Loader2 className="w-10 h-10 text-brand-500 animate-spin" />
         <div>
-          <h3 className="text-sm font-bold text-foreground">Loading Referral Network...</h3>
-          <p className="text-xs text-muted-foreground mt-1">Retrieving account downline lineage and volume statistics.</p>
+          <h3 className="text-xs font-bold text-gray-900 dark:text-white">Loading Referral Network...</h3>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Retrieving account downline lineage and volume statistics.</p>
         </div>
       </div>
     );
@@ -257,17 +257,17 @@ function ReferralTreeInner() {
 
   if (isError || !data?.shareholder) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-card rounded-2xl border border-border p-12 text-center space-y-4">
-        <div className="p-3 bg-red-500/10 text-red-500 rounded-full">
+      <div className="flex flex-col items-center justify-center min-h-[500px] w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-200 dark:border-gray-800 p-12 text-center space-y-4 font-outfit">
+        <div className="p-3 bg-error-50 dark:bg-error-500/15 text-error-600 dark:text-error-400 rounded-full">
           <AlertCircle className="w-8 h-8" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-foreground">Unable to Load Referral Tree</h3>
-          <p className="text-xs text-muted-foreground mt-1">Please verify network connectivity or session status.</p>
+          <h3 className="text-xs font-bold text-gray-900 dark:text-white">Unable to Load Referral Tree</h3>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-1">Please verify network connectivity or session status.</p>
         </div>
         <button
           onClick={() => refetch()}
-          className="px-4 py-2 bg-brand-primary text-white text-xs font-bold rounded-xl hover:bg-brand-primary/90 transition-all flex items-center gap-2 cursor-pointer shadow-sm"
+          className="px-4 py-2 bg-brand-500 text-white text-xs font-semibold rounded-xl hover:bg-brand-600 transition-all flex items-center gap-2 cursor-pointer shadow-theme-xs"
         >
           <RotateCcw className="w-3.5 h-3.5" /> Retry Loading
         </button>
@@ -276,36 +276,36 @@ function ReferralTreeInner() {
   }
 
   return (
-    <div className="space-y-6 flex flex-col h-full w-full">
+    <div className="space-y-4 flex flex-col h-full w-full font-outfit">
       {/* Toolbar & Search */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 select-none">
         <div className="relative w-full md:w-80">
-          <Search className="absolute left-3.5 top-3.5 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-3.5 top-3 text-gray-400 dark:text-gray-500 w-4 h-4" />
           <input
             type="text"
             placeholder="Search Name or Shareholder ID..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-border text-sm focus:outline-none focus:border-brand-primary focus:ring-1 focus:ring-brand-primary bg-background font-medium"
+            className="w-full pl-10 pr-4 py-2 bg-gray-50 dark:bg-gray-800/60 rounded-xl border border-gray-200 dark:border-gray-700 text-xs focus:outline-none focus:border-brand-500 text-gray-900 dark:text-white font-medium"
           />
         </div>
 
         {/* Dynamic statistics overview */}
         <div className="flex items-center gap-3">
-          <div className="bg-card border border-border px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
-            <Users className="w-4 h-4 text-brand-primary" />
+          <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-200">
+            <Users className="w-4 h-4 text-brand-500" />
             <span>Downline: {stats.totalCount}</span>
           </div>
-          <div className="bg-card border border-border px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2">
-            <Award className="w-4 h-4 text-brand-accent" />
+          <div className="bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-2 text-gray-800 dark:text-gray-200">
+            <Award className="w-4 h-4 text-brand-500" />
             <span>Max Level: {stats.maxDepth}</span>
           </div>
         </div>
       </div>
 
       {/* Main Flow Canvas Container */}
-      <div className="relative flex-1 border border-border rounded-2xl bg-muted/20 overflow-hidden flex flex-col xl:flex-row gap-4 p-4">
-        <div className="flex-1 w-full h-[600px] rounded-xl overflow-hidden relative border border-border bg-background">
+      <div className="relative flex-1 border border-gray-200 dark:border-gray-800 rounded-2xl bg-gray-50/50 dark:bg-gray-950/40 overflow-hidden flex flex-col xl:flex-row gap-4 p-4">
+        <div className="flex-1 w-full h-[600px] rounded-xl overflow-hidden relative border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -325,7 +325,7 @@ function ReferralTreeInner() {
               nodeStrokeWidth={3}
               zoomable
               pannable
-              className="!bg-card !border-border !rounded-xl overflow-hidden"
+              className="!bg-white dark:!bg-gray-900 !border-gray-200 dark:!border-gray-800 !rounded-xl overflow-hidden"
             />
             <Background gap={16} size={1} />
           </ReactFlow>
@@ -338,50 +338,50 @@ function ReferralTreeInner() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="w-full xl:w-72 bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between h-fit"
+              className="w-full xl:w-72 app-card p-5 flex flex-col justify-between h-fit space-y-4"
             >
-              <div className="space-y-4">
-                <div className="flex justify-between items-center pb-3 border-b border-border">
-                  <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <Eye className="w-4 h-4 text-brand-primary" /> Shareholder Inspector
+              <div className="space-y-3.5">
+                <div className="flex justify-between items-center pb-3 border-b border-gray-100 dark:border-gray-800">
+                  <h3 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-brand-500" /> Shareholder Details
                   </h3>
                   <button 
                     onClick={() => setSelectedNodeDetails(null)}
-                    className="p-1 hover:bg-secondary rounded-lg text-muted-foreground transition-all cursor-pointer"
+                    className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-all cursor-pointer"
                   >
                     <X size={14} />
                   </button>
                 </div>
 
-                <div className="space-y-4 text-sm select-none">
+                <div className="space-y-3 text-xs select-none">
                   <div>
-                    <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Shareholder Name</span>
-                    <strong className="text-foreground text-base block">{selectedNodeDetails.name || 'Unnamed'}</strong>
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 block uppercase tracking-wider">Shareholder Name</span>
+                    <strong className="text-gray-900 dark:text-white text-sm block mt-0.5">{selectedNodeDetails.name || 'Unnamed'}</strong>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Shareholder ID</span>
-                    <span className="text-foreground font-mono font-bold bg-muted px-2 py-0.5 rounded border border-border inline-block">
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 block uppercase tracking-wider">Shareholder ID</span>
+                    <span className="text-gray-800 dark:text-gray-200 font-mono font-bold bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded border border-gray-200 dark:border-gray-700 inline-block mt-0.5">
                       {selectedNodeDetails.shareholderId}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Approved Contribution Amount</span>
-                    <span className="text-brand-primary font-bold text-base block">
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 block uppercase tracking-wider">Approved Amount</span>
+                    <span className="text-brand-600 dark:text-brand-400 font-bold text-sm block mt-0.5">
                       ₹{Number(selectedNodeDetails.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold text-muted-foreground block uppercase mb-1">Referral Level</span>
-                    <span className="text-foreground bg-secondary px-2.5 py-1 rounded-md border border-border inline-block">
+                    <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 block uppercase tracking-wider">Referral Level</span>
+                    <span className="text-gray-800 dark:text-gray-200 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded-md inline-block mt-0.5">
                       {selectedNodeDetails.depth === 0 ? 'Root Account' : `Level ${selectedNodeDetails.depth}`}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="pt-4 mt-6 border-t border-border text-xs text-muted-foreground flex gap-2 items-start bg-secondary/50 p-3 rounded-xl leading-normal select-none">
-                <Info className="w-4 h-4 text-brand-primary shrink-0 mt-0.5" />
-                <p>Path trace outlines lineage from the selected shareholder to your own account root.</p>
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 text-[11px] text-gray-400 dark:text-gray-500 flex gap-2 items-start leading-normal select-none">
+                <Info className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" />
+                <p>Path trace outlines lineage from the selected shareholder to your account root.</p>
               </div>
             </motion.div>
           )}

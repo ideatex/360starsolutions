@@ -87,62 +87,63 @@ export default function AdminRegistrationsPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12 font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border pb-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-gray-200 dark:border-gray-800 pb-5">
         <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-black text-foreground tracking-tight">Registration Review Queue</h1>
-            <span className="text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded-full bg-brand-primary/10 text-brand-primary border border-brand-primary/20">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Registration Review Queue</h1>
+            <span className="badge-brand">
               Product 360
             </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Verify payment proofs, approve new Contributor / Zero-Contribution accounts, and monitor SMS credential delivery.
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            Verify payment proofs, approve new Contributor accounts, and monitor SMS credential delivery.
           </p>
         </div>
 
         <button
           onClick={() => refetch()}
-          className="px-3.5 py-2 bg-secondary hover:bg-secondary/80 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-foreground border border-border cursor-pointer"
+          className="px-3.5 py-2 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 shadow-theme-xs cursor-pointer"
         >
-          <RefreshCw className="w-3.5 h-3.5" /> Refresh
+          <RefreshCw className="w-3.5 h-3.5" /> 
+          <span>Refresh</span>
         </button>
       </div>
 
       {/* Notifications */}
       {actionSuccess && (
-        <div className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-success-50 dark:bg-success-500/10 border border-success-200 dark:border-success-500/20 text-success-600 dark:text-success-400 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{actionSuccess}</span>
           </div>
-          <button onClick={() => setActionSuccess(null)} className="text-muted-foreground hover:text-foreground cursor-pointer">✕</button>
+          <button onClick={() => setActionSuccess(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
         </div>
       )}
 
       {actionError && (
-        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/30 text-red-600 dark:text-red-400 text-xs font-bold flex items-center justify-between">
+        <div className="p-4 rounded-2xl bg-error-50 dark:bg-error-500/10 border border-error-200 dark:border-error-500/20 text-error-600 dark:text-error-400 text-xs font-semibold flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{actionError}</span>
           </div>
-          <button onClick={() => setActionError(null)} className="text-muted-foreground hover:text-foreground cursor-pointer">✕</button>
+          <button onClick={() => setActionError(null)} className="text-gray-400 hover:text-gray-600 cursor-pointer">✕</button>
         </div>
       )}
 
       {/* Toolbar & Filter */}
       <div className="flex flex-col sm:flex-row justify-between gap-4">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3.5 top-2.5 w-4 h-4 text-gray-400" />
           <input
             type="text"
             placeholder="Search by Applicant Name or Phone..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 rounded-xl border border-border bg-card text-xs font-medium focus:outline-none focus:border-brand-primary"
+            className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-800/60 dark:border-gray-700 text-xs text-gray-900 dark:text-white font-medium focus:outline-none focus:border-brand-500 shadow-theme-xs"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
           {[
             { label: 'Pending Review', value: 'PENDING_ADMIN_REVIEW' },
             { label: 'Approved', value: 'APPROVED' },
@@ -152,10 +153,10 @@ export default function AdminRegistrationsPage() {
             <button
               key={tab.value}
               onClick={() => { setStatusFilter(tab.value); setPage(1); }}
-              className={`px-3 py-1.5 rounded-xl text-xs font-extrabold uppercase tracking-wider transition-all cursor-pointer border whitespace-nowrap ${
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer border whitespace-nowrap ${
                 statusFilter === tab.value
-                  ? 'bg-brand-primary text-white border-brand-primary shadow-xs'
-                  : 'bg-card text-muted-foreground hover:text-foreground border-border'
+                  ? 'bg-brand-500 text-white border-brand-500 shadow-theme-xs'
+                  : 'bg-white text-gray-500 hover:text-gray-900 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700 dark:hover:text-white'
               }`}
             >
               {tab.label}
@@ -165,10 +166,10 @@ export default function AdminRegistrationsPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-card border border-border rounded-2xl overflow-hidden shadow-xs">
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-muted/40 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+            <thead className="bg-gray-50/80 dark:bg-white/[0.02] border-b border-gray-200 dark:border-gray-800 text-[11px] font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">
               <tr>
                 <th className="px-5 py-3.5">Applicant</th>
                 <th className="px-5 py-3.5">Account Type</th>
@@ -180,38 +181,34 @@ export default function AdminRegistrationsPage() {
                 <th className="px-5 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground font-semibold">
+                  <td colSpan={8} className="text-center py-12 text-gray-500 font-semibold">
                     Loading registration requests...
                   </td>
                 </tr>
               ) : data?.items?.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12 text-muted-foreground font-semibold">
+                  <td colSpan={8} className="text-center py-12 text-gray-400 font-semibold">
                     No registration requests found in this queue.
                   </td>
                 </tr>
               ) : (
                 data?.items?.map((item: any) => (
-                  <tr key={item.id} className="hover:bg-muted/20 transition-colors">
+                  <tr key={item.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
                     <td className="px-5 py-4">
-                      <p className="font-bold text-foreground cursor-pointer hover:text-brand-primary" onClick={() => setDetailModalItem(item)}>
+                      <p className="font-bold text-gray-900 dark:text-white cursor-pointer hover:text-brand-600 dark:hover:text-brand-400" onClick={() => setDetailModalItem(item)}>
                         {item.name}
                       </p>
-                      <p className="text-[10px] text-muted-foreground font-mono">{item.phone}</p>
+                      <p className="text-[11px] text-gray-400 font-mono mt-0.5">{item.phone}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                        item.accountType === 'ZERO_CONTRIBUTION'
-                          ? 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                          : 'bg-blue-500/10 text-blue-600 border-blue-500/20'
-                      }`}>
+                      <span className={item.accountType === 'ZERO_CONTRIBUTION' ? 'badge-warning' : 'badge-brand'}>
                         {item.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contrib' : 'Standard'}
                       </span>
                     </td>
-                    <td className="px-5 py-4 font-bold text-foreground">
+                    <td className="px-5 py-4 font-bold text-gray-900 dark:text-white">
                       {item.contributionAmount 
                         ? `₹${Number(item.contributionAmount).toLocaleString('en-IN')}`
                         : '—'
@@ -220,46 +217,41 @@ export default function AdminRegistrationsPage() {
                     <td className="px-5 py-4">
                       {item.referrer ? (
                         <div>
-                          <span className="font-semibold text-foreground">{item.referrer.name}</span>
-                          <span className="text-[10px] text-muted-foreground block font-mono">({item.referrer.shareholderId})</span>
+                          <span className="font-semibold text-gray-900 dark:text-white">{item.referrer.name}</span>
+                          <span className="text-[11px] text-gray-400 block font-mono">({item.referrer.shareholderId})</span>
                         </div>
                       ) : (
-                        <span className="text-muted-foreground">—</span>
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
                       {item.paymentProofUrl ? (
                         <button 
                           onClick={() => setProofPreviewUrl(item.paymentProofUrl)} 
-                          className="text-brand-primary font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
+                          className="text-brand-600 dark:text-brand-400 font-bold hover:underline inline-flex items-center gap-1 cursor-pointer"
                         >
-                          <FileText className="w-3.5 h-3.5" /> View Receipt
+                          <FileText className="w-3.5 h-3.5" /> 
+                          <span>View Receipt</span>
                         </button>
                       ) : (
-                        <span className="text-muted-foreground text-[11px]">No proof required</span>
+                        <span className="text-gray-400 text-[11px]">No proof required</span>
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase border ${
-                        item.status === 'APPROVED' 
-                          ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                          : item.status === 'REJECTED'
-                          ? 'bg-red-500/10 text-red-600 border-red-500/20'
-                          : 'bg-amber-500/10 text-amber-600 border-amber-500/20'
-                      }`}>
+                      <span className={
+                        item.status === 'APPROVED' ? 'badge-success' :
+                        item.status === 'REJECTED' ? 'badge-error' : 'badge-warning'
+                      }>
                         {item.status.replace(/_/g, ' ')}
                       </span>
                     </td>
                     <td className="px-5 py-4">
                       {item.status === 'APPROVED' ? (
                         <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase border ${
-                            item.smsStatus === 'SENT' || item.smsStatus === 'DELIVERED'
-                              ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/20'
-                              : item.smsStatus === 'FAILED'
-                              ? 'bg-red-500/10 text-red-600 border-red-500/20'
-                              : 'bg-slate-500/10 text-slate-500 border-slate-500/20'
-                          }`}>
+                          <span className={
+                            item.smsStatus === 'SENT' || item.smsStatus === 'DELIVERED' ? 'badge-success' :
+                            item.smsStatus === 'FAILED' ? 'badge-error' : 'badge-brand'
+                          }>
                             {item.smsStatus || 'SENT'}
                           </span>
                           {item.smsStatus === 'FAILED' && item.smsLogId && (
@@ -267,21 +259,21 @@ export default function AdminRegistrationsPage() {
                               onClick={() => retrySmsMutation.mutate(item.smsLogId)}
                               disabled={retrySmsMutation.isPending}
                               title="Retry SMS dispatch"
-                              className="p-1 rounded bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
+                              className="p-1 rounded-lg bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 cursor-pointer"
                             >
                               <RefreshCw className="w-3 h-3" />
                             </button>
                           )}
                         </div>
                       ) : (
-                        <span className="text-muted-foreground text-[10px]">—</span>
+                        <span className="text-gray-400 text-[10px]">—</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           onClick={() => setDetailModalItem(item)}
-                          className="p-1.5 text-muted-foreground hover:text-foreground rounded-lg hover:bg-secondary transition-colors cursor-pointer"
+                          className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                           title="View Full Details"
                         >
                           <Eye className="w-4 h-4" />

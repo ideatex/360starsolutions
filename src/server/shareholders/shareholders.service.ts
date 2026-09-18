@@ -8,6 +8,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { MlmService } from '@server/engines/mlm/mlm.service';
 import { InvestorsService } from '@server/engines/investors/investors.service';
+import { SmsService } from '@server/sms/sms.service';
 
 @Injectable()
 export class UsersService {
@@ -18,6 +19,7 @@ export class UsersService {
     private readonly businessConfigService: BusinessConfigService,
     private readonly mlmService: MlmService,
     private readonly investorsService: InvestorsService,
+    private readonly smsService: SmsService,
   ) {}
 
   async getUsers(search?: string, role?: Role, status?: UserStatus, page = 1, limit = 20) {
@@ -61,6 +63,8 @@ export class UsersService {
           
           
           dob: true,
+          pan: true,
+          permissions: true,
           addressBuilding: true,
           addressArea: true,
           addressCity: true,
@@ -105,6 +109,10 @@ export class UsersService {
     const searchCode = (code || '').trim();
     if (!searchCode) {
       throw new NotFoundException('Referrer ID / Code is required');
+    }
+
+    if (['none', 'null', 'root', '-', 'direct'].includes(searchCode.toLowerCase())) {
+      return { name: 'None (Direct / Root)', shareholderId: '', referralCode: '' };
     }
 
     const parent = await this.prisma.shareholder.findFirst({
@@ -165,6 +173,15 @@ export class UsersService {
     }
 
     const isAdminRole = data.role === 'ADMIN' || data.role === 'SUPER_ADMIN';
+
+    // PAN Card validation (AAAAA9999A)
+    if (data.pan) {
+      const panClean = data.pan.trim().toUpperCase();
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panClean)) {
+        errors.pan = 'Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)';
+      }
+    }
 
     // Date of birth validation
     if (!data.dob) {
@@ -238,14 +255,14 @@ export class UsersService {
     }
 
     // Referrer validation
-    if (data.referrerId) {
+    const refId = typeof data.referrerId === 'string' ? data.referrerId.trim() : '';
+    if (refId && !['none', 'null', 'root', '-', 'direct'].includes(refId.toLowerCase())) {
       const parentUser = await this.prisma.shareholder.findFirst({
         where: {
           OR: [
-            { id: data.referrerId },
-            { shareholderId: data.referrerId },
-            { referralCode: data.referrerId },
-            { shareholderId: data.referrerId },
+            { id: refId },
+            { shareholderId: { equals: refId, mode: 'insensitive' } },
+            { referralCode: { equals: refId, mode: 'insensitive' } },
           ],
         },
       });
@@ -294,14 +311,14 @@ export class UsersService {
 
     // Fetch parent shareholder
     let parentUser = null;
-    if (data.referrerId) {
+    const refId = typeof data.referrerId === 'string' ? data.referrerId.trim() : '';
+    if (refId && !['none', 'null', 'root', '-', 'direct'].includes(refId.toLowerCase())) {
       parentUser = await this.prisma.shareholder.findFirst({
         where: {
           OR: [
-            { id: data.referrerId },
-            { shareholderId: data.referrerId },
-            { referralCode: data.referrerId },
-            { shareholderId: data.referrerId }
+            { id: refId },
+            { shareholderId: { equals: refId, mode: 'insensitive' } },
+            { referralCode: { equals: refId, mode: 'insensitive' } },
           ]
         }
       });
@@ -318,6 +335,8 @@ export class UsersService {
         passwordHash: data.passwordHash,
         name: data.name,
         phone: data.phone,
+        pan: data.pan ? data.pan.trim().toUpperCase() : null,
+        permissions: data.permissions || null,
         dob: data.dob ? new Date(data.dob) : null,
         role: data.role ?? 'SHAREHOLDER',
         status: data.status ?? 'ACTIVE',
@@ -343,12 +362,16 @@ export class UsersService {
     // Save Contribution & Investment records if contribution details are provided
     if (data.contributionAmount && Number(data.contributionAmount) > 0) {
       const validityMonths = data.validityMonths ? Number(data.validityMonths) : 12;
+      const invDate = data.contributionDate ? new Date(data.contributionDate) : new Date();
       const contribution = await this.prisma.contribution.create({
         data: {
           shareholderId: shareholder.id,
           amount: new Prisma.Decimal(data.contributionAmount),
           mode: data.contributionMode || 'Cash',
-          date: data.contributionDate ? new Date(data.contributionDate) : new Date(),
+          date: invDate,
+          effectiveDate: invDate,
+          activeDate: invDate,
+          createdAt: invDate,
           issuedAgreement: !!data.issuedAgreement,
           issuedCheque: !!data.issuedCheque,
           status: 'APPROVED',
@@ -363,7 +386,8 @@ export class UsersService {
           amount: new Prisma.Decimal(data.contributionAmount),
           dailyProfitRate: new Prisma.Decimal('0.0033'),
           status: 'ACTIVE',
-          startDate: data.contributionDate ? new Date(data.contributionDate) : new Date(),
+          startDate: invDate,
+          createdAt: invDate,
           validityMonths,
         }
       });
@@ -386,12 +410,81 @@ export class UsersService {
     return shareholder;
   }
 
+  /**
+   * Dedicated Admin Account Creation
+   * Strictly separates Admin creation from Shareholder creation.
+   * Requires only Admin ID, Password, and Permission matrix.
+   */
+  async createAdminUser(data: { adminId: string; password: string; permissions?: any }, superAdminId: string) {
+    const adminIdClean = (data.adminId || '').trim().toUpperCase();
+    if (!adminIdClean) {
+      throw new BadRequestException('Admin ID is required.');
+    }
+
+    const existing = await this.prisma.shareholder.findFirst({
+      where: {
+        OR: [
+          { shareholderId: adminIdClean },
+          { referralCode: adminIdClean },
+        ],
+      },
+    });
+
+    if (existing) {
+      throw new BadRequestException(`Account with ID "${adminIdClean}" already exists.`);
+    }
+
+    if (!data.password || data.password.length < 6) {
+      throw new BadRequestException('Admin password must be at least 6 characters long.');
+    }
+
+    const passwordHash = await bcrypt.hash(data.password, 10);
+
+    const admin = await this.prisma.shareholder.create({
+      data: {
+        shareholderId: adminIdClean,
+        name: `Admin (${adminIdClean})`,
+        passwordHash,
+        role: Role.ADMIN,
+        status: UserStatus.ACTIVE,
+        referralCode: adminIdClean,
+        permissions: data.permissions || {
+          shareholderManagement: { view: true, create: true, edit: true, delete: true, approve: true },
+          registrationQueue: { view: true, create: true, edit: false, delete: false, approve: true },
+          rankEngine: { view: true, create: false, edit: false, delete: false, approve: true },
+          payoutBatches: { view: true, create: false, edit: false, delete: false, approve: true },
+          withdrawals: { view: true, create: false, edit: false, delete: false, approve: true },
+          businessConfiguration: { view: true, create: true, edit: true, delete: false, approve: true },
+          reports: { view: true, create: false, edit: false, delete: false, approve: false },
+        },
+      },
+    });
+
+    await this.auditService.logAction({
+      shareholderId: superAdminId,
+      action: 'CREATE_ADMIN_ACCOUNT',
+      entityType: 'Shareholder',
+      entityId: admin.id,
+      newValue: JSON.stringify({ adminId: admin.shareholderId, permissions: admin.permissions }),
+    });
+
+    return admin;
+  }
+
   async updateUser(id: string, updates: any, adminId: string) {
     const shareholder = await this.prisma.shareholder.findUnique({ where: { id } });
     if (!shareholder) {
       throw new NotFoundException('Shareholder not found');
     }
 
+    // Validate PAN if provided
+    if (updates.pan) {
+      const panClean = updates.pan.trim().toUpperCase();
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panClean)) {
+        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A');
+      }
+    }
 
     // Validate IFSC format if provided
     if (updates.bankIfsc) {
@@ -404,14 +497,14 @@ export class UsersService {
     // Handle referral circular reference checks
     let parentUser = null;
     if (updates.referrerId !== undefined) {
-      if (updates.referrerId) {
+      const refId = typeof updates.referrerId === 'string' ? updates.referrerId.trim() : '';
+      if (refId && !['none', 'null', 'root', '-', 'direct'].includes(refId.toLowerCase())) {
         parentUser = await this.prisma.shareholder.findFirst({
           where: {
             OR: [
-              { id: updates.referrerId },
-              { shareholderId: updates.referrerId },
-              { referralCode: updates.referrerId },
-              { shareholderId: updates.referrerId }
+              { id: refId },
+              { shareholderId: { equals: refId, mode: 'insensitive' } },
+              { referralCode: { equals: refId, mode: 'insensitive' } },
             ]
           }
         });
@@ -435,7 +528,7 @@ export class UsersService {
 
     // Copy updates to clean data object
     const fields = [
-      'shareholderId', 'name', 'phone', 'role', 'status', 'dob',
+      'shareholderId', 'name', 'phone', 'role', 'status', 'dob', 'pan', 'permissions',
       'addressBuilding', 'addressArea', 'addressCity', 'addressDistrict', 'addressPincode', 'addressState',
       'bankAccountName', 'bankAccountNumber', 'bankName', 'bankBranch', 'bankIfsc'
     ];
@@ -565,13 +658,18 @@ export class UsersService {
     return updated;
   }
 
-  async resetPassword(id: string, newPasswordText: string, adminId: string) {
+  async resetPassword(id: string, newPassword: string, adminId: string) {
+    if (!newPassword || newPassword.trim().length < 6) {
+      throw new BadRequestException('Password must be at least 6 characters long');
+    }
+
+    const cleanPassword = newPassword.trim();
     const shareholder = await this.prisma.shareholder.findUnique({ where: { id } });
     if (!shareholder) {
       throw new NotFoundException('Shareholder not found');
     }
 
-    const passwordHash = await bcrypt.hash(newPasswordText, 10);
+    const passwordHash = await bcrypt.hash(cleanPassword, 10);
 
     await this.prisma.shareholder.update({
       where: { id },
@@ -581,24 +679,48 @@ export class UsersService {
     // Create Audit Log
     await this.auditService.logAction({
       shareholderId: adminId,
-      action: 'RESET_PASSWORD',
+      action: 'ADMIN_RESET_PASSWORD',
       entityType: 'Shareholder',
       entityId: id,
-      newValue: 'Password successfully reset by Admin',
+      newValue: `Password reset by admin for shareholder ${shareholder.shareholderId} (${shareholder.name})`,
     });
 
     // Send Notification to shareholder
-    await this.prisma.notification.create({
-      data: {
-        shareholderId: id,
-        title: 'Password Reset',
-        message: 'Your account password has been successfully reset by an Administrator.',
-        type: 'SECURITY',
-        priority: 'HIGH',
-      },
-    });
+    try {
+      await this.prisma.notification.create({
+        data: {
+          shareholderId: id,
+          title: 'Account Password Reset',
+          message: 'Your account password has been reset by the system administrator.',
+          type: 'SECURITY',
+          priority: 'HIGH',
+        },
+      });
+    } catch (notifErr) {}
 
-    return { success: true };
+    // Dispatch SMS with new credentials if phone is available
+    let smsStatus = 'SKIPPED';
+    if (shareholder.phone) {
+      try {
+        await this.smsService.sendCredentialsSms(
+          shareholder.phone,
+          shareholder.shareholderId,
+          cleanPassword,
+          shareholder.id,
+        );
+        smsStatus = 'SENT';
+      } catch (smsErr: any) {
+        smsStatus = 'FAILED';
+      }
+    }
+
+    return {
+      success: true,
+      shareholderId: shareholder.shareholderId,
+      name: shareholder.name,
+      smsStatus,
+      message: `Password for shareholder ${shareholder.shareholderId} (${shareholder.name}) has been reset successfully.`,
+    };
   }
 
   async changeMyPassword(shareholderId: string, currentPasswordText: string, newPasswordText: string) {
@@ -656,11 +778,17 @@ export class UsersService {
         _sum: { amount: true },
       }),
       this.prisma.profitLedger.aggregate({
-        where: { shareholderId },
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
         _sum: { amount: true },
       }),
       this.prisma.commissionLedger.aggregate({
-        where: { shareholderId },
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
         _sum: { amount: true },
       }),
       this.referralTreeService.getUnlockedLevel(shareholderId),
@@ -808,6 +936,7 @@ export class UsersService {
       investorId: shareholder.investorProfile?.id || '-',
       name: shareholder.name || shareholder.shareholderId,
       phone: shareholder.phone || 'N/A',
+      pan: shareholder.pan || 'N/A',
       address: [shareholder.addressBuilding, shareholder.addressArea, shareholder.addressCity, shareholder.addressDistrict, shareholder.addressState, shareholder.addressPincode].filter(Boolean).join(', ') || 'N/A',
       bankDetails: {
         accountName: shareholder.bankAccountName || 'N/A',
@@ -826,12 +955,20 @@ export class UsersService {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.prisma.profitLedger.findMany({
-        where: { shareholderId },
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.profitLedger.count({ where: { shareholderId } }),
+      this.prisma.profitLedger.count({
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
+      }),
     ]);
     return { data, total, page, lastPage: Math.ceil(total / limit) };
   }
@@ -840,13 +977,21 @@ export class UsersService {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.prisma.commissionLedger.findMany({
-        where: { shareholderId },
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: { fromInvestment: { include: { shareholder: { select: { shareholderId: true } } } } },
       }),
-      this.prisma.commissionLedger.count({ where: { shareholderId } }),
+      this.prisma.commissionLedger.count({
+        where: {
+          shareholderId,
+          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
+      }),
     ]);
     return { data, total, page, lastPage: Math.ceil(total / limit) };
   }
@@ -855,15 +1000,296 @@ export class UsersService {
     const skip = (page - 1) * limit;
     const [data, total] = await Promise.all([
       this.prisma.payoutDetail.findMany({
-        where: { shareholderId },
+        where: {
+          shareholderId,
+          batch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: { batch: true },
       }),
-      this.prisma.payoutDetail.count({ where: { shareholderId } }),
+      this.prisma.payoutDetail.count({
+        where: {
+          shareholderId,
+          batch: { status: { in: ['APPROVED', 'RELEASED'] } },
+        },
+      }),
     ]);
     return { data, total, page, lastPage: Math.ceil(total / limit) };
+  }
+
+  // ==========================================
+  // Financial Information Change Request Workflow
+  // ==========================================
+
+  /**
+   * Shareholder submits request to update financial info
+   */
+  async requestFinancialChange(shareholderId: string, dto: {
+    bankAccountName?: string;
+    bankAccountNumber?: string;
+    bankName?: string;
+    bankBranch?: string;
+    bankIfsc?: string;
+    pan?: string;
+  }) {
+    const shareholder = await this.prisma.shareholder.findUnique({
+      where: { id: shareholderId },
+    });
+
+    if (!shareholder) {
+      throw new NotFoundException('Shareholder not found');
+    }
+
+    if (dto.pan) {
+      const panClean = dto.pan.trim().toUpperCase();
+      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
+      if (!panRegex.test(panClean)) {
+        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
+      }
+    }
+
+    if (dto.bankIfsc) {
+      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
+      if (!ifscRegex.test(dto.bankIfsc.trim().toUpperCase())) {
+        throw new BadRequestException('Invalid IFSC format. Expected pattern: ABCD0123456');
+      }
+    }
+
+    // Cancel any previous PENDING request
+    await this.prisma.financialChangeRequest.updateMany({
+      where: { shareholderId, status: 'PENDING' },
+      data: { status: 'REJECTED', rejectionReason: 'Superseded by a new change request.' },
+    });
+
+    const request = await this.prisma.financialChangeRequest.create({
+      data: {
+        shareholderId,
+        bankAccountName: dto.bankAccountName || shareholder.bankAccountName,
+        bankAccountNumber: dto.bankAccountNumber || shareholder.bankAccountNumber,
+        bankName: dto.bankName || shareholder.bankName,
+        bankBranch: dto.bankBranch || shareholder.bankBranch,
+        bankIfsc: dto.bankIfsc ? dto.bankIfsc.trim().toUpperCase() : shareholder.bankIfsc,
+        pan: dto.pan ? dto.pan.trim().toUpperCase() : shareholder.pan,
+        status: 'PENDING',
+      },
+    });
+
+    // Notify Super Admins
+    const superAdmins = await this.prisma.shareholder.findMany({
+      where: { role: { in: [Role.SUPER_ADMIN, Role.ADMIN] } },
+      select: { id: true },
+    });
+
+    for (const admin of superAdmins) {
+      await this.prisma.notification.create({
+        data: {
+          shareholderId: admin.id,
+          title: 'Financial Info Change Request',
+          message: `Shareholder ${shareholder.name || shareholder.shareholderId} (${shareholder.shareholderId}) has requested a financial information change.`,
+          type: 'FINANCE',
+          priority: 'HIGH',
+        },
+      });
+    }
+
+    return {
+      success: true,
+      message: 'Financial information change request submitted successfully. Awaiting Super Admin approval.',
+      request,
+    };
+  }
+
+  /**
+   * Get latest financial change request for logged-in shareholder
+   */
+  async getMyFinancialChangeRequest(shareholderId: string) {
+    return this.prisma.financialChangeRequest.findFirst({
+      where: { shareholderId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Super Admin: List all financial information change requests
+   */
+  async getFinancialRequests(status?: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where: any = {};
+    if (status) {
+      where.status = status;
+    }
+
+    const [data, total] = await Promise.all([
+      this.prisma.financialChangeRequest.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          shareholder: {
+            select: {
+              id: true,
+              shareholderId: true,
+              name: true,
+              phone: true,
+              pan: true,
+              bankAccountName: true,
+              bankAccountNumber: true,
+              bankName: true,
+              bankBranch: true,
+              bankIfsc: true,
+            },
+          },
+          reviewedBy: {
+            select: {
+              id: true,
+              shareholderId: true,
+              name: true,
+            },
+          },
+        },
+      }),
+      this.prisma.financialChangeRequest.count({ where }),
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      lastPage: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * Super Admin: Approve Financial Information Change Request
+   */
+  async approveFinancialRequest(requestId: string, adminId: string) {
+    const request = await this.prisma.financialChangeRequest.findUnique({
+      where: { id: requestId },
+      include: { shareholder: true },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Financial change request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException(`Request is already ${request.status.toLowerCase()}`);
+    }
+
+    // Apply changes to Shareholder record
+    await this.prisma.$transaction(async (tx) => {
+      await tx.shareholder.update({
+        where: { id: request.shareholderId },
+        data: {
+          bankAccountName: request.bankAccountName,
+          bankAccountNumber: request.bankAccountNumber,
+          bankName: request.bankName,
+          bankBranch: request.bankBranch,
+          bankIfsc: request.bankIfsc,
+          pan: request.pan,
+        },
+      });
+
+      await tx.financialChangeRequest.update({
+        where: { id: requestId },
+        data: {
+          status: 'APPROVED',
+          reviewedById: adminId,
+          reviewedAt: new Date(),
+        },
+      });
+    });
+
+    // Audit Log
+    await this.auditService.logAction({
+      shareholderId: adminId,
+      action: 'APPROVE_FINANCIAL_CHANGE',
+      entityType: 'Shareholder',
+      entityId: request.shareholderId,
+      oldValue: JSON.stringify({
+        bankAccountName: request.shareholder.bankAccountName,
+        bankAccountNumber: request.shareholder.bankAccountNumber,
+        bankName: request.shareholder.bankName,
+        pan: request.shareholder.pan,
+      }),
+      newValue: JSON.stringify({
+        bankAccountName: request.bankAccountName,
+        bankAccountNumber: request.bankAccountNumber,
+        bankName: request.bankName,
+        pan: request.pan,
+      }),
+    });
+
+    // Notify Shareholder
+    await this.prisma.notification.create({
+      data: {
+        shareholderId: request.shareholderId,
+        title: 'Financial Information Updated',
+        message: 'Your requested financial information changes have been approved and applied to your profile.',
+        type: 'FINANCE',
+        priority: 'HIGH',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Financial information changes approved and activated successfully.',
+    };
+  }
+
+  /**
+   * Super Admin: Reject Financial Information Change Request
+   */
+  async rejectFinancialRequest(requestId: string, adminId: string, reason?: string) {
+    const request = await this.prisma.financialChangeRequest.findUnique({
+      where: { id: requestId },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Financial change request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException(`Request is already ${request.status.toLowerCase()}`);
+    }
+
+    await this.prisma.financialChangeRequest.update({
+      where: { id: requestId },
+      data: {
+        status: 'REJECTED',
+        rejectionReason: reason || 'Financial details could not be verified by Admin.',
+        reviewedById: adminId,
+        reviewedAt: new Date(),
+      },
+    });
+
+    // Audit Log
+    await this.auditService.logAction({
+      shareholderId: adminId,
+      action: 'REJECT_FINANCIAL_CHANGE',
+      entityType: 'FinancialChangeRequest',
+      entityId: requestId,
+      reason: reason || 'Rejected by administrator',
+    });
+
+    // Notify Shareholder
+    await this.prisma.notification.create({
+      data: {
+        shareholderId: request.shareholderId,
+        title: 'Financial Information Request Rejected',
+        message: `Your financial information change request was rejected: ${reason || 'Details could not be verified.'}`,
+        type: 'FINANCE',
+        priority: 'HIGH',
+      },
+    });
+
+    return {
+      success: true,
+      message: 'Financial change request rejected.',
+    };
   }
 }
 

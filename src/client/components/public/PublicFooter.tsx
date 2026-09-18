@@ -11,7 +11,7 @@ export function PublicFooter() {
         
         {/* Brand Summary */}
         <div className="md:col-span-4 space-y-4">
-          <img src="/logo-360.png" alt="360 Star Logo" className="h-10 w-auto object-contain" />
+          <img src="/logo-369.png" alt="360 Star Logo" className="h-10 w-auto object-contain" />
           <p className="text-xs text-slate-500 font-medium leading-relaxed">
             Visionary financial guidance, strategic planning, and wealth architecting for long-term stability across generations.
           </p>

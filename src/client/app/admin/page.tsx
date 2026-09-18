@@ -5,7 +5,11 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { motion } from 'framer-motion';
-import { BarChart3, Users, DollarSign, Wallet, FileDown, Database, Loader2, Search, Filter, ArrowUp, ArrowDown, X, FileText } from 'lucide-react';
+import { 
+  BarChart3, Users, DollarSign, Wallet, FileDown, Database, 
+  Loader2, Search, Filter, ArrowUp, ArrowDown, X, FileText, 
+  TrendingUp, ShieldCheck, ArrowUpRight
+} from 'lucide-react';
 import { exportToPDF, exportToCSV, ExportColumn } from '@/lib/exportUtils';
 
 export default function AdminDashboardPage() {
@@ -114,7 +118,7 @@ export default function AdminDashboardPage() {
       columns = [
         { header: 'Shareholder ID', key: 'shareholderId' },
         { header: 'Name', key: 'name' },
-        { header: 'Amount ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Amount (₹)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
         { header: 'Mode', key: 'mode' },
         { header: 'Status', key: 'status' },
         { header: 'Date', key: 'date', formatter: (v) => new Date(v).toLocaleDateString() },
@@ -123,7 +127,7 @@ export default function AdminDashboardPage() {
       columns = [
         { header: 'Shareholder ID', key: 'shareholderId' },
         { header: 'Name', key: 'name' },
-        { header: 'Monthly Profit ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Monthly Profit (₹)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
         { header: 'Status', key: 'status' },
         { header: 'Date', key: 'createdAt', formatter: (v) => new Date(v).toLocaleDateString() },
       ];
@@ -133,7 +137,7 @@ export default function AdminDashboardPage() {
         { header: 'Recipient Name', key: 'recipientName' },
         { header: 'Source ID', key: 'sourceShareholderId' },
         { header: 'Level', key: 'level' },
-        { header: 'Commission ($)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
+        { header: 'Commission (₹)', key: 'amount', formatter: (v) => Number(v || 0).toFixed(2) },
         { header: 'Status', key: 'status' },
       ];
     }
@@ -161,13 +165,13 @@ export default function AdminDashboardPage() {
 
   const SortIcon = ({ field }: { field: string }) => {
     if (sortBy !== field) return null;
-    return sortOrder === 'asc' ? <ArrowUp size={14} className="inline ml-1" /> : <ArrowDown size={14} className="inline ml-1" />;
+    return sortOrder === 'asc' ? <ArrowUp size={13} className="inline ml-1 text-brand-500" /> : <ArrowDown size={13} className="inline ml-1 text-brand-500" />;
   };
 
   if (loadingMetrics) {
     return (
-      <div className="flex flex-col items-center justify-center py-24 gap-3 text-muted-foreground">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-primary" />
+      <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-500">
+        <Loader2 className="w-8 h-8 animate-spin text-brand-500" />
         <p className="text-sm font-semibold">Retrieving system diagnostics...</p>
       </div>
     );
@@ -175,108 +179,117 @@ export default function AdminDashboardPage() {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, y: 15 }} 
+      initial={{ opacity: 0, y: 12 }} 
       animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto"
+      transition={{ duration: 0.2 }}
+      className="space-y-6 max-w-7xl mx-auto"
     >
-      {/* Title */}
-      <div className="border-b border-border pb-6">
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">Enterprise Overview</h1>
-        <p className="text-sm text-muted-foreground mt-1">High-level financial diagnostics and audit reporting logs</p>
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-gray-200 dark:border-gray-800 pb-5">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Enterprise Overview</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Real-time business volumes, active capital funds, and ledger audit logs</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="badge-brand">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            Live Sync Verified
+          </span>
+        </div>
       </div>
 
-      {/* Sleek 6-Card Compact Admin Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      {/* Sleek NextAdmin KPI Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* 1. Active Shareholders */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-emerald-500/30 transition-all flex flex-col justify-between space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active</span>
-            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
-              <Users size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Active</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
+              <Users size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-foreground tracking-tight">{metrics?.activeShareholders || 0}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Active Shareholders</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{metrics?.activeShareholders || 0}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Active Shareholders</p>
           </div>
         </div>
 
         {/* 2. Active Capital */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-brand-primary/30 transition-all flex flex-col justify-between space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Active Capital</span>
-            <div className="p-2 bg-brand-primary/10 rounded-xl text-brand-primary">
-              <BarChart3 size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Active Fund</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400">
+              <BarChart3 size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-brand-primary tracking-tight">₹{Number(metrics?.activeCapital || 0).toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Active Capital Fund</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-brand-600 dark:text-brand-400 tracking-tight">₹{Number(metrics?.activeCapital || 0).toLocaleString()}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Active Capital Volume</p>
           </div>
         </div>
 
         {/* 3. Gross Payouts */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-amber-500/30 transition-all flex flex-col justify-between space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Gross Payouts</span>
-            <div className="p-2 bg-amber-500/10 rounded-xl text-amber-600 dark:text-amber-400">
-              <Wallet size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Disbursed</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-warning-50 dark:bg-warning-500/15 text-warning-600 dark:text-warning-400">
+              <Wallet size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-foreground tracking-tight">₹{Number(metrics?.grossPayouts || 0).toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Gross Profit Payouts</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">₹{Number(metrics?.grossPayouts || 0).toLocaleString()}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Gross Profit Payouts</p>
           </div>
         </div>
 
-        {/* 4. Total Shareholders */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-blue-500/30 transition-all flex flex-col justify-between space-y-2">
+        {/* 4. Total Accounts */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Total</span>
-            <div className="p-2 bg-blue-500/10 rounded-xl text-blue-600 dark:text-blue-400">
-              <Users size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Total</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 dark:bg-blue-500/15 text-blue-600 dark:text-blue-400">
+              <Users size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-foreground tracking-tight">{metrics?.totalShareholders || 0}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Total Accounts</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">{metrics?.totalShareholders || 0}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Total Shareholder Base</p>
           </div>
         </div>
 
         {/* 5. Overall Capital */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-purple-500/30 transition-all flex flex-col justify-between space-y-2">
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Overall</span>
-            <div className="p-2 bg-purple-500/10 rounded-xl text-purple-600 dark:text-purple-400">
-              <Database size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Lifetime</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-50 dark:bg-purple-500/15 text-purple-600 dark:text-purple-400">
+              <Database size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-purple-600 dark:text-purple-400 tracking-tight">₹{Number(metrics?.overallCapital || 0).toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Overall Capital</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-purple-600 dark:text-purple-400 tracking-tight">₹{Number(metrics?.overallCapital || 0).toLocaleString()}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Lifetime Placements</p>
           </div>
         </div>
 
-        {/* 6. Released Funds */}
-        <div className="bg-card p-4 rounded-2xl border border-border-subtle shadow-xs hover:border-emerald-500/30 transition-all flex flex-col justify-between space-y-2">
+        {/* 6. Released Batch Funds */}
+        <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-theme-xs transition-all dark:border-gray-800 dark:bg-gray-900/60 flex flex-col justify-between">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Released</span>
-            <div className="p-2 bg-emerald-500/10 rounded-xl text-emerald-600 dark:text-emerald-400">
-              <DollarSign size={16} />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Released</span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
+              <DollarSign size={18} />
             </div>
           </div>
-          <div>
-            <p className="text-xl font-extrabold text-emerald-600 dark:text-emerald-400 tracking-tight">₹{Number(metrics?.releasedFunds || 0).toLocaleString()}</p>
-            <p className="text-[10px] text-muted-foreground font-semibold">Released Batch Funds</p>
+          <div className="mt-4">
+            <h3 className="text-2xl font-bold text-success-600 dark:text-success-400 tracking-tight">₹{Number(metrics?.releasedFunds || 0).toLocaleString()}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-0.5">Batch Funds Released</p>
           </div>
         </div>
       </div>
 
-      {/* Reports Section */}
-      <div className="bg-card rounded-2xl shadow-sm border border-border overflow-hidden">
-        {/* Tab Buttons & Actions */}
-        <div className="p-4 border-b border-border bg-secondary/30 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 select-none">
-          <div className="flex bg-secondary p-1 rounded-xl border border-border w-full sm:w-auto">
+      {/* Reports & Ledgers Modern Card Container */}
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 overflow-hidden">
+        {/* Navigation Toolbar & Actions */}
+        <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-white/[0.02] flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+          <div className="flex bg-gray-100 dark:bg-gray-800/70 p-1 rounded-xl border border-gray-200/80 dark:border-gray-700/80 overflow-x-auto max-w-full">
             {(['shareholders', 'investments', 'profits', 'commissions'] as const).map((tab) => (
               <button
                 key={tab}
@@ -284,97 +297,105 @@ export default function AdminDashboardPage() {
                   setActiveTab(tab);
                   resetFilters();
                 }}
-                className={`px-4 py-2 rounded-lg font-semibold text-sm capitalize transition-all cursor-pointer ${
+                className={`px-4 py-2 rounded-lg text-xs font-bold capitalize transition-all cursor-pointer whitespace-nowrap ${
                   activeTab === tab
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
+                    ? 'bg-white text-gray-900 shadow-theme-xs dark:bg-gray-900 dark:text-white'
+                    : 'text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white'
                 }`}
               >
                 {tab}
               </button>
             ))}
           </div>
-          <div className="flex gap-2">
+
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <button
               onClick={() => setIsFiltersOpen(!isFiltersOpen)}
-              className={`border border-border font-semibold text-sm px-4 py-2 rounded-lg transition-all flex items-center gap-2 cursor-pointer shadow-sm ${isFiltersOpen ? 'bg-brand-primary text-white border-brand-primary' : 'bg-card hover:bg-secondary text-foreground'}`}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer border shadow-theme-xs ${
+                isFiltersOpen 
+                  ? 'bg-brand-500 text-white border-brand-500' 
+                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800 dark:hover:bg-gray-800'
+              }`}
             >
-              <Filter size={16} /> Filters
+              <Filter size={14} /> 
+              <span>Filters</span>
             </button>
             <button
               onClick={() => handleExport(activeTab)}
-              className="border border-emerald-600/30 bg-emerald-600 hover:bg-emerald-700 font-semibold text-xs text-white px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-all shadow-theme-xs cursor-pointer"
             >
-              <FileDown size={15} /> Export CSV
+              <FileDown size={14} /> 
+              <span>Export CSV</span>
             </button>
             <button
               onClick={() => handleExportPDF(activeTab)}
-              className="border border-slate-800 bg-slate-800 hover:bg-slate-900 font-semibold text-xs text-white px-3.5 py-2 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-gray-900 hover:bg-black text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition-all shadow-theme-xs cursor-pointer dark:bg-gray-800 dark:hover:bg-gray-700"
             >
-              <FileText size={15} /> Export PDF
+              <FileText size={14} /> 
+              <span>Export PDF</span>
             </button>
           </div>
         </div>
 
-        {/* Filters Toolbar */}
+        {/* Filter Drawer */}
         {isFiltersOpen && (
-          <div className="p-4 border-b border-border bg-muted/20 flex flex-wrap gap-4 items-end text-sm">
+          <div className="p-4 sm:p-5 border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-800/40 flex flex-wrap gap-4 items-end text-xs">
             <div className="flex-1 min-w-[200px]">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Search</label>
+              <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Search</label>
               <div className="relative">
-                <Search className="absolute left-3 top-2.5 text-muted-foreground w-4 h-4" />
+                <Search className="absolute left-3 top-2.5 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Shareholder ID, Name..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs"
                 />
               </div>
             </div>
             
             <div className="w-[140px]">
-              <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Month</label>
+              <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Month</label>
               <input
                 type="month"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs"
               />
             </div>
 
-            <div className="flex gap-2 w-[240px]">
+            <div className="flex gap-2 w-[220px]">
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Min Amount</label>
+                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Min (₹)</label>
                 <input
                   type="number"
                   placeholder="0"
                   value={minAmount}
                   onChange={(e) => setMinAmount(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs"
                 />
               </div>
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Max Amount</label>
+                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Max (₹)</label>
                 <input
                   type="number"
-                  placeholder="âˆž"
+                  placeholder="Max"
                   value={maxAmount}
                   onChange={(e) => setMaxAmount(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs"
                 />
               </div>
             </div>
 
             {(activeTab === 'shareholders' || activeTab === 'investments') && (
-              <div className="w-[140px]">
-                <label className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Status</label>
+              <div className="w-[130px]">
+                <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Status</label>
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-border bg-card text-sm focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                  className="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white dark:bg-gray-900 dark:border-gray-700 text-xs text-gray-900 dark:text-white focus:outline-none focus:border-brand-500 shadow-theme-xs cursor-pointer"
                 >
-                  <option value="">All</option>
+                  <option value="">All Statuses</option>
                   <option value="ACTIVE">Active</option>
                   <option value="DISABLED">Disabled</option>
                   {activeTab === 'shareholders' && <option value="AUTO_ARCHIVED">Archived</option>}
@@ -383,13 +404,13 @@ export default function AdminDashboardPage() {
             )}
 
             {(activeTab === 'shareholders' || activeTab === 'investments') && (
-              <div className="flex flex-col gap-2">
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
-                  <input type="checkbox" checked={agreementIssued} onChange={(e) => setAgreementIssued(e.target.checked)} className="rounded border-border text-brand-primary focus:ring-brand-primary" />
+              <div className="flex flex-col gap-1.5 justify-center py-1">
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={agreementIssued} onChange={(e) => setAgreementIssued(e.target.checked)} className="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
                   Agreement Issued
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
-                  <input type="checkbox" checked={chequeIssued} onChange={(e) => setChequeIssued(e.target.checked)} className="rounded border-border text-brand-primary focus:ring-brand-primary" />
+                <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  <input type="checkbox" checked={chequeIssued} onChange={(e) => setChequeIssued(e.target.checked)} className="rounded border-gray-300 text-brand-500 focus:ring-brand-500" />
                   Cheque Issued
                 </label>
               </div>
@@ -397,82 +418,78 @@ export default function AdminDashboardPage() {
 
             <button
               onClick={resetFilters}
-              className="p-2 border border-border bg-card hover:bg-secondary rounded-lg text-muted-foreground transition-all cursor-pointer"
+              className="p-2 border border-gray-200 bg-white hover:bg-gray-100 dark:border-gray-700 dark:bg-gray-900 dark:hover:bg-gray-800 rounded-xl text-gray-500 transition-all cursor-pointer shadow-theme-xs"
               title="Clear Filters"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         )}
 
-        {/* Tab Table Content */}
-        <div className="p-1">
+        {/* Tab Data Table */}
+        <div>
           {loadingReport ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-              <Loader2 className="w-6 h-6 animate-spin text-brand-primary" />
-              <p className="text-sm font-medium">Retrieving report ledger...</p>
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
+              <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
+              <p className="text-xs font-semibold">Retrieving ledger database...</p>
             </div>
           ) : !reportData || reportData.length === 0 ? (
-            <div className="text-center py-16 text-muted-foreground">
-              <Database className="w-8 h-8 mx-auto mb-3 opacity-30" />
-              <p className="text-sm font-semibold">No Records Found</p>
+            <div className="text-center py-16 text-gray-400">
+              <Database className="w-8 h-8 mx-auto mb-2.5 opacity-30" />
+              <p className="text-xs font-bold text-gray-600 dark:text-gray-300">No Records Found</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Try clearing or broadening your search filters</p>
             </div>
           ) : (
-            <div className="overflow-x-auto min-h-[400px]">
+            <div className="overflow-x-auto min-h-[380px]">
               {activeTab === 'shareholders' && (
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-secondary/50 text-muted-foreground text-xs font-semibold uppercase tracking-wider border-b border-border">
+                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('name')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('name')}>
                         Shareholder <SortIcon field="name" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('role')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('role')}>
                         Role <SortIcon field="role" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('status')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
                         Status <SortIcon field="status" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('activeInvestmentsCount')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsCount')}>
                         Active Placements <SortIcon field="activeInvestmentsCount" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('activeInvestmentsVolume')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsVolume')}>
                         Total Contribution <SortIcon field="activeInvestmentsVolume" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('createdAt')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('createdAt')}>
                         Joined Date <SortIcon field="createdAt" />
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border text-sm text-foreground font-medium">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                     {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
+                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-foreground">{r.name || 'N/A'}</div>
-                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.shareholderId}</div>
+                          <div className="font-bold text-gray-900 dark:text-white">{r.name || 'N/A'}</div>
+                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.shareholderId}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold border ${
-                            r.role === 'SUPER_ADMIN' 
-                              ? 'bg-brand-accent/10 text-brand-accent border-brand-accent/20' 
-                              : r.role === 'ADMIN'
-                              ? 'bg-brand-info/10 text-brand-info border-brand-info/20'
-                              : 'bg-secondary text-muted-foreground border-border'
-                          }`}>
+                          <span className={
+                            r.role === 'SUPER_ADMIN' ? 'badge-brand' :
+                            r.role === 'ADMIN' ? 'badge-warning' : 'badge-brand'
+                          }>
                             {r.role}
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase border ${
-                            r.status === 'ACTIVE' || r.status === 'RESTORED'
-                              ? 'bg-brand-success/10 text-brand-success border-brand-success/20' 
-                              : 'bg-brand-warning/10 text-brand-warning border-brand-warning/20'
-                          }`}>
+                          <span className={
+                            r.status === 'ACTIVE' || r.status === 'RESTORED' ? 'badge-success' : 'badge-warning'
+                          }>
                             {r.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4">{r.activeInvestmentsCount}</td>
-                        <td className="px-6 py-4 font-semibold">${r.activeInvestmentsVolume.toFixed(2)}</td>
-                        <td className="px-6 py-4 text-muted-foreground">{new Date(r.createdAt).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 font-semibold">{r.activeInvestmentsCount}</td>
+                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.activeInvestmentsVolume?.toLocaleString() || '0'}</td>
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -481,48 +498,44 @@ export default function AdminDashboardPage() {
 
               {activeTab === 'investments' && (
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-secondary/50 text-muted-foreground text-xs font-semibold uppercase tracking-wider border-b border-border">
+                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('id')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
                         Investment ID <SortIcon field="id" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('userShareholderId')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
                         Shareholder <SortIcon field="userShareholderId" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('amount')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
                         Amount <SortIcon field="amount" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('dailyProfitRate')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('dailyProfitRate')}>
                         Daily Rate <SortIcon field="dailyProfitRate" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('status')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
                         Status <SortIcon field="status" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('startDate')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('startDate')}>
                         Start Date <SortIcon field="startDate" />
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border text-sm text-foreground font-medium">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                     {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
+                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-foreground">{r.userName || 'N/A'}</div>
-                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.userShareholderId}</div>
+                          <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
+                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
                         </td>
-                        <td className="px-6 py-4 font-semibold">${r.amount.toFixed(2)}</td>
-                        <td className="px-6 py-4 font-semibold text-brand-primary">{(r.dailyProfitRate * 100).toFixed(2)}%</td>
+                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.amount?.toLocaleString() || '0'}</td>
+                        <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">{(r.dailyProfitRate * 100).toFixed(2)}%</td>
                         <td className="px-6 py-4">
-                          <span className={`px-2.5 py-1 rounded-md text-xs font-semibold uppercase border ${
-                            r.status === 'ACTIVE' 
-                              ? 'bg-brand-success/10 text-brand-success border-brand-success/20' 
-                              : 'bg-brand-warning/10 text-brand-warning border-brand-warning/20'
-                          }`}>
+                          <span className={r.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}>
                             {r.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-muted-foreground">{new Date(r.startDate).toLocaleDateString()}</td>
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.startDate).toLocaleDateString()}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -531,42 +544,42 @@ export default function AdminDashboardPage() {
 
               {activeTab === 'profits' && (
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-secondary/50 text-muted-foreground text-xs font-semibold uppercase tracking-wider border-b border-border">
+                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('id')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
                         Ledger ID <SortIcon field="id" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('userShareholderId')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
                         Shareholder <SortIcon field="userShareholderId" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('investmentAmount')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('investmentAmount')}>
                         Investment <SortIcon field="investmentAmount" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('cycleStart')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('cycleStart')}>
                         Cycle Period <SortIcon field="cycleStart" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('eligibleDays')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('eligibleDays')}>
                         Eligible Days <SortIcon field="eligibleDays" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('amount')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
                         Amount <SortIcon field="amount" />
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border text-sm text-foreground font-medium">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                     {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
+                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-foreground">{r.userName || 'N/A'}</div>
-                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.userShareholderId}</div>
+                          <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
+                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
                         </td>
-                        <td className="px-6 py-4 font-semibold">${r.investmentAmount?.toFixed(2) || '0.00'}</td>
-                        <td className="px-6 py-4 text-muted-foreground">
+                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.investmentAmount?.toLocaleString() || '0'}</td>
+                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
                           {new Date(r.cycleStart).toLocaleDateString()} - {new Date(r.cycleEnd).toLocaleDateString()}
                         </td>
-                        <td className="px-6 py-4">{r.eligibleDays} days</td>
-                        <td className="px-6 py-4 font-semibold text-brand-primary">+${r.amount.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-semibold">{r.eligibleDays} days</td>
+                        <td className="px-6 py-4 font-bold text-success-600 dark:text-success-400">+₹{r.amount?.toLocaleString() || '0'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -575,43 +588,43 @@ export default function AdminDashboardPage() {
 
               {activeTab === 'commissions' && (
                 <table className="w-full text-left border-collapse">
-                  <thead className="bg-secondary/50 text-muted-foreground text-xs font-semibold uppercase tracking-wider border-b border-border">
+                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
                     <tr>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('id')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
                         Commission ID <SortIcon field="id" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('recipientShareholderId')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('recipientShareholderId')}>
                         Recipient <SortIcon field="recipientShareholderId" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('sourceShareholderId')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('sourceShareholderId')}>
                         From Shareholder <SortIcon field="sourceShareholderId" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('level')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('level')}>
                         Level <SortIcon field="level" />
                       </th>
-                      <th className="px-6 py-4 cursor-pointer hover:bg-secondary/80 select-none" onClick={() => handleSort('amount')}>
+                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
                         Amount <SortIcon field="amount" />
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border text-sm text-foreground font-medium">
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                     {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-secondary/30 transition-colors">
-                        <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
+                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-foreground">{r.recipientName || 'N/A'}</div>
-                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.recipientShareholderId}</div>
+                          <div className="font-bold text-gray-900 dark:text-white">{r.recipientName || 'N/A'}</div>
+                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.recipientShareholderId}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-semibold text-foreground">{r.sourceName || 'N/A'}</div>
-                          <div className="text-xs text-muted-foreground font-mono mt-1">{r.sourceShareholderId}</div>
+                          <div className="font-bold text-gray-900 dark:text-white">{r.sourceName || 'N/A'}</div>
+                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.sourceShareholderId}</div>
                         </td>
                         <td className="px-6 py-4">
-                          <span className="bg-brand-info/10 text-brand-info border border-brand-info/20 text-xs font-semibold px-2.5 py-1 rounded-md uppercase">
+                          <span className="badge-brand">
                             Level {r.level}
                           </span>
                         </td>
-                        <td className="px-6 py-4 font-semibold text-brand-primary">+${r.amount.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">+₹{r.amount?.toLocaleString() || '0'}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Query, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Query, Param, UseGuards, Request } from '@nestjs/common';
 import { RankService } from './rank.service';
 import { JwtAuthGuard } from '@server/auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '@server/auth/roles.guard';
@@ -11,6 +11,36 @@ export class RankController {
   @Get('configurations')
   async getConfigurations() {
     return this.rankService.getRankConfigurations();
+  }
+
+  @Put('configurations')
+  @Roles('SUPER_ADMIN')
+  async updateConfigurations(@Request() req: any, @Body() body: { configs: any[] }) {
+    return this.rankService.updateRankConfigurations(body.configs, req.shareholder.id);
+  }
+
+  @Get('members-status')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getMembersRankStatus(
+    @Query('search') search?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '50',
+  ) {
+    return this.rankService.getMembersRankStatus(search, Number(page), Number(limit));
+  }
+
+  @Post('manual-allot')
+  @Roles('SUPER_ADMIN')
+  async manuallyAllotRank(
+    @Request() req: any,
+    @Body() body: { shareholderId: string; rankName: string; remarks?: string },
+  ) {
+    return this.rankService.manuallyAllotRank({
+      shareholderId: body.shareholderId,
+      rankName: body.rankName,
+      remarks: body.remarks,
+      adminId: req.shareholder.id,
+    });
   }
 
   @Get('progress')
@@ -37,3 +67,4 @@ export class RankController {
     return this.rankService.reevaluateAllRanks();
   }
 }
+

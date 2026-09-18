@@ -142,6 +142,44 @@ export class UsersController {
     return this.usersService.setStatus(id, 'BLOCKED', req.shareholder.id);
   }
 
+  @Post('admin')
+  @Roles('SUPER_ADMIN')
+  async createAdmin(@Request() req: any, @Body() body: any) {
+    return this.usersService.createAdminUser(body, req.shareholder.id);
+  }
+
+  @Post('me/financial-change-request')
+  async requestFinancialChange(@Request() req: any, @Body() body: any) {
+    return this.usersService.requestFinancialChange(req.shareholder.id, body);
+  }
+
+  @Get('me/financial-change-request')
+  async getMyFinancialChangeRequest(@Request() req: any) {
+    return this.usersService.getMyFinancialChangeRequest(req.shareholder.id);
+  }
+
+  @Get('admin/financial-requests')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async getFinancialRequests(
+    @Query('status') status?: string,
+    @Query('page') page = '1',
+    @Query('limit') limit = '20',
+  ) {
+    return this.usersService.getFinancialRequests(status, Number(page), Number(limit));
+  }
+
+  @Post('admin/financial-requests/:id/approve')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async approveFinancialRequest(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.approveFinancialRequest(id, req.shareholder.id);
+  }
+
+  @Post('admin/financial-requests/:id/reject')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  async rejectFinancialRequest(@Request() req: any, @Param('id') id: string, @Body() body: any) {
+    return this.usersService.rejectFinancialRequest(id, req.shareholder.id, body.reason);
+  }
+
   @Patch(':id/unblock')
   @Roles('ADMIN', 'SUPER_ADMIN')
   @HttpCode(HttpStatus.OK)

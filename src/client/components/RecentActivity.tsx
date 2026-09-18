@@ -32,15 +32,15 @@ export default function RecentActivity() {
 
   if (loadingProfits || loadingCommissions) {
     return (
-      <div className="space-y-4 py-4">
+      <div className="space-y-3 py-2">
         {[1, 2, 3].map((n) => (
           <div key={n} className="flex gap-4 items-center animate-pulse">
-            <div className="w-10 h-10 bg-muted rounded-xl"></div>
-            <div className="flex-1 space-y-2">
-              <div className="h-3 bg-muted rounded w-2/3"></div>
-              <div className="h-2 bg-muted rounded w-1/3"></div>
+            <div className="w-9 h-9 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
+            <div className="flex-1 space-y-1.5">
+              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded w-2/3"></div>
+              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded w-1/3"></div>
             </div>
-            <div className="w-12 h-4 bg-muted rounded"></div>
+            <div className="w-12 h-4 bg-gray-100 dark:bg-gray-800 rounded"></div>
           </div>
         ))}
       </div>
@@ -56,7 +56,7 @@ export default function RecentActivity() {
       type: 'profit',
       amount: Number(p.amount),
       date: p.createdAt,
-      description: `Daily ROI distribution (${p.eligibleDays} active days)`,
+      description: `Daily Profit Distribution (${p.eligibleDays} days)`,
       status: 'completed',
     });
   });
@@ -67,7 +67,7 @@ export default function RecentActivity() {
       type: 'commission',
       amount: Number(c.amount),
       date: c.createdAt,
-      description: `Level ${c.level} Referral Reward`,
+      description: `Level ${c.level} Gratitude Share`,
       status: 'completed',
     });
   });
@@ -78,10 +78,10 @@ export default function RecentActivity() {
 
   if (sortedActivities.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 text-center text-muted-foreground select-none">
-        <RefreshCcw className="w-8 h-8 text-muted-foreground/30 animate-spin-slow mb-2" />
-        <p className="text-xs font-bold">No Transactions Found</p>
-        <p className="text-[10px] text-muted-foreground/75 mt-0.5">Your earnings ledger is currently empty.</p>
+      <div className="flex flex-col items-center justify-center py-10 text-center text-gray-400 select-none">
+        <RefreshCcw className="w-7 h-7 text-gray-300 dark:text-gray-700 mb-2" />
+        <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">No Transactions Found</p>
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Your earnings ledger is currently empty.</p>
       </div>
     );
   }
@@ -89,50 +89,50 @@ export default function RecentActivity() {
   const getIcon = (type: string) => {
     switch (type) {
       case 'commission':
-        return <Gift className="w-4 h-4 text-brand-accent animate-pulse" />;
+        return <Gift className="w-4 h-4 text-brand-500" />;
       case 'profit':
-        return <TrendingUp className="w-4 h-4 text-brand-primary" />;
+        return <TrendingUp className="w-4 h-4 text-success-500" />;
       default:
-        return <RefreshCcw className="w-4 h-4 text-muted-foreground" />;
+        return <RefreshCcw className="w-4 h-4 text-gray-400" />;
     }
   };
 
   const getBadgeStyle = (type: string) => {
     return type === 'profit' 
-      ? 'bg-brand-primary/10 text-brand-primary' 
-      : 'bg-brand-accent/10 text-brand-accent';
+      ? 'bg-success-50 dark:bg-success-500/15' 
+      : 'bg-brand-50 dark:bg-brand-500/15';
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 font-outfit">
       {sortedActivities.map((activity) => (
         <div 
           key={activity.id} 
-          className="flex items-center justify-between p-3.5 rounded-2xl border border-border-subtle bg-muted/20 hover:bg-muted/40 transition-all"
+          className="flex items-center justify-between p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 hover:bg-gray-50 dark:hover:bg-gray-800/60 transition-all"
         >
-          <div className="flex items-center gap-3.5 overflow-hidden">
-            <div className={`p-2.5 rounded-xl shrink-0 ${getBadgeStyle(activity.type)}`}>
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className={`p-2 rounded-lg shrink-0 ${getBadgeStyle(activity.type)}`}>
               {getIcon(activity.type)}
             </div>
             <div className="overflow-hidden">
-              <p className="text-xs font-bold text-gray-900 dark:text-white leading-snug truncate">{activity.description}</p>
-              <p className="text-[9px] text-muted-foreground dark:text-gray-400 mt-1 font-semibold">
+              <p className="text-xs font-semibold text-gray-900 dark:text-white leading-snug truncate">{activity.description}</p>
+              <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
                 {new Date(activity.date).toLocaleDateString()} at {new Date(activity.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
           <div className="text-right shrink-0">
-            <p className={`text-xs font-extrabold ${activity.type === 'profit' ? 'text-brand-primary' : 'text-brand-accent'}`}>
+            <p className={`text-xs font-bold ${activity.type === 'profit' ? 'text-success-600 dark:text-success-400' : 'text-brand-600 dark:text-brand-400'}`}>
               +₹{activity.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
-            <span className="text-[8px] uppercase font-extrabold tracking-widest px-2 py-0.5 rounded-full bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-emerald-900/40 mt-1 inline-block">
+            <span className="text-[9px] uppercase font-semibold px-2 py-0.5 rounded-full badge-success mt-1 inline-block">
               {activity.status}
             </span>
           </div>
         </div>
       ))}
       <Link href="/dashboard/profit-history">
-        <span className="block text-center w-full py-3 text-xs font-extrabold text-brand-primary hover:text-brand-primary/90 bg-brand-primary/5 hover:bg-brand-primary/10 rounded-2xl transition-all mt-3 cursor-pointer">
+        <span className="block text-center w-full py-2.5 text-xs font-semibold text-brand-600 dark:text-brand-400 hover:text-brand-700 dark:hover:text-brand-300 bg-brand-50/50 dark:bg-brand-500/10 hover:bg-brand-50 dark:hover:bg-brand-500/20 rounded-xl transition-all mt-2 cursor-pointer">
           View Earnings Ledger
         </span>
       </Link>

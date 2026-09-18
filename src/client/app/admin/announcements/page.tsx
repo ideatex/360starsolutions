@@ -253,96 +253,101 @@ export default function AdminAnnouncementsPage() {
     <motion.div 
       initial={{ opacity: 0, y: 15 }} 
       animate={{ opacity: 1, y: 0 }} 
-      className="space-y-8 max-w-7xl mx-auto"
+      className="space-y-6 max-w-7xl mx-auto p-4 sm:p-6 lg:p-8"
     >
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-border-subtle pb-6">
+      <div className="app-card flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
-            <Megaphone className="w-7 h-7 text-brand-primary" /> Announcement System
+          <div className="flex items-center gap-2">
+            <span className="badge-brand">
+              Communications Center
+            </span>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-2 flex items-center gap-2.5">
+            <Megaphone className="w-7 h-7 text-brand-600 dark:text-brand-400" /> Announcement System
           </h1>
-          <p className="text-xs text-muted-foreground dark:text-gray-400 mt-1">Publish and schedule targeted notifications and pin priority messages to specific shareholder roles or individual shareholders.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Publish and schedule targeted notifications and pin priority messages to specific shareholder roles or individual shareholders.</p>
         </div>
         <button
           onClick={() => { resetForm(); setIsOpen(true); }}
-          className="bg-brand-primary hover:bg-brand-primary/95 text-white font-bold px-5 py-3 rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer text-xs uppercase tracking-wider"
+          className="bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-semibold px-5 py-2.5 rounded-lg transition-all shadow-theme-xs flex items-center justify-center gap-2 cursor-pointer text-xs"
         >
-          <Plus size={14} /> Compose Announcement
+          <Plus size={16} /> Compose Announcement
         </button>
       </div>
 
       {/* Grid List Table */}
-      <div className="bg-white dark:bg-card rounded-3xl border border-border-subtle shadow-sm overflow-hidden">
+      <div className="app-card p-0 overflow-hidden">
         {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-20 gap-3 text-muted-foreground">
-            <Loader2 className="w-6 h-6 animate-spin text-brand-primary" />
-            <p className="text-xs font-semibold">Loading announcements...</p>
+          <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
+            <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
+            <p className="text-sm font-medium">Loading announcements...</p>
           </div>
         ) : announcements?.length === 0 ? (
-          <div className="text-center py-20 text-muted-foreground">
-            <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-primary" />
-            <p className="text-xs font-bold">No Announcements Published</p>
-            <p className="text-[10px] text-muted-foreground/75 mt-0.5">Click "Compose Announcement" to publish your first post.</p>
+          <div className="text-center py-20 text-gray-500">
+            <Megaphone className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-600" />
+            <p className="text-sm font-semibold">No Announcements Published</p>
+            <p className="text-xs text-gray-400 mt-0.5">Click "Compose Announcement" to publish your first post.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse">
-              <thead className="bg-muted/15 border-b border-border-subtle text-muted-foreground text-[10px] font-bold uppercase tracking-wider">
+              <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-semibold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-4 align-middle whitespace-nowrap">Title / Summary</th>
-                  <th className="px-6 py-4 align-middle whitespace-nowrap">Audience Target</th>
-                  <th className="px-6 py-4 align-middle whitespace-nowrap">Priority</th>
-                  <th className="px-6 py-4 align-middle whitespace-nowrap">Status</th>
-                  <th className="px-6 py-4 align-middle whitespace-nowrap">Scheduled For</th>
-                  <th className="px-6 py-4 align-middle text-right whitespace-nowrap">Actions</th>
+                  <th className="px-5 py-3.5 align-middle whitespace-nowrap">Title / Summary</th>
+                  <th className="px-5 py-3.5 align-middle whitespace-nowrap">Audience Target</th>
+                  <th className="px-5 py-3.5 align-middle whitespace-nowrap">Priority</th>
+                  <th className="px-5 py-3.5 align-middle whitespace-nowrap">Status</th>
+                  <th className="px-5 py-3.5 align-middle whitespace-nowrap">Scheduled For</th>
+                  <th className="px-5 py-3.5 align-middle text-right whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-border-subtle text-xs text-gray-700 dark:text-gray-300 font-medium">
+              <tbody className="divide-y divide-gray-150 dark:divide-gray-800 text-xs text-gray-700 dark:text-gray-300 font-medium">
                 {announcements?.map((a: any) => (
-                  <tr key={a.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4 align-middle">
+                  <tr key={a.id} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors">
+                    <td className="px-5 py-3.5 align-middle">
                       <div className="flex items-center gap-2 select-none">
                         {a.pinned && (
-                          <span className="bg-amber-100 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 text-[8px] font-extrabold px-1.5 py-0.5 rounded border border-amber-200 dark:border-amber-900/40 uppercase tracking-wide shrink-0">
+                          <span className="badge-warning text-[10px] shrink-0">
                             Pinned
                           </span>
                         )}
-                        <span className="font-extrabold text-gray-900 dark:text-white">{a.title}</span>
+                        <span className="font-bold text-gray-900 dark:text-white text-sm">{a.title}</span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground truncate max-w-xs mt-1">{a.content.replace(/<[^>]*>/g, '')}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs mt-1">{a.content.replace(/<[^>]*>/g, '')}</p>
                     </td>
-                    <td className="px-6 py-4 align-middle whitespace-nowrap">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-brand-primary/10 text-brand-primary dark:bg-brand-primary/20 border border-brand-primary/20">
+                    <td className="px-5 py-3.5 align-middle whitespace-nowrap">
+                      <span className="badge-brand flex items-center gap-1 w-max">
                         <Users size={11} /> {formatAudienceLabel(a)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 align-middle whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase text-center
-                        ${a.priority === 'HIGH' ? 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/40' : ''}
-                        ${a.priority === 'MEDIUM' ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40' : ''}
-                        ${a.priority === 'LOW' ? 'bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle' : ''}
-                      `}>
+                    <td className="px-5 py-3.5 align-middle whitespace-nowrap">
+                      <span className={`badge ${
+                        a.priority === 'HIGH' ? 'badge-error' :
+                        a.priority === 'MEDIUM' ? 'badge-warning' :
+                        'badge-neutral'
+                      }`}>
                         {a.priority}
                       </span>
                     </td>
-                    <td className="px-6 py-4 align-middle whitespace-nowrap">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-[10px] font-extrabold border uppercase text-center
-                        ${a.status === 'PUBLISHED' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : ''}
-                        ${a.status === 'DRAFT' ? 'bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle' : ''}
-                        ${a.status === 'ARCHIVED' ? 'bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 border-red-100' : ''}
-                      `}>
+                    <td className="px-5 py-3.5 align-middle whitespace-nowrap">
+                      <span className={`badge ${
+                        a.status === 'PUBLISHED' ? 'badge-success' :
+                        a.status === 'DRAFT' ? 'badge-neutral' :
+                        'badge-error'
+                      }`}>
                         {a.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 align-middle whitespace-nowrap text-muted-foreground font-semibold">
+                    <td className="px-5 py-3.5 align-middle whitespace-nowrap text-gray-500 dark:text-gray-400 font-medium">
                       <span className="inline-flex items-center gap-1.5">
-                        <Calendar size={12} /> 
+                        <Calendar size={13} /> 
                         {a.scheduledFor ? new Date(a.scheduledFor).toLocaleDateString() : 'Immediate'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 align-middle text-right whitespace-nowrap space-x-1 select-none">
-                      <button onClick={() => handleEdit(a)} className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer inline-flex items-center justify-center" title="Edit"><Edit3 size={14} /></button>
-                      <button onClick={() => handleDelete(a.id)} className="p-2 hover:bg-red-50 hover:text-red-650 rounded-xl text-muted-foreground transition-all cursor-pointer inline-flex items-center justify-center" title="Archive"><Trash2 size={14} /></button>
+                    <td className="px-5 py-3.5 align-middle text-right whitespace-nowrap space-x-1 select-none">
+                      <button onClick={() => handleEdit(a)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-500 hover:text-gray-900 dark:hover:text-white transition-all cursor-pointer inline-flex items-center justify-center" title="Edit"><Edit3 size={15} /></button>
+                      <button onClick={() => handleDelete(a.id)} className="p-1.5 hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-950/30 rounded-lg text-gray-500 transition-all cursor-pointer inline-flex items-center justify-center" title="Archive"><Trash2 size={15} /></button>
                     </td>
                   </tr>
                 ))}
@@ -355,42 +360,42 @@ export default function AdminAnnouncementsPage() {
       {/* Compose/Edit Modal Dialog */}
       <AnimatePresence>
         {isOpen && (
-          <div className="fixed inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }} 
               animate={{ opacity: 1, scale: 1 }} 
               exit={{ opacity: 0, scale: 0.95 }} 
-              className="bg-white dark:bg-card rounded-3xl max-w-2xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh] border border-border-subtle my-auto"
+              className="bg-white dark:bg-gray-900 rounded-2xl max-w-2xl w-full shadow-theme-xl relative overflow-hidden flex flex-col max-h-[90vh] border border-gray-200 dark:border-gray-800 my-auto"
             >
-              <div className="p-6 border-b border-border-subtle flex justify-between items-center bg-muted/10">
+              <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/80">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900 dark:text-white">{selectedAnnouncement ? 'Edit Announcement' : 'Compose Announcement'}</h3>
-                  <p className="text-[10px] text-muted-foreground">Broadcast notifications across roles or target specific shareholders by ID</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">{selectedAnnouncement ? 'Edit Announcement' : 'Compose Announcement'}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Broadcast notifications across roles or target specific shareholders by ID</p>
                 </div>
-                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-muted dark:hover:bg-secondary rounded-lg text-muted-foreground transition-all cursor-pointer"><X size={16} /></button>
+                <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all cursor-pointer"><X size={18} /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
+              <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs custom-scrollbar">
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Announcement Title *</label>
-                  <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="System Maintenance / Corporate Alert" />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Announcement Title *</label>
+                  <input type="text" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="System Maintenance / Corporate Alert" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Message Content *</label>
-                  <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={4} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-sans" placeholder="Detail the bulletin update..." />
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Message Content *</label>
+                  <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={4} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="Detail the bulletin update..." />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Priority Level</label>
-                    <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Priority Level</label>
+                    <select value={form.priority} onChange={e => setForm({...form, priority: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
                       <option value="LOW">Low</option>
                       <option value="MEDIUM">Medium</option>
                       <option value="HIGH">High</option>
                     </select>
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Audience Target</label>
-                    <select value={form.audience} onChange={e => setForm({...form, audience: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Audience Target</label>
+                    <select value={form.audience} onChange={e => setForm({...form, audience: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg bg-white dark:bg-gray-900 text-xs font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-1 focus:ring-brand-500 cursor-pointer">
                       <option value="EVERYONE">Everyone (All Roles)</option>
                       <option value="ADMINS">Administrators Only</option>
                       <option value="SHAREHOLDERS">Standard Shareholders Only</option>
@@ -401,22 +406,22 @@ export default function AdminAnnouncementsPage() {
 
                 {/* PARTICULAR SHAREHOLDERS SELECTOR SECTION */}
                 {(form.audience === 'INDIVIDUAL_USER' || form.audience === 'TARGETED_SHAREHOLDERS') && (
-                  <div className="p-4 rounded-2xl border border-brand-primary/20 bg-brand-primary/5 dark:bg-brand-primary/10 space-y-3.5">
+                  <div className="p-4 rounded-xl border border-brand-200 dark:border-brand-900/50 bg-brand-50/40 dark:bg-brand-950/20 space-y-3">
                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                       <div>
-                        <label className="block text-[11px] font-extrabold text-brand-primary uppercase tracking-wider flex items-center gap-1.5">
+                        <label className="block text-xs font-bold text-brand-700 dark:text-brand-300 flex items-center gap-1.5">
                           <UserCheck size={14} /> Select Particular Shareholders
                         </label>
-                        <p className="text-[10px] text-muted-foreground">Search and select individual shareholder IDs to receive this announcement.</p>
+                        <p className="text-[11px] text-gray-500 dark:text-gray-400">Search and select individual shareholder IDs to receive this announcement.</p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand-primary text-white">
+                        <span className="badge-brand">
                           {selectedShareholderIds.length} Selected
                         </span>
                         <button 
                           type="button"
                           onClick={handleSelectAllFiltered}
-                          className="px-2.5 py-1 text-[10px] font-bold bg-white dark:bg-card border border-border-subtle rounded-lg hover:bg-muted text-gray-700 dark:text-gray-200 cursor-pointer"
+                          className="px-2.5 py-1 text-xs font-semibold bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 text-gray-700 dark:text-gray-200 cursor-pointer"
                         >
                           Select Filtered
                         </button>
@@ -424,7 +429,7 @@ export default function AdminAnnouncementsPage() {
                           <button 
                             type="button"
                             onClick={handleClearSelection}
-                            className="px-2.5 py-1 text-[10px] font-bold bg-red-50 text-red-650 dark:bg-red-950/40 dark:text-red-400 border border-red-200 rounded-lg hover:bg-red-100 cursor-pointer"
+                            className="px-2.5 py-1 text-xs font-semibold bg-rose-50 text-rose-600 dark:bg-rose-950/40 dark:text-rose-400 border border-rose-200 dark:border-rose-900/50 rounded-lg hover:bg-rose-100 cursor-pointer"
                           >
                             Clear
                           </button>
@@ -440,26 +445,26 @@ export default function AdminAnnouncementsPage() {
                         value={shareholderSearch} 
                         onChange={e => setShareholderSearch(e.target.value)}
                         placeholder="Search shareholder by Name, Shareholder ID (USR...), Phone..."
-                        className="w-full pl-9 pr-4 py-2 border border-border-subtle rounded-xl text-xs bg-white dark:bg-card focus:outline-none focus:ring-1 focus:ring-brand-primary"
+                        className="w-full pl-9 pr-4 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg text-xs bg-white dark:bg-gray-900 focus:outline-none focus:ring-1 focus:ring-brand-500"
                       />
                     </div>
 
                     {/* Selected Shareholders Badges/Chips */}
                     {selectedShareholderIds.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-white/70 dark:bg-card/70 rounded-xl border border-border-subtle">
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 custom-scrollbar">
                         {selectedShareholderIds.map(idOrCode => {
                           const matched = (shareholdersList || []).find((s: any) => s.id === idOrCode || s.shareholderId === idOrCode);
                           const displayName = matched ? `${matched.name} (${matched.shareholderId || matched.id})` : idOrCode;
                           return (
                             <span 
                               key={idOrCode}
-                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand-primary/15 text-brand-primary dark:bg-brand-primary/30 dark:text-white text-[10px] font-bold border border-brand-primary/30"
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-brand-50 dark:bg-brand-950/50 text-brand-700 dark:text-brand-300 text-xs font-semibold border border-brand-200 dark:border-brand-900/50"
                             >
                               {displayName}
                               <button 
                                 type="button"
                                 onClick={() => toggleSelectShareholder(idOrCode)}
-                                className="hover:text-red-500 cursor-pointer ml-0.5"
+                                className="hover:text-rose-500 cursor-pointer ml-0.5"
                               >
                                 <X size={12} />
                               </button>
@@ -470,13 +475,13 @@ export default function AdminAnnouncementsPage() {
                     )}
 
                     {/* Interactive List with Checkboxes */}
-                    <div className="border border-border-subtle rounded-xl overflow-hidden bg-white dark:bg-card max-h-48 overflow-y-auto divide-y divide-border-subtle">
+                    <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden bg-white dark:bg-gray-900 max-h-48 overflow-y-auto divide-y divide-gray-150 dark:divide-gray-800 custom-scrollbar">
                       {isLoadingShareholders ? (
-                        <div className="p-4 text-center text-muted-foreground flex items-center justify-center gap-2">
-                          <Loader2 size={14} className="animate-spin text-brand-primary" /> Loading shareholder directory...
+                        <div className="p-4 text-center text-gray-500 flex items-center justify-center gap-2">
+                          <Loader2 size={14} className="animate-spin text-brand-600" /> Loading shareholder directory...
                         </div>
                       ) : filteredShareholders.length === 0 ? (
-                        <div className="p-4 text-center text-muted-foreground text-[11px]">
+                        <div className="p-4 text-center text-gray-400 text-xs">
                           No shareholders found matching "{shareholderSearch}"
                         </div>
                       ) : (
@@ -487,26 +492,26 @@ export default function AdminAnnouncementsPage() {
                             <div 
                               key={s.id} 
                               onClick={() => toggleSelectShareholder(targetId)}
-                              className={`flex items-center justify-between p-2.5 hover:bg-muted/40 cursor-pointer transition-colors ${isSelected ? 'bg-brand-primary/5 dark:bg-brand-primary/10' : ''}`}
+                              className={`flex items-center justify-between p-2.5 hover:bg-gray-50 dark:hover:bg-gray-800/40 cursor-pointer transition-colors ${isSelected ? 'bg-brand-50/60 dark:bg-brand-950/30' : ''}`}
                             >
                               <div className="flex items-center gap-2.5 min-w-0">
                                 {isSelected ? (
-                                  <CheckSquare size={16} className="text-brand-primary shrink-0" />
+                                  <CheckSquare size={16} className="text-brand-600 dark:text-brand-400 shrink-0" />
                                 ) : (
                                   <Square size={16} className="text-gray-400 shrink-0" />
                                 )}
                                 <div className="truncate">
-                                  <span className="font-bold text-gray-900 dark:text-white text-xs">{s.name || 'Unnamed Shareholder'}</span>
-                                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
-                                    <span className="font-mono bg-muted px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300 font-bold">{s.shareholderId || s.id}</span>
+                                  <span className="font-semibold text-gray-900 dark:text-white text-xs">{s.name || 'Unnamed Shareholder'}</span>
+                                  <div className="flex items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400">
+                                    <span className="font-mono bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded text-gray-700 dark:text-gray-300 font-semibold">{s.shareholderId || s.id}</span>
                                     {s.phone && <span>• {s.phone}</span>}
-                                    <span className="uppercase text-[9px] font-extrabold text-brand-primary">{s.role}</span>
+                                    <span className="uppercase text-[10px] font-bold text-brand-600 dark:text-brand-400">{s.role}</span>
                                   </div>
                                 </div>
                               </div>
                               {isSelected && (
-                                <span className="text-[10px] font-bold text-brand-primary flex items-center gap-1 shrink-0">
-                                  <CheckCircle2 size={12} /> Selected
+                                <span className="text-xs font-semibold text-brand-600 dark:text-brand-400 flex items-center gap-1 shrink-0">
+                                  <CheckCircle2 size={13} /> Selected
                                 </span>
                               )}
                             </div>
@@ -517,14 +522,14 @@ export default function AdminAnnouncementsPage() {
 
                     {/* Manual Input Fallback */}
                     <div className="pt-1">
-                      <label className="block text-[9px] font-bold text-gray-400 uppercase tracking-widest mb-1">
+                      <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400 mb-1">
                         Manual Shareholder ID / UUID (Optional comma-separated string)
                       </label>
                       <input 
                         type="text" 
                         value={form.targetUserId} 
                         onChange={e => setForm({...form, targetUserId: e.target.value})} 
-                        className="w-full px-3 py-1.5 border border-border-subtle rounded-xl font-mono text-[11px] focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white dark:bg-card" 
+                        className="w-full px-3 py-1.5 border border-gray-200 dark:border-gray-800 rounded-lg font-mono text-xs focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white dark:bg-gray-900" 
                         placeholder="USR000001, USR000002..." 
                       />
                     </div>
@@ -533,38 +538,38 @@ export default function AdminAnnouncementsPage() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={12} /> Schedule Publish Date</label>
-                    <input type="datetime-local" value={form.scheduledFor} onChange={e => setForm({...form, scheduledFor: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground dark:bg-secondary/35" />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1"><Clock size={13} /> Schedule Publish Date</label>
+                    <input type="datetime-local" value={form.scheduledFor} onChange={e => setForm({...form, scheduledFor: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none text-gray-700 dark:text-gray-300 dark:bg-gray-900" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1"><Clock size={12} /> Expire Date</label>
-                    <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground dark:bg-secondary/35" />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1"><Clock size={13} /> Expire Date</label>
+                    <input type="datetime-local" value={form.expiresAt} onChange={e => setForm({...form, expiresAt: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none text-gray-700 dark:text-gray-300 dark:bg-gray-900" />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Cover Image URL (Optional)</label>
-                    <input type="text" value={form.imageUrl} onChange={e => setForm({...form, imageUrl: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-secondary/35" placeholder="http://..." />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Cover Image URL (Optional)</label>
+                    <input type="text" value={form.imageUrl} onChange={e => setForm({...form, imageUrl: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none dark:bg-gray-900" placeholder="https://..." />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Attachment URL (Optional)</label>
-                    <input type="text" value={form.attachmentUrl} onChange={e => setForm({...form, attachmentUrl: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-secondary/35" placeholder="http://..." />
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Attachment URL (Optional)</label>
+                    <input type="text" value={form.attachmentUrl} onChange={e => setForm({...form, attachmentUrl: e.target.value})} className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none dark:bg-gray-900" placeholder="https://..." />
                   </div>
                 </div>
 
                 <div className="pt-2 select-none">
-                  <label className="flex items-center gap-3 cursor-pointer">
-                    <input type="checkbox" checked={form.pinned} onChange={e => setForm({...form, pinned: e.target.checked})} className="rounded text-brand-primary focus:ring-brand-primary w-4.5 h-4.5" />
-                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Pin to top of target shareholder dashboard feeds</span>
+                  <label className="flex items-center gap-2.5 cursor-pointer">
+                    <input type="checkbox" checked={form.pinned} onChange={e => setForm({...form, pinned: e.target.checked})} className="rounded text-brand-600 focus:ring-brand-500 w-4 h-4 cursor-pointer" />
+                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Pin to top of target shareholder dashboard feeds</span>
                   </label>
                 </div>
               </div>
 
-              <div className="p-4 border-t border-border-subtle bg-muted/10 flex justify-end gap-3 select-none">
-                <button onClick={() => setIsOpen(false)} className="px-4 py-2.5 border border-border-subtle rounded-xl hover:bg-muted text-xs font-bold text-gray-500 cursor-pointer">Cancel</button>
-                <button onClick={handleSubmit} className="px-6 py-2.5 bg-brand-primary hover:bg-brand-primary/95 text-white rounded-xl text-xs font-bold shadow-md cursor-pointer uppercase tracking-wider">
-                  {selectedAnnouncement ? 'Save Changes' : 'Publish'}
+              <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/80 flex justify-end gap-2.5 select-none">
+                <button onClick={() => setIsOpen(false)} className="px-4 py-2 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">Cancel</button>
+                <button onClick={handleSubmit} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-theme-xs cursor-pointer">
+                  {selectedAnnouncement ? 'Save Changes' : 'Publish Announcement'}
                 </button>
               </div>
             </motion.div>
