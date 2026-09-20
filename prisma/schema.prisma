@@ -104,6 +104,7 @@ model Shareholder {
   children         Shareholder[]   @relation("ReferralHierarchy")
   
   holdingBalance   Decimal  @default(0) @db.Decimal(19, 4)
+  withholdingPercentage Decimal? @default(20) @db.Decimal(5, 2)
   unlockedLevelOverride Int?
   currentRank      String?  // Bronze, Silver, Gold, Diamond
   
@@ -167,6 +168,8 @@ model Shareholder {
   @@index([parentId])
   @@index([status])
   @@index([accountType])
+  @@index([phone])
+  @@index([pan])
 }
 
 model Investment {
@@ -539,6 +542,7 @@ model RegistrationRequest {
   initialPassword     String?
 
   status              RegistrationStatus @default(PENDING_REVIEW)
+  withholdingPercentage Decimal?         @default(20) @db.Decimal(5, 2)
   rejectionReason     String?
   reviewedById        String?
   reviewedBy          Shareholder?       @relation("ReviewedRegistrations", fields: [reviewedById], references: [id])

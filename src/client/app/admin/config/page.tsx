@@ -614,7 +614,7 @@ export default function AdminConfigPage() {
                     <tr>
                       <th className="px-4 py-3 w-16">Level</th>
                       <th className="px-4 py-3">Description Name</th>
-                      <th className="px-4 py-3 w-40">Volume Target ($)</th>
+                      <th className="px-4 py-3 w-40">Volume Target (₹)</th>
                       <th className="px-4 py-3 w-28">Sharing %</th>
                       <th className="px-4 py-3 w-16 text-center">Active</th>
                     </tr>
@@ -778,7 +778,7 @@ export default function AdminConfigPage() {
               {/* Simulator Inputs */}
               <div className="space-y-3 shrink-0 border-b border-gray-100 dark:border-gray-800 pb-4">
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Mock Own Investment ($)</label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300">Mock Own Investment (₹)</label>
                   <input
                     type="number"
                     value={simOwnInvestment}
@@ -792,7 +792,7 @@ export default function AdminConfigPage() {
                     const lvlStr = String(level);
                     return (
                       <div key={level} className="space-y-1">
-                        <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400">Level {level} Vol ($)</label>
+                        <label className="block text-[11px] font-semibold text-gray-500 dark:text-gray-400">Level {level} Vol (₹)</label>
                         <input
                           type="number"
                           value={simLevelVolumes[lvlStr] || '0'}
@@ -811,11 +811,11 @@ export default function AdminConfigPage() {
                 <div className="p-3 border border-brand-200 dark:border-brand-900/50 rounded-xl bg-brand-50/40 dark:bg-brand-950/20 flex justify-between items-center text-xs">
                   <div>
                     <span className="badge-brand">Own Investment</span>
-                    <strong className="text-gray-900 dark:text-white block mt-1.5">Vol: ${Number(simOwnInvestment || 0).toLocaleString()}</strong>
+                    <strong className="text-gray-900 dark:text-white block mt-1.5">Vol: ₹{Number(simOwnInvestment || 0).toLocaleString()}</strong>
                   </div>
                   <div className="text-right">
                     <span className="badge-success block">✓ Qualified</span>
-                    <strong className="text-brand-600 dark:text-brand-400 text-xs mt-1 block">+${calculatedSimulatorResults.ownPayout.toFixed(2)}</strong>
+                    <strong className="text-brand-600 dark:text-brand-400 text-xs mt-1 block">+₹{calculatedSimulatorResults.ownPayout.toFixed(2)}</strong>
                   </div>
                 </div>
 
@@ -837,12 +837,12 @@ export default function AdminConfigPage() {
                       }`}>
                         Level {r.level} {r.status === 'LOCKED' && '🔒'}
                       </span>
-                      <strong className="block mt-1.5 text-gray-900 dark:text-white">Vol: ${Number(r.currentVolume).toLocaleString()}</strong>
+                      <strong className="block mt-1.5 text-gray-900 dark:text-white">Vol: ₹{Number(r.currentVolume).toLocaleString()}</strong>
                     </div>
                     <div className="text-right">
-                      <span className="text-[10px] text-gray-400 block">Min Target: ${r.volumeRequired.toLocaleString()}</span>
+                      <span className="text-[10px] text-gray-400 block">Min Target: ₹{r.volumeRequired.toLocaleString()}</span>
                       <strong className="text-brand-600 dark:text-brand-400 text-xs mt-1 block">
-                        {r.status === 'ELIGIBLE' ? `+$${r.profit.toFixed(2)}` : r.status === 'LOCKED' ? 'Locked' : 'Ineligible'}
+                        {r.status === 'ELIGIBLE' ? `+₹${r.profit.toFixed(2)}` : r.status === 'LOCKED' ? 'Locked' : 'Ineligible'}
                       </strong>
                     </div>
                   </div>
@@ -853,7 +853,7 @@ export default function AdminConfigPage() {
               <div className="border-t border-gray-100 dark:border-gray-800 pt-4 shrink-0 flex justify-between items-center select-none">
                 <div>
                   <span className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider block">Simulated Total Payout</span>
-                  <strong className="text-2xl text-emerald-600 dark:text-emerald-400 font-bold">${calculatedSimulatorResults.grandTotal.toFixed(2)}</strong>
+                  <strong className="text-2xl text-emerald-600 dark:text-emerald-400 font-bold">₹{calculatedSimulatorResults.grandTotal.toFixed(2)}</strong>
                 </div>
                 <span className="text-xs text-gray-400 italic">Simulation Only</span>
               </div>

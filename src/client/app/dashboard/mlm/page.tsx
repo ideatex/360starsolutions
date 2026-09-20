@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Network, Award, Coins, Info, CheckCircle2, AlertCircle, Calendar, 
-  TrendingUp, Wallet, ShieldAlert, GitBranch, Table, DollarSign, ChevronRight 
+  TrendingUp, Wallet, ShieldAlert, GitBranch, Table, ChevronRight 
 } from 'lucide-react';
 
 export default function MlmUserDashboardPage() {
@@ -183,7 +183,7 @@ export default function MlmUserDashboardPage() {
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Contribution Fund</span>
-                    <strong className="text-xl text-gray-900 font-extrabold">${totalApprovedContribution.toLocaleString()}</strong>
+                    <strong className="text-xl text-gray-900 font-extrabold">₹{totalApprovedContribution.toLocaleString()}</strong>
                   </div>
                 </div>
               </div>
@@ -195,7 +195,7 @@ export default function MlmUserDashboardPage() {
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Own ROI Profit</span>
-                    <strong className="text-xl text-gray-900 font-extrabold">${Number(ownProfit).toFixed(2)}</strong>
+                    <strong className="text-xl text-gray-900 font-extrabold">₹{Number(ownProfit).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -207,7 +207,7 @@ export default function MlmUserDashboardPage() {
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Referral Profit</span>
-                    <strong className="text-xl text-gray-900 font-extrabold">${Number(refProfit).toFixed(2)}</strong>
+                    <strong className="text-xl text-gray-900 font-extrabold">₹{Number(refProfit).toFixed(2)}</strong>
                   </div>
                 </div>
               </div>
@@ -219,7 +219,7 @@ export default function MlmUserDashboardPage() {
                   </div>
                   <div>
                     <span className="text-xs text-gray-400 font-semibold block">Team Business Volume</span>
-                    <strong className="text-xl text-gray-900 font-extrabold">${Number(teamVolume).toLocaleString()}</strong>
+                    <strong className="text-xl text-gray-900 font-extrabold">₹{Number(teamVolume).toLocaleString()}</strong>
                   </div>
                 </div>
               </div>
@@ -252,10 +252,10 @@ export default function MlmUserDashboardPage() {
                                   ? 'bg-gray-200 text-gray-500'
                                   : 'bg-emerald-50 text-emerald-700'
                               }`}>
-                                Level {item.level} {isLocked && "ðŸ”’"}
+                                Level {item.level} {isLocked && "🔒"}
                               </span>
                               <div className={`text-sm font-bold mt-2 ${isLocked ? 'text-gray-400' : 'text-gray-800'}`}>
-                                Current Volume: ${Number(item.volume).toLocaleString()}
+                                Current Volume: ₹{Number(item.volume).toLocaleString()}
                               </div>
                             </div>
                             <span className={`text-[10px] font-extrabold px-2.5 py-1 rounded-full ${
@@ -272,7 +272,7 @@ export default function MlmUserDashboardPage() {
                           <div className="space-y-1 mt-3">
                             <div className="flex justify-between text-[10px] font-semibold text-gray-400">
                               <span>{isLocked ? 'Locked' : `Progress: ${pct.toFixed(1)}%`}</span>
-                              <span>Target: ${Number(item.threshold).toLocaleString()}</span>
+                              <span>Target: ₹{Number(item.threshold).toLocaleString()}</span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
                               <div
@@ -310,7 +310,7 @@ export default function MlmUserDashboardPage() {
                       </div>
                       <div className="text-right">
                         <span className="text-[10px] text-gray-400 block font-semibold">Total Earned</span>
-                        <strong className="text-emerald-600 font-bold text-sm">+${Number(item.totalProfit).toFixed(2)}</strong>
+                        <strong className="text-emerald-600 font-bold text-sm">+₹{Number(item.totalProfit).toFixed(2)}</strong>
                       </div>
                     </div>
                   ))}
@@ -373,7 +373,7 @@ export default function MlmUserDashboardPage() {
                           Cycle: {new Date(l.cycleStart).toLocaleDateString()} - {new Date(l.cycleEnd).toLocaleDateString()} ({l.eligibleDays} days)
                         </span>
                       </div>
-                      <span className="font-bold text-emerald-600 text-sm">+${Number(l.amount).toFixed(2)}</span>
+                      <span className="font-bold text-emerald-600 text-sm">+₹{Number(l.amount).toFixed(2)}</span>
                     </div>
                   ))
                 )}
@@ -395,11 +395,11 @@ export default function MlmUserDashboardPage() {
                       <div>
                         <span className="font-bold text-gray-800 block">Level {c.level} Referral Commission</span>
                         <span className="text-[10px] text-gray-400 font-medium block">
-                          Level Volume: ${Number(c.volume).toLocaleString()}
+                          Level Volume: ₹{Number(c.volume).toLocaleString()}
                         </span>
                       </div>
                       <div className="text-right">
-                        <span className="font-bold text-emerald-600 text-sm block">+${Number(c.profitAmount).toFixed(2)}</span>
+                        <span className="font-bold text-emerald-600 text-sm block">+₹{Number(c.profitAmount).toFixed(2)}</span>
                         <span className="text-[9px] text-gray-400 block">{new Date(c.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
@@ -434,7 +434,7 @@ function TreeNodeComponent({ node }: { node: any }) {
         </span>
         <div className="font-bold text-xs truncate max-w-[140px] mt-1">{node.name || node.shareholderId}</div>
         <div className="text-[9px] text-gray-500 font-semibold mt-1">
-          Vol: ${Number(node.contributionsSum || 0).toLocaleString()}
+          Vol: ₹{Number(node.contributionsSum || 0).toLocaleString()}
         </div>
         {node.investorStatus === 'ACTIVE' && (
           <span className="mt-2 inline-block text-[8px] font-extrabold bg-emerald-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-wider">

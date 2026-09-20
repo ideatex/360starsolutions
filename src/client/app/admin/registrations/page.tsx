@@ -19,6 +19,9 @@ export default function AdminRegistrationsPage() {
   const [proofPreviewUrl, setProofPreviewUrl] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveItem, setApproveItem] = useState<any | null>(null);
+  const [approveWithholdingPct, setApproveWithholdingPct] = useState('20');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
@@ -34,8 +37,8 @@ export default function AdminRegistrationsPage() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await api.post(`/registrations/${id}/approve`);
+    mutationFn: async ({ id, withholdingPercentage }: { id: string; withholdingPercentage?: number }) => {
+      const res = await api.post(`/registrations/${id}/approve`, { withholdingPercentage });
       return res.data;
     },
     onSuccess: (data) => {
@@ -43,6 +46,8 @@ export default function AdminRegistrationsPage() {
       setActionError(null);
       setSelectedRequest(null);
       setDetailModalItem(null);
+      setShowApproveModal(false);
+      setApproveItem(null);
       queryClient.invalidateQueries({ queryKey: ['adminRegistrations'] });
     },
     onError: (err: any) => {
@@ -282,7 +287,11 @@ export default function AdminRegistrationsPage() {
                         {(item.status === 'PENDING_REVIEW' || item.status === 'PENDING_ADMIN_REVIEW') && (
                           <>
                             <button
-                              onClick={() => approveMutation.mutate(item.id)}
+                              onClick={() => {
+                                setApproveItem(item);
+                                setApproveWithholdingPct(item.withholdingPercentage ? String(item.withholdingPercentage) : '20');
+                                setShowApproveModal(true);
+                              }}
                               disabled={approveMutation.isPending}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer shadow-xs disabled:opacity-50"
                             >
@@ -402,7 +411,11 @@ export default function AdminRegistrationsPage() {
                     Reject Application
                   </button>
                   <button
-                    onClick={() => approveMutation.mutate(detailModalItem.id)}
+                    onClick={() => {
+                      setApproveItem(detailModalItem);
+                      setApproveWithholdingPct(detailModalItem.withholdingPercentage ? String(detailModalItem.withholdingPercentage) : '20');
+                      setShowApproveModal(true);
+                    }}
                     disabled={approveMutation.isPending}
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
                   >
@@ -410,6 +423,80 @@ export default function AdminRegistrationsPage() {
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Approve Modal with Withholding Percentage Configuration */}
+      {showApproveModal && approveItem && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <h3 className="text-base font-extrabold text-foreground flex items-center gap-2">
+                <ShieldCheck className="w-5 h-5 text-emerald-600" /> Approve & Activate Account
+              </h3>
+              <button 
+                onClick={() => { setShowApproveModal(false); setApproveItem(null); }} 
+                className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-3 bg-muted/20 rounded-xl border border-border/60 text-xs space-y-1">
+              <div><strong className="text-muted-foreground">Applicant:</strong> <span className="font-bold text-foreground">{approveItem.name}</span></div>
+              <div><strong className="text-muted-foreground">Phone:</strong> <span className="font-mono text-foreground">{approveItem.phone}</span></div>
+              <div><strong className="text-muted-foreground">Account Type:</strong> <span className="font-bold text-foreground">{approveItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</span></div>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
+                  Gratitude Share Withholding Percentage (%) *
+                </label>
+                {approveItem.accountType !== 'ZERO_CONTRIBUTION' && (
+                  <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-2 py-0.5 rounded">Not Applicable</span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  disabled={approveItem.accountType !== 'ZERO_CONTRIBUTION'}
+                  value={approveItem.accountType === 'ZERO_CONTRIBUTION' ? approveWithholdingPct : ''}
+                  onChange={(e) => setApproveWithholdingPct(e.target.value)}
+                  className={`w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold focus:outline-none focus:border-brand-500 font-mono ${approveItem.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-50 cursor-not-allowed bg-muted/40' : ''}`}
+                  placeholder={approveItem.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"}
+                />
+                <span className="text-sm font-bold text-muted-foreground">%</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground leading-normal">
+                {approveItem.accountType === 'ZERO_CONTRIBUTION'
+                  ? "Admin setting: Percentage of gratitude share withheld by the system for this Zero Contribution account."
+                  : "Not applicable for Standard Contribution accounts (100% of profit & gratitude payouts are released)."}
+              </p>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <button
+                onClick={() => { setShowApproveModal(false); setApproveItem(null); }}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => approveMutation.mutate({
+                  id: approveItem.id,
+                  withholdingPercentage: parseFloat(approveWithholdingPct) || 20,
+                })}
+                disabled={approveMutation.isPending}
+                className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {approveMutation.isPending ? 'Activating...' : 'Confirm Approval'}
+              </button>
             </div>
           </div>
         </div>

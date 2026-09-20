@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, UserPlus, ShieldAlert, Edit3, X, Check, Eye, Trash2, Key, 
-  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus, FileText, FileSpreadsheet,
+  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, Coins, Wallet, Plus, FileText, FileSpreadsheet,
   ShieldCheck, UserCheck, CheckSquare, Square, Settings, Sliders, CheckCircle2, Clock
 } from 'lucide-react';
 import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
@@ -159,6 +159,8 @@ export default function AdminUsersPage() {
     shareholderId: '',
     password: '',
     role: 'SHAREHOLDER',
+    accountType: 'CONTRIBUTION',
+    withholdingPercentage: '20',
     status: 'ACTIVE',
     name: '',
     phone: '',
@@ -190,6 +192,8 @@ export default function AdminUsersPage() {
     lastName: '',
     phone: '',
     pan: '',
+    accountType: 'CONTRIBUTION',
+    withholdingPercentage: '20',
     dob: '',
     addressBuilding: '',
     addressArea: '',
@@ -418,9 +422,12 @@ export default function AdminUsersPage() {
         shareholderId: '',
         password: '',
         role: 'SHAREHOLDER',
+        accountType: 'CONTRIBUTION',
+        withholdingPercentage: '20',
         status: 'ACTIVE',
         name: '',
         phone: '',
+        pan: '',
         dob: '',
         addressBuilding: '',
         addressArea: '',
@@ -446,7 +453,7 @@ export default function AdminUsersPage() {
     onError: (err: any) => {
       const errors = err.response?.data?.errors;
       if (errors) {
-        const errorList = Object.entries(errors).map(([field, msg]) => `Ã¢â‚¬Â¢ ${field}: ${msg}`).join('\n');
+        const errorList = Object.entries(errors).map(([field, msg]) => `• ${field}: ${msg}`).join('\n');
         toast({ title: "Validation Failed", description: `Please check creation values:\n${errorList}`, type: "error" });
       } else {
         toast({ title: "Registration Error", description: err.response?.data?.message || 'Error creating shareholder', type: "error" });
@@ -526,9 +533,12 @@ export default function AdminUsersPage() {
     setSelectedUser(u);
     setEditForm({
       shareholderId: u.shareholderId,
-      firstName: u.firstName || '',
-      lastName: u.lastName || '',
+      firstName: u.firstName || (u.name ? u.name.split(' ')[0] : ''),
+      lastName: u.lastName || (u.name ? u.name.split(' ').slice(1).join(' ') : ''),
       phone: u.phone || '',
+      pan: u.pan || '',
+      accountType: u.accountType || 'CONTRIBUTION',
+      withholdingPercentage: u.withholdingPercentage != null ? String(u.withholdingPercentage) : (u.accountType === 'ZERO_CONTRIBUTION' ? '20' : '0'),
       dob: u.dob ? u.dob.split('T')[0] : '',
       addressBuilding: u.addressBuilding || '',
       addressArea: u.addressArea || '',
@@ -590,6 +600,8 @@ export default function AdminUsersPage() {
       { header: 'Name', key: 'name' },
       { header: 'Phone', key: 'phone' },
       { header: 'Role', key: 'role' },
+      { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
+      { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
       { header: 'Status', key: 'status' },
       { header: 'Referral Code', key: 'referralCode' },
       { header: 'Bank Name', key: 'bankName' },
@@ -611,6 +623,8 @@ export default function AdminUsersPage() {
       { header: 'Name', key: 'name' },
       { header: 'Phone', key: 'phone', formatter: (v) => v || '-' },
       { header: 'Role', key: 'role' },
+      { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
+      { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
       { header: 'Status', key: 'status' },
       { header: 'Bank Name', key: 'bankName', formatter: (v) => v || '-' },
       { header: 'Account No.', key: 'bankAccountNumber', formatter: (v) => v || '-' },
@@ -738,29 +752,31 @@ export default function AdminUsersPage() {
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50/80 dark:bg-white/[0.02] border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Name</th>
-                  <th className="px-6 py-3.5">Shareholder ID</th>
-                  <th className="px-6 py-3.5">Phone / Location</th>
-                  <th className="px-6 py-3.5">Role</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Total Contribution</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-5 py-3.5">Name</th>
+                  <th className="px-5 py-3.5">Shareholder ID</th>
+                  <th className="px-5 py-3.5">Phone / Location</th>
+                  <th className="px-5 py-3.5">Role</th>
+                  <th className="px-5 py-3.5">Account Type</th>
+                  <th className="px-5 py-3.5">Withholding %</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Total Contribution</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                 {usersData?.data?.map((u: any) => (
                   <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <div className="font-extrabold text-gray-950 dark:text-white">{u.name || 'N/A'}</div>
                     </td>
-                    <td className="px-6 py-4 font-mono font-extrabold text-brand-primary">
+                    <td className="px-5 py-4 font-mono font-extrabold text-brand-primary">
                       {u.shareholderId}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <div className="font-semibold text-gray-900 dark:text-white">{u.phone || '-'}</div>
                       {u.addressCity && <div className="text-[10px] text-muted-foreground">{u.addressCity}{u.addressState ? `, ${u.addressState}` : ''}</div>}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
                         u.role === 'SUPER_ADMIN' 
                           ? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/40' 
@@ -771,7 +787,30 @@ export default function AdminUsersPage() {
                         {u.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                        u.accountType === 'ZERO_CONTRIBUTION'
+                          ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                          : 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/40'
+                      }`}>
+                        {u.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      {u.accountType === 'ZERO_CONTRIBUTION' ? (
+                        <button
+                          onClick={() => handleOpenEdit(u)}
+                          className="inline-flex items-center gap-1 font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 cursor-pointer text-[10px]"
+                          title="Click to edit withholding %"
+                        >
+                          <span>{u.withholdingPercentage != null ? `${u.withholdingPercentage}%` : '20%'}</span>
+                          <Edit3 size={10} className="opacity-60" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-semibold">0% (N/A)</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border ${
                         u.status === 'ACTIVE' || u.status === 'RESTORED'
                           ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' 
@@ -782,33 +821,33 @@ export default function AdminUsersPage() {
                         {u.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                      ${(u.contributions
+                    <td className="px-5 py-4 font-semibold text-gray-900 dark:text-white">
+                      ₹{(u.contributions
                         ? u.contributions
                             .filter((c: any) => c.status === 'APPROVED')
                             .reduce((sum: number, c: any) => sum + Number(c.amount), 0)
                         : 0
-                      ).toLocaleString()}
+                      ).toLocaleString('en-IN')}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
+                    <td className="px-5 py-4 text-right space-x-1 whitespace-nowrap">
                       <button
                         onClick={() => { setSelectedUser(u); setIsResetOpen(true); }}
-                        className="px-2.5 py-1 text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800/40 inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-theme-xs"
+                        className="px-2 py-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800/40 inline-flex items-center gap-1 transition-all cursor-pointer shadow-theme-xs"
                         title="Reset Shareholder Password"
                       >
-                        <Key size={12} />
-                        <span>Reset Password</span>
+                        <Key size={11} />
+                        <span>Reset</span>
                       </button>
                       <button
                         onClick={() => handleOpenView(u)}
-                        className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        className="p-1.5 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                         title="View Details"
                       >
                         <Eye size={14} />
                       </button>
                       <button
                         onClick={() => handleOpenEdit(u)}
-                        className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        className="p-1.5 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                         title="Edit Shareholder"
                       >
                         <Edit3 size={14} />
@@ -934,6 +973,56 @@ export default function AdminUsersPage() {
                         <option value="ADMIN">Admin</option>
                         <option value="SUPER_ADMIN">Super Admin</option>
                       </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Type *</label>
+                        <select 
+                          value={createForm.accountType} 
+                          onChange={e => {
+                            const newType = e.target.value;
+                            setCreateForm(prev => ({
+                              ...prev,
+                              accountType: newType,
+                              withholdingPercentage: newType === 'ZERO_CONTRIBUTION' ? (prev.withholdingPercentage && prev.withholdingPercentage !== '0' ? prev.withholdingPercentage : '20') : '0',
+                            }));
+                          }} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                        >
+                          <option value="CONTRIBUTION">Standard Contribution Account</option>
+                          <option value="ZERO_CONTRIBUTION">Zero Contribution Account</option>
+                        </select>
+                        <p className="text-[9px] text-muted-foreground">Standard gets full profit & gratitude share; Zero Contribution applies gratitude withholding.</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gratitude Share Withholding (%)</label>
+                          {createForm.accountType !== 'ZERO_CONTRIBUTION' && (
+                            <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-1.5 py-0.5 rounded">Not Applicable</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            step="0.1"
+                            disabled={createForm.accountType !== 'ZERO_CONTRIBUTION'}
+                            value={createForm.accountType === 'ZERO_CONTRIBUTION' ? createForm.withholdingPercentage : ''} 
+                            onChange={e => setCreateForm({...createForm, withholdingPercentage: e.target.value})} 
+                            className={`w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-40 cursor-not-allowed bg-muted/40' : ''}`} 
+                            placeholder={createForm.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"} 
+                          />
+                          <span className="text-xs font-bold text-gray-500">%</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">
+                          {createForm.accountType === 'ZERO_CONTRIBUTION' 
+                            ? "Admin setting for % of gratitude share withheld by system for zero contribution accounts." 
+                            : "Withholding is not applicable for Standard Contribution accounts."}
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
                 )}
@@ -1165,9 +1254,16 @@ export default function AdminUsersPage() {
                 {wizardStep === 5 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 5: Capital Contribution</h4>
+                    
+                    {createForm.accountType === 'ZERO_CONTRIBUTION' && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                        <strong>Zero Contribution Account:</strong> Capital deposit is optional (can be ₹0). The system will withhold {createForm.withholdingPercentage}% of Gratitude commissions into holding ledger until requirements are met.
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund ($)</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund (₹)</label>
                         <input type="number" value={createForm.contributionAmount} onChange={e => setCreateForm({...createForm, contributionAmount: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-extrabold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="5000" />
                       </div>
                       <div className="space-y-1.5">
@@ -1225,6 +1321,10 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">shareholderId:</strong> {createForm.shareholderId}</div>
                         <div><strong className="text-muted-foreground">Role:</strong> {createForm.role}</div>
                       </div>
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
+                        <div><strong className="text-muted-foreground">Account Type:</strong> {createForm.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</div>
+                        <div><strong className="text-muted-foreground">Withholding Rate:</strong> {createForm.withholdingPercentage}%</div>
+                      </div>
                       <div className="pb-2 border-b border-border-subtle">
                         <strong className="text-muted-foreground">Full Name:</strong> {createForm.name || '-'}
                       </div>
@@ -1258,7 +1358,7 @@ export default function AdminUsersPage() {
                         <strong className="text-muted-foreground">Referrer Identifier:</strong> {createForm.referrerId || 'None'}
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        <div><strong className="text-muted-foreground">Fund Amount:</strong> ${createForm.contributionAmount || '0'}</div>
+                        <div><strong className="text-muted-foreground">Fund Amount:</strong> ₹{createForm.contributionAmount || '0'}</div>
                         <div><strong className="text-muted-foreground">Mode:</strong> {createForm.contributionMode}</div>
                         <div><strong className="text-muted-foreground">Validity:</strong> {createForm.validityMonths} Mos</div>
                       </div>
@@ -1398,6 +1498,55 @@ export default function AdminUsersPage() {
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Birth</label>
                       <input type="date" value={editForm.dob} onChange={e => setEditForm({...editForm, dob: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Type</label>
+                      <select 
+                        value={editForm.accountType} 
+                        onChange={e => {
+                          const newType = e.target.value;
+                          setEditForm(prev => ({
+                            ...prev,
+                            accountType: newType,
+                            withholdingPercentage: newType === 'ZERO_CONTRIBUTION' ? (prev.withholdingPercentage && prev.withholdingPercentage !== '0' ? prev.withholdingPercentage : '20') : '0',
+                          }));
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none cursor-pointer"
+                      >
+                        <option value="CONTRIBUTION">Standard Contribution Account</option>
+                        <option value="ZERO_CONTRIBUTION">Zero Contribution Account</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gratitude Share Withholding (%)</label>
+                        {editForm.accountType !== 'ZERO_CONTRIBUTION' && (
+                          <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-1.5 py-0.5 rounded">Not Applicable</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          disabled={editForm.accountType !== 'ZERO_CONTRIBUTION'}
+                          value={editForm.accountType === 'ZERO_CONTRIBUTION' ? editForm.withholdingPercentage : ''} 
+                          onChange={e => setEditForm({...editForm, withholdingPercentage: e.target.value})} 
+                          className={`w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-secondary/35 ${editForm.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-40 cursor-not-allowed bg-muted/40' : ''}`} 
+                          placeholder={editForm.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"} 
+                        />
+                        <span className="text-xs font-bold text-gray-500">%</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground">
+                        {editForm.accountType === 'ZERO_CONTRIBUTION' 
+                          ? "Saved percentage is applied during all subsequent payout calculations." 
+                          : "Withholding is not applicable for Standard Contribution accounts."}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -1578,10 +1727,10 @@ export default function AdminUsersPage() {
 
                 {/* Additional Contribution */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1"><DollarSign size={13} className="inline mr-1" /> Additional Capital Placement</h4>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1"><Coins size={13} className="inline mr-1 text-brand-primary" /> Additional Capital Placement</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Amount ($)</label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Amount (₹)</label>
                       <input type="number" value={editForm.contributionAmount} onChange={e => setEditForm({...editForm, contributionAmount: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-extrabold focus:outline-none" placeholder="0" />
                     </div>
                     <div className="space-y-1.5">
@@ -1807,7 +1956,7 @@ export default function AdminUsersPage() {
                         <div key={c.id} className="p-3.5 border border-border-subtle rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs bg-white dark:bg-card">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-gray-900 dark:text-white">${Number(c.amount).toLocaleString()}</span>
+                              <span className="font-extrabold text-gray-900 dark:text-white">₹{Number(c.amount).toLocaleString()}</span>
                               <span className="text-gray-300 dark:text-gray-700">|</span>
                               <span className="text-muted-foreground font-semibold">{c.mode}</span>
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${

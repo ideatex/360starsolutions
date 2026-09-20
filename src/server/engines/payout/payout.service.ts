@@ -32,6 +32,8 @@ export interface PayoutPreviewItem {
   grossGratitudeShare: number;
   withheldAmount: number;
   netGratitudeShare: number;
+  withholdingPercentage?: number;
+  gratitudeDetails?: any[];
   
   // Final Net
   netPayable: number;
@@ -316,14 +318,16 @@ export class PayoutService {
       if (isFirstPayout) firstPayoutCount++;
       else if (grossProfit > 0) fullCyclePayoutCount++;
 
-      // Zero Contribution 20% withholding rule
+      // Zero Contribution dynamic withholding rule
       let withheldAmount = 0;
       let netGratitude = grossGratitude;
       const holdingBefore = Number(sh.holdingBalance || 0);
+      const withholdingPercent = Number((sh as any).withholdingPercentage ?? 20);
 
       if (sh.accountType === AccountType.ZERO_CONTRIBUTION) {
         zeroContributionCount++;
-        withheldAmount = Math.round(grossGratitude * 0.2 * 100) / 100;
+        const withheldRate = withholdingPercent / 100;
+        withheldAmount = Math.round(grossGratitude * withheldRate * 100) / 100;
         netGratitude = Math.round((grossGratitude - withheldAmount) * 100) / 100;
       }
 
@@ -354,6 +358,8 @@ export class PayoutService {
         grossGratitudeShare: grossGratitude,
         withheldAmount,
         netGratitudeShare: netGratitude,
+        withholdingPercentage: withholdingPercent,
+        gratitudeDetails: gratitudeData.details,
         netPayable,
         holdingBalanceBefore: holdingBefore,
         holdingBalanceAfter: holdingAfter,
@@ -478,6 +484,7 @@ export class PayoutService {
               const currentBal = Number(sh.holdingBalance || 0);
               const newBal = currentBal + item.withheldAmount;
 
+              const withheldPct = item.withholdingPercentage ?? 20;
               await tx.holdingLedger.create({
                 data: {
                   shareholderId: item.shareholderId,
@@ -486,7 +493,7 @@ export class PayoutService {
                   balanceBefore: new Prisma.Decimal(currentBal),
                   balanceAfter: new Prisma.Decimal(newBal),
                   type: 'WITHHOLDING',
-                  remarks: `20% Gratitude Share withholding for cycle ${cycleIdentifier}`,
+                  remarks: `${withheldPct}% Gratitude Share withholding for cycle ${cycleIdentifier}`,
                 },
               });
 
@@ -576,8 +583,25 @@ export class PayoutService {
             });
           }
 
-          // Persist CommissionLedger entry if gratitude > 0
-          if (item.grossGratitudeShare > 0) {
+          // Persist CommissionLedger entries for every level in gratitudeDetails (L1 through L12)
+          if (item.gratitudeDetails && item.gratitudeDetails.length > 0) {
+            for (const detail of item.gratitudeDetails) {
+              await tx.commissionLedger.create({
+                data: {
+                  shareholderId: item.shareholderId,
+                  sourceShareholderId: detail.sourceShareholderId,
+                  fromContributionId: detail.sourceContributionId,
+                  cycleIdentifier,
+                  level: detail.level,
+                  rate: new Prisma.Decimal(detail.rate),
+                  amount: new Prisma.Decimal(detail.amount),
+                  calculationBase: new Prisma.Decimal(detail.calculationBase),
+                  status: CommissionStatus.PROCESSED,
+                  payoutBatchId: batchId,
+                },
+              });
+            }
+          } else if (item.grossGratitudeShare > 0) {
             await tx.commissionLedger.create({
               data: {
                 shareholderId: item.shareholderId,

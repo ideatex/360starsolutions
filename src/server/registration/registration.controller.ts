@@ -163,8 +163,13 @@ export class RegistrationController {
   @Post(':id/approve')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPER_ADMIN')
-  async approve(@Request() req: any, @Param('id') id: string) {
-    return this.registrationService.approveRegistration(id, req.shareholder.id);
+  async approve(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() body: { withholdingPercentage?: number } = {}
+  ) {
+    const adminId = req.shareholder?.id || req.user?.id;
+    return this.registrationService.approveRegistration(id, adminId, body);
   }
 
   /**
@@ -174,6 +179,7 @@ export class RegistrationController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN', 'SUPER_ADMIN')
   async reject(@Request() req: any, @Param('id') id: string, @Body() body: { reason?: string }) {
-    return this.registrationService.rejectRegistration(id, req.shareholder.id, body.reason);
+    const adminId = req.shareholder?.id || req.user?.id;
+    return this.registrationService.rejectRegistration(id, adminId, body.reason);
   }
 }

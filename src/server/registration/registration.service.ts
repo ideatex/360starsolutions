@@ -88,7 +88,7 @@ export class RegistrationService {
     const phone = this.normalizePhone(dto.phone);
     const accountType = dto.accountType || AccountType.CONTRIBUTION;
 
-    // Validate PAN Card if provided
+    // Validate PAN Card if provided & enforce system-wide uniqueness
     let panClean: string | null = null;
     if (dto.pan && dto.pan.trim()) {
       panClean = dto.pan.trim().toUpperCase();
@@ -96,14 +96,36 @@ export class RegistrationService {
       if (!panRegex.test(panClean)) {
         throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
       }
+
+      const existingUserByPan = await this.prisma.shareholder.findFirst({
+        where: { pan: { equals: panClean, mode: 'insensitive' } },
+      });
+      if (existingUserByPan) {
+        throw new ConflictException(`An account with PAN card ${panClean} is already registered (User ID: ${existingUserByPan.shareholderId}). Every shareholder must use a unique PAN card.`);
+      }
+
+      const existingReqByPan = await this.prisma.registrationRequest.findFirst({
+        where: {
+          pan: { equals: panClean, mode: 'insensitive' },
+          status: { in: [RegistrationStatus.PENDING_REVIEW, RegistrationStatus.PENDING_ADMIN_REVIEW] },
+        },
+      });
+      if (existingReqByPan) {
+        throw new ConflictException(`A registration request with PAN card ${panClean} is already pending admin review.`);
+      }
     }
 
     // Check if phone number is already registered to an active shareholder account
     const existingUser = await this.prisma.shareholder.findFirst({
-      where: { phone },
+      where: {
+        OR: [
+          { phone },
+          { phone: `+91${phone}` },
+        ],
+      },
     });
     if (existingUser) {
-      throw new ConflictException(`An account with phone number ${phone} is already registered (User ID: ${existingUser.shareholderId}).`);
+      throw new ConflictException(`An account with phone number ${phone} is already registered (User ID: ${existingUser.shareholderId}). Every shareholder must use a unique mobile number.`);
     }
 
     // Check if a registration request is already pending review for this phone
@@ -414,7 +436,7 @@ export class RegistrationService {
    * 7. Dispatches SMS with isolated error handling
    * 8. Sanitizes response (NEVER returns plaintext password or passwordHash)
    */
-  async approveRegistration(id: string, adminId: string) {
+  async approveRegistration(id: string, adminId: string, options: { withholdingPercentage?: number } = {}) {
     const request = await this.prisma.registrationRequest.findUnique({
       where: { id },
     });
@@ -485,8 +507,37 @@ export class RegistrationService {
     const isZeroContribution = request.accountType === AccountType.ZERO_CONTRIBUTION;
     const initialStatus = isZeroContribution ? UserStatus.ZERO_ACTIVE : UserStatus.CONTRIBUTION_ACTIVE;
 
+    // Use admin-specified withholding percentage or default to 20%
+    const finalWithholdingPercentage = (options?.withholdingPercentage !== undefined && options?.withholdingPercentage !== null && String(options.withholdingPercentage) !== '')
+      ? Number(options.withholdingPercentage)
+      : ((request as any).withholdingPercentage ? Number((request as any).withholdingPercentage) : 20);
+
     // Execute atomic creation inside a unified Prisma transaction
     const result = await this.prisma.$transaction(async (tx) => {
+      // Re-check phone & PAN uniqueness inside transaction to avoid race conditions
+      if (request.phone) {
+        const existingPhone = await tx.shareholder.findFirst({
+          where: {
+            OR: [
+              { phone: request.phone },
+              { phone: `+91${request.phone}` },
+            ],
+          },
+        });
+        if (existingPhone) {
+          throw new BadRequestException(`An account with phone number ${request.phone} already exists (${existingPhone.shareholderId}).`);
+        }
+      }
+
+      if (request.pan) {
+        const existingPan = await tx.shareholder.findFirst({
+          where: { pan: { equals: request.pan, mode: 'insensitive' } },
+        });
+        if (existingPan) {
+          throw new BadRequestException(`An account with PAN card ${request.pan} already exists (${existingPan.shareholderId}).`);
+        }
+      }
+
       // Atomic conditional update to claim request and eliminate race conditions
       const claim = await tx.registrationRequest.updateMany({
         where: {
@@ -495,9 +546,10 @@ export class RegistrationService {
         },
         data: {
           status: RegistrationStatus.APPROVED,
+          withholdingPercentage: new Prisma.Decimal(finalWithholdingPercentage),
           reviewedById: adminId,
           reviewedAt: now,
-        },
+        } as any,
       });
 
       if (claim.count === 0) {
@@ -552,9 +604,10 @@ export class RegistrationService {
           referralCode,
           parentId: request.referrerId,
           accountType: request.accountType,
+          withholdingPercentage: new Prisma.Decimal(finalWithholdingPercentage),
           status: initialStatus,
           holdingBalance: new Prisma.Decimal(0),
-        },
+        } as any,
       });
 
       // 2. Create authoritative edge in ReferralRelationship table

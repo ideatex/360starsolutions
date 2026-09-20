@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { motion } from 'framer-motion';
 import { 
-  BarChart3, Users, DollarSign, Wallet, FileDown, Database, 
+  BarChart3, Users, Coins, Wallet, FileDown, Database, 
   Loader2, Search, Filter, ArrowUp, ArrowDown, X, FileText, 
   TrendingUp, ShieldCheck, ArrowUpRight
 } from 'lucide-react';
@@ -275,7 +275,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Released</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
-              <DollarSign size={18} />
+              <Coins size={18} />
             </div>
           </div>
           <div className="mt-4">
