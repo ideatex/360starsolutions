@@ -9,9 +9,9 @@ import { InvestorsService } from '@server/engines/investors/investors.service';
 import { Prisma, RegistrationStatus, AccountType, UserStatus, ContributionStatus, Role } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 
-export interface SubmitRegistrationDto {
-  name: string;
-  phone: string;
+export class SubmitRegistrationDto {
+  name!: string;
+  phone!: string;
   pan?: string;
   accountType?: AccountType;
   referrerId?: string;
@@ -58,7 +58,7 @@ export class RegistrationService {
   ) {}
 
   /**
-   * Helper to normalize and validate 10-digit Indian phone numbers
+   * Helper to normalize and validate 10-digit Indian phone numbers (starting with 6-9)
    */
   private normalizePhone(rawPhone: string): string {
     let cleaned = (rawPhone || '').replace(/[^0-9]/g, '');
@@ -67,8 +67,8 @@ export class RegistrationService {
     } else if (cleaned.length === 11 && cleaned.startsWith('0')) {
       cleaned = cleaned.slice(1);
     }
-    if (cleaned.length !== 10) {
-      throw new BadRequestException(`Invalid phone number: ${rawPhone}. Please provide a valid 10-digit mobile number.`);
+    if (!/^[6-9]\d{9}$/.test(cleaned)) {
+      throw new BadRequestException(`Invalid phone number: ${rawPhone}. Phone number must be exactly 10 digits starting with 6, 7, 8, or 9.`);
     }
     return cleaned;
   }
@@ -87,6 +87,15 @@ export class RegistrationService {
 
     const phone = this.normalizePhone(dto.phone);
     const accountType = dto.accountType || AccountType.CONTRIBUTION;
+
+    // Validate Bank Account Number if provided: only numbers, 10 to 16 digits
+    let bankAccountNumberClean = '';
+    if (dto.bankAccountNumber && dto.bankAccountNumber.trim()) {
+      bankAccountNumberClean = dto.bankAccountNumber.trim().replace(/\D/g, '');
+      if (!/^\d{10,16}$/.test(bankAccountNumberClean)) {
+        throw new BadRequestException('Bank account number must be between 10 and 16 digits containing only numbers.');
+      }
+    }
 
     // Validate PAN Card if provided & enforce system-wide uniqueness
     let panClean: string | null = null;
@@ -436,7 +445,7 @@ export class RegistrationService {
    * 7. Dispatches SMS with isolated error handling
    * 8. Sanitizes response (NEVER returns plaintext password or passwordHash)
    */
-  async approveRegistration(id: string, adminId: string, options: { withholdingPercentage?: number } = {}) {
+  async approveRegistration(id: string, adminId: string, options: { password?: string; withholdingPercentage?: number } = {}) {
     const request = await this.prisma.registrationRequest.findUnique({
       where: { id },
     });
@@ -494,23 +503,29 @@ export class RegistrationService {
       }
     }
 
+    // Admin MUST setup initial password for all shareholders
+    const adminPassword = options?.password?.trim() || request.initialPassword?.trim();
+    if (!adminPassword || adminPassword.length < 6) {
+      throw new BadRequestException('Initial password is required (minimum 6 characters) for account approval.');
+    }
+    const finalPassword = adminPassword;
+    const passwordHash = await bcrypt.hash(finalPassword, 10);
+
     // Generate sequential Shareholder ID via BusinessConfigService
     const shareholderId = await this.businessConfigService.generateNextUserId();
     const referralCode = shareholderId; // Standard: referralCode equals shareholderId
-    const finalPassword = request.initialPassword && request.initialPassword.trim().length >= 6
-      ? request.initialPassword.trim()
-      : this.generateTempPassword();
-    const passwordHash = await bcrypt.hash(finalPassword, 10);
     const now = new Date();
     const investmentDate = request.contributionDate ? new Date(request.contributionDate) : now;
 
     const isZeroContribution = request.accountType === AccountType.ZERO_CONTRIBUTION;
     const initialStatus = isZeroContribution ? UserStatus.ZERO_ACTIVE : UserStatus.CONTRIBUTION_ACTIVE;
 
-    // Use admin-specified withholding percentage or default to 20%
-    const finalWithholdingPercentage = (options?.withholdingPercentage !== undefined && options?.withholdingPercentage !== null && String(options.withholdingPercentage) !== '')
-      ? Number(options.withholdingPercentage)
-      : ((request as any).withholdingPercentage ? Number((request as any).withholdingPercentage) : 20);
+    // Use admin-specified withholding percentage for Zero Contribution accounts (default 20%)
+    const finalWithholdingPercentage = isZeroContribution
+      ? ((options?.withholdingPercentage !== undefined && options?.withholdingPercentage !== null && String(options.withholdingPercentage) !== '')
+          ? Number(options.withholdingPercentage)
+          : ((request as any).withholdingPercentage ? Number((request as any).withholdingPercentage) : 20))
+      : 0;
 
     // Execute atomic creation inside a unified Prisma transaction
     const result = await this.prisma.$transaction(async (tx) => {

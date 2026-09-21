@@ -213,6 +213,15 @@ export class PayoutService {
         const principal = Number(contrib.amount);
         if (principal <= 0) continue;
 
+        // Check if contribution has expired (validityMonths, default 12)
+        const contribDate = new Date(contrib.date);
+        const validityMonths = contrib.validityMonths || 12;
+        const expiryDate = new Date(contribDate);
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+        if (cycle.periodStart >= expiryDate) {
+          continue; // Expired contribution
+        }
+
         const calc = this.prorationService.calculateContributionProfitForCycle(
           contrib.id,
           sh.id,
@@ -233,7 +242,10 @@ export class PayoutService {
       }
     }
 
-    // 4. Evaluate Gratitude Share (L1–L12) across downline contributions
+    const maxReferralLevels = Math.max(12, Number((config?.referralLevelSettings as any)?.levels || 12));
+    const activeLevelMap = (config?.referralLevelSettings as any)?.active || {};
+
+    // 4. Evaluate Gratitude Share (L1–L12+) across downline contributions
     const gratitudeByShareholder = new Map<string, { grossGratitude: number; details: any[] }>();
 
     for (const sh of shareholders) {
@@ -245,10 +257,20 @@ export class PayoutService {
         const contribAmount = Number(contrib.amount);
         if (contribAmount <= 0) continue;
 
-        // Walk up to 12 levels upstream
-        const ancestors = await this.referralTreeService.getUpstreamAncestors(sh.id, 12);
+        // Check if downline contribution has expired
+        const contribDate = new Date(contrib.date);
+        const validityMonths = contrib.validityMonths || 12;
+        const expiryDate = new Date(contribDate);
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+        if (cycle.periodStart >= expiryDate) {
+          continue; // Expired downline contribution generates no gratitude share
+        }
+
+        // Walk up to maxReferralLevels upstream
+        const ancestors = await this.referralTreeService.getUpstreamAncestors(sh.id, maxReferralLevels);
         for (const item of ancestors) {
           const { level, shareholder: ancestor } = item;
+          if (activeLevelMap[String(level)] === false) continue;
           const rate = gratitudeRates[level] || 0;
           if (rate <= 0) continue;
 
@@ -264,19 +286,27 @@ export class PayoutService {
             continue;
           }
 
-          const rawGratitude = contribAmount * rate;
-          const roundedGratitude = Math.round(rawGratitude * 100) / 100;
+          const gratitudeCalc = this.prorationService.calculateContributionGratitudeForCycle(
+            contribAmount,
+            contrib.date,
+            cycle,
+            rate, // monthly rate from config (e.g. 0.01 for L1)
+            prorationBasis,
+          );
 
-          if (roundedGratitude > 0) {
+          if (gratitudeCalc.gratitudeAmount > 0) {
             const current = gratitudeByShareholder.get(ancestor.id) || { grossGratitude: 0, details: [] };
-            current.grossGratitude += roundedGratitude;
+            current.grossGratitude += gratitudeCalc.gratitudeAmount;
             current.details.push({
               sourceShareholderId: sh.id,
               sourceContributionId: contrib.id,
               level,
-              rate,
+              rate: gratitudeCalc.cycleRate,
+              monthlyRate: rate,
+              isFirstPayout: gratitudeCalc.isFirstPayout,
+              activeDays: gratitudeCalc.activeDays,
               calculationBase: contribAmount,
-              amount: roundedGratitude,
+              amount: gratitudeCalc.gratitudeAmount,
             });
             gratitudeByShareholder.set(ancestor.id, current);
           }

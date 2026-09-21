@@ -195,4 +195,55 @@ export class FirstPayoutProrationService {
       };
     }
   }
+
+  /**
+   * Calculates Gratitude Share for a downline contribution in a specific cycle:
+   * - If this is the contribution's first payout cycle: applies Rule A/B/C proration based on monthly gratitude rate.
+   * - If this is a subsequent cycle: applies standard fortnightly cycle rate (monthlyRate / 2).
+   * - If contribution was activated after cycle cutoff: returns 0.
+   */
+  calculateContributionGratitudeForCycle(
+    principal: number,
+    investmentDate: Date,
+    targetCycle: PayoutCycleDefinition,
+    monthlyGratitudeRate: number,
+    basis: 'MONTH_DAYS' | 'CYCLE_DAYS' = 'MONTH_DAYS',
+  ): { gratitudeAmount: number; isFirstPayout: boolean; activeDays: number; cycleRate: number } {
+    const investDate = new Date(investmentDate);
+    const firstCycle = this.getFirstPayoutCycle(investDate);
+
+    // If investment belongs to a future cycle, it is not eligible in this cycle
+    if (firstCycle.cutoffDate.getTime() > targetCycle.cutoffDate.getTime()) {
+      return { gratitudeAmount: 0, isFirstPayout: false, activeDays: 0, cycleRate: 0 };
+    }
+
+    const isFirstPayout = firstCycle.cycleIdentifier === targetCycle.cycleIdentifier;
+
+    if (isFirstPayout) {
+      const activeDays = this.calculateFirstPayoutActiveDays(investDate, targetCycle);
+      const investYear = investDate.getFullYear();
+      const investMonth = investDate.getMonth() + 1;
+      const daysInInvestMonth = this.payoutCycleService.getDaysInMonth(investYear, investMonth);
+
+      let dailyRate: number;
+      if (basis === 'MONTH_DAYS') {
+        dailyRate = monthlyGratitudeRate / daysInInvestMonth;
+      } else {
+        const cycleRate = monthlyGratitudeRate / 2;
+        dailyRate = cycleRate / targetCycle.totalCycleDays;
+      }
+
+      const effectiveRate = dailyRate * activeDays;
+      const rawGratitude = principal * effectiveRate;
+      const gratitudeAmount = Math.round(rawGratitude * 100) / 100;
+      return { gratitudeAmount, isFirstPayout: true, activeDays, cycleRate: effectiveRate };
+    } else {
+      // Subsequent cycles: Fortnightly cycle rate = monthlyGratitudeRate / 2
+      const cycleRate = monthlyGratitudeRate / 2;
+      const rawGratitude = principal * cycleRate;
+      const gratitudeAmount = Math.round(rawGratitude * 100) / 100;
+      return { gratitudeAmount, isFirstPayout: false, activeDays: targetCycle.totalCycleDays, cycleRate };
+    }
+  }
 }
+

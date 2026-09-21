@@ -221,48 +221,59 @@ export class UsersService {
       }
     }
 
-    // shareholderId uniqueness validation
-    if (!shareholderId) {
-      errors.shareholderId = 'Shareholder ID is required';
-    } else {
+    // shareholderId uniqueness validation (if explicitly supplied)
+    if (shareholderId) {
       const existingshareholderId = await this.prisma.shareholder.findFirst({
         where: {
-          shareholderId,
+          shareholderId: { equals: shareholderId, mode: 'insensitive' },
           ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
         },
       });
       if (existingshareholderId) {
-        errors.shareholderId = 'Shareholder ID already exists';
+        errors.shareholderId = `Shareholder ID "${shareholderId.toUpperCase()}" already exists. Please choose a different ID.`;
       }
     }
 
-    // Phone validation & Uniqueness
+
+    // Phone validation & Uniqueness (Strictly 10 digits starting with 6-9)
     if (!phone) {
       if (!isAdminRole) {
         errors.phone = 'Phone number is required';
         errors.phoneNumber = 'Phone number is required';
       }
     } else {
-      const digitsOnly = phone.replace(/[^0-9]/g, '');
-      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-        errors.phone = 'Phone number must be between 10 and 15 digits';
-        errors.phoneNumber = 'Phone number must be between 10 and 15 digits';
+      let digitsOnly = phone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        digitsOnly = digitsOnly.slice(2);
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        digitsOnly = digitsOnly.slice(1);
+      }
+
+      if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
+        errors.phone = 'Phone number must be exactly 10 digits starting with 6, 7, 8, or 9';
+        errors.phoneNumber = errors.phone;
       } else {
         const existingPhone = await this.prisma.shareholder.findFirst({
           where: {
             OR: [
-              { phone },
               { phone: digitsOnly },
-              { phone: `+91${digitsOnly.slice(-10)}` },
-              { phone: digitsOnly.slice(-10) },
+              { phone: `+91${digitsOnly}` },
             ],
             ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
           },
         });
         if (existingPhone) {
-          errors.phone = `Phone number ${phone} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`;
+          errors.phone = `Phone number ${digitsOnly} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`;
           errors.phoneNumber = errors.phone;
         }
+      }
+    }
+
+    // Bank Account Number validation: only numbers, 10 to 16 digits
+    if (data.bankAccountNumber && String(data.bankAccountNumber).trim()) {
+      const cleanAcc = String(data.bankAccountNumber).trim().replace(/\D/g, '');
+      if (!/^\d{10,16}$/.test(cleanAcc)) {
+        errors.bankAccountNumber = 'Bank account number must be between 10 and 16 digits containing only numbers.';
       }
     }
 
@@ -527,25 +538,40 @@ export class UsersService {
     }
 
     // Validate Phone if provided & enforce uniqueness
+    // Validate Phone if provided & enforce uniqueness (strictly 10 digits starting with 6-9)
     if (updates.phone) {
-      const digitsOnly = updates.phone.replace(/[^0-9]/g, '');
-      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-        throw new BadRequestException('Phone number must be between 10 and 15 digits');
+      let digitsOnly = updates.phone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        digitsOnly = digitsOnly.slice(2);
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        digitsOnly = digitsOnly.slice(1);
+      }
+
+      if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
+        throw new BadRequestException('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9');
       }
       const existingPhone = await this.prisma.shareholder.findFirst({
         where: {
           OR: [
-            { phone: updates.phone },
             { phone: digitsOnly },
-            { phone: `+91${digitsOnly.slice(-10)}` },
-            { phone: digitsOnly.slice(-10) },
+            { phone: `+91${digitsOnly}` },
           ],
           id: { not: id },
         },
       });
       if (existingPhone) {
-        throw new BadRequestException(`Phone number ${updates.phone} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`);
+        throw new BadRequestException(`Phone number ${digitsOnly} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`);
       }
+      updates.phone = digitsOnly;
+    }
+
+    // Validate Bank Account Number if provided (only numbers, 10 to 16 digits)
+    if (updates.bankAccountNumber && String(updates.bankAccountNumber).trim()) {
+      const cleanAcc = String(updates.bankAccountNumber).trim().replace(/\D/g, '');
+      if (!/^\d{10,16}$/.test(cleanAcc)) {
+        throw new BadRequestException('Bank account number must be between 10 and 16 digits containing only numbers.');
+      }
+      updates.bankAccountNumber = cleanAcc;
     }
 
     // Validate IFSC format if provided

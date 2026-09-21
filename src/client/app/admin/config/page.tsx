@@ -91,7 +91,7 @@ export default function AdminConfigPage() {
       const activeMap = refSettings.active || {};
       const descMap = refSettings.descriptions || {};
       const volumesMap = config.levelOpeningVolume || {};
-      const percentagesMap = config.levelWiseProfitSharing || {};
+      const percentagesMap = config.levelWiseProfitSharing || config.gratitudeShareConfig || {};
 
       const nextActives: Record<string, boolean> = {};
       const nextDescs: Record<string, string> = {};
@@ -209,6 +209,7 @@ export default function AdminConfigPage() {
       profitSharingPercentage: Number(profitSharingPercentage) / 100, // convert to decimal
       levelOpeningVolume: mappedOpeningVolumes,
       levelWiseProfitSharing: mappedWiseSharing,
+      gratitudeShareConfig: mappedWiseSharing,
       referralLevelSettings: {
         levels: levelsCount,
         active: mappedActive,

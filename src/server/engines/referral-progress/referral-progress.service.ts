@@ -11,6 +11,7 @@ export class ReferralProgressService {
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
     private readonly referralTreeService: ReferralTreeService,
+    private readonly commissionService: CommissionService,
   ) {}
 
   async getReferralProgress(shareholderId: string) {
@@ -36,8 +37,8 @@ export class ReferralProgressService {
     const unlockInfo = await this.referralTreeService.getUnlockedLevel(actualId);
     const effectiveUnlockedLevel = unlockInfo.effectiveLevel;
 
-    // Gratitude rates for L1-L12
-    const rates = CommissionService.DEFAULT_GRATITUDE_RATES;
+    // Dynamic Gratitude rates for referral levels
+    const rates = await this.commissionService.getGratitudeRates();
 
     // Calculate level volumes across downline up to 12 levels
     const levelVolumes: Record<number, number> = {};

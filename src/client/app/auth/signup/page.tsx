@@ -21,14 +21,8 @@ export default function SignupPage() {
   const [phone, setPhone] = useState('');
   const [accountType, setAccountType] = useState<'CONTRIBUTION' | 'ZERO_CONTRIBUTION'>('CONTRIBUTION');
   const [referrerCode, setReferrerCode] = useState('');
-  const [referrerInfo, setReferrerInfo] = useState<{ valid: boolean; name?: string; shareholderId?: string; message?: string } | null>(null);
+  const [referrerInfo, setReferrerInfo] = useState<{ valid: boolean; id?: string; name?: string; shareholderId?: string; message?: string } | null>(null);
   const [isCheckingReferrer, setIsCheckingReferrer] = useState(false);
-
-  // Password State
-  const [passwordType, setPasswordType] = useState<'auto' | 'custom'>('auto');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
 
   // Contribution State
   const [contributionAmount, setContributionAmount] = useState<number>(100000);
@@ -140,17 +134,6 @@ export default function SignupPage() {
       }
     }
 
-    if (passwordType === 'custom') {
-      if (!password || password.length < 6) {
-        toast({ title: 'Weak Password', description: 'Custom password must be at least 6 characters.', type: 'warning' });
-        return;
-      }
-      if (password !== confirmPassword) {
-        toast({ title: 'Password Mismatch', description: 'Password and Confirm Password do not match.', type: 'warning' });
-        return;
-      }
-    }
-
     setIsSubmitting(true);
     try {
       const payload: any = {
@@ -160,10 +143,6 @@ export default function SignupPage() {
         contributionDate,
         referrerId: referrerInfo?.valid ? referrerInfo.id || referrerCode.trim() : undefined,
       };
-
-      if (passwordType === 'custom' && password.trim()) {
-        payload.password = password.trim();
-      }
 
       if (accountType === 'CONTRIBUTION') {
         payload.contributionAmount = contributionAmount;
@@ -377,96 +356,19 @@ export default function SignupPage() {
                 )}
               </div>
 
-              {/* Password Setting Option */}
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-3">
-                <label className="text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                  <Key className="w-3.5 h-3.5 text-brand-primary" /> Account Password Setup
-                </label>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div
-                    onClick={() => { setPasswordType('auto'); setPassword(''); setConfirmPassword(''); }}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
-                      passwordType === 'auto'
-                        ? 'border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10'
-                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="authPasswordType"
-                      checked={passwordType === 'auto'}
-                      onChange={() => { setPasswordType('auto'); setPassword(''); setConfirmPassword(''); }}
-                      className="mt-0.5 accent-brand-primary"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 dark:text-white block">Auto-generate</span>
-                      <span className="text-[10px] text-slate-500 block">Temporary password sent via SMS</span>
-                    </div>
+              {/* Admin Credential Provisioning Notice */}
+              <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                <div className="p-3.5 rounded-2xl bg-brand-primary/5 border border-brand-primary/20 flex items-start gap-3">
+                  <div className="p-1.5 rounded-xl bg-brand-primary/10 text-brand-primary shrink-0 mt-0.5">
+                    <ShieldCheck className="w-4 h-4" />
                   </div>
-
-                  <div
-                    onClick={() => setPasswordType('custom')}
-                    className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-2.5 ${
-                      passwordType === 'custom'
-                        ? 'border-brand-primary bg-brand-primary/5 dark:bg-brand-primary/10'
-                        : 'border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30 text-slate-500'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="authPasswordType"
-                      checked={passwordType === 'custom'}
-                      onChange={() => setPasswordType('custom')}
-                      className="mt-0.5 accent-brand-primary"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 dark:text-white block">Set Custom Password</span>
-                      <span className="text-[10px] text-slate-500 block">Choose password now</span>
-                    </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-900 dark:text-white">Admin Security Verification</h4>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                      Initial login credentials will be securely configured by the Administrator upon reviewing your application and payment receipt. Credentials will be sent via SMS upon approval.
+                    </p>
                   </div>
                 </div>
-
-                {passwordType === 'custom' && (
-                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700">
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                        Password * (Min 6 chars)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="••••••••"
-                          className="w-full pl-3 pr-8 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:border-brand-primary"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
-                        Confirm Password *
-                      </label>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-semibold focus:outline-none focus:border-brand-primary"
-                      />
-                    </div>
-                  </motion.div>
-                )}
               </div>
             </div>
 

@@ -3,10 +3,11 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/useAuthStore';
 import { 
-  Users, CheckCircle2, XCircle, Search, Filter, Eye, AlertCircle, 
+  Users, CheckCircle2, XCircle, Search, Filter, Eye, EyeOff, AlertCircle, 
   Clock, FileText, ArrowRight, ShieldCheck, RefreshCw, Layers, Send,
-  X, ExternalLink, Calendar, Phone, User as UserIcon
+  X, ExternalLink, Calendar, Phone, User as UserIcon, Key, Sparkles, Download, Maximize2
 } from 'lucide-react';
 
 export default function AdminRegistrationsPage() {
@@ -21,9 +22,51 @@ export default function AdminRegistrationsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [approveItem, setApproveItem] = useState<any | null>(null);
+  const [approvePassword, setApprovePassword] = useState('');
+  const [showApprovePassword, setShowApprovePassword] = useState(false);
+  const [approvePasswordError, setApprovePasswordError] = useState<string | null>(null);
   const [approveWithholdingPct, setApproveWithholdingPct] = useState('20');
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Helper to resolve full authenticated URL for payment receipts
+  const getProofUrl = (url?: string | null) => {
+    if (!url) return '';
+    const token = useAuthStore.getState().token;
+    let fullUrl = url;
+    if (url.startsWith('/')) {
+      const backendBase = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+        ? 'http://localhost:3002'
+        : '';
+      fullUrl = `${backendBase}${url}`;
+    }
+    if (token) {
+      const separator = fullUrl.includes('?') ? '&' : '?';
+      return `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+    }
+    return fullUrl;
+  };
+
+  const generateRandomPassword = () => {
+    const specials = ['@', '#', '$', '!'];
+    const special = specials[Math.floor(Math.random() * specials.length)];
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    const pass = `Star${special}${randomNum}`;
+    setApprovePassword(pass);
+    setApprovePasswordError(null);
+  };
+
+  const handleOpenApproveModal = (item: any) => {
+    setApproveItem(item);
+    setApproveWithholdingPct(item.withholdingPercentage ? String(item.withholdingPercentage) : '20');
+    const specials = ['@', '#', '$', '!'];
+    const special = specials[Math.floor(Math.random() * specials.length)];
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
+    setApprovePassword(`Star${special}${randomNum}`);
+    setShowApprovePassword(false);
+    setApprovePasswordError(null);
+    setShowApproveModal(true);
+  };
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['adminRegistrations', statusFilter, search, page],
@@ -37,8 +80,8 @@ export default function AdminRegistrationsPage() {
   });
 
   const approveMutation = useMutation({
-    mutationFn: async ({ id, withholdingPercentage }: { id: string; withholdingPercentage?: number }) => {
-      const res = await api.post(`/registrations/${id}/approve`, { withholdingPercentage });
+    mutationFn: async ({ id, password, withholdingPercentage }: { id: string; password: string; withholdingPercentage?: number }) => {
+      const res = await api.post(`/registrations/${id}/approve`, { password, withholdingPercentage });
       return res.data;
     },
     onSuccess: (data) => {
@@ -48,6 +91,7 @@ export default function AdminRegistrationsPage() {
       setDetailModalItem(null);
       setShowApproveModal(false);
       setApproveItem(null);
+      setApprovePassword('');
       queryClient.invalidateQueries({ queryKey: ['adminRegistrations'] });
     },
     onError: (err: any) => {
@@ -287,11 +331,7 @@ export default function AdminRegistrationsPage() {
                         {(item.status === 'PENDING_REVIEW' || item.status === 'PENDING_ADMIN_REVIEW') && (
                           <>
                             <button
-                              onClick={() => {
-                                setApproveItem(item);
-                                setApproveWithholdingPct(item.withholdingPercentage ? String(item.withholdingPercentage) : '20');
-                                setShowApproveModal(true);
-                              }}
+                              onClick={() => handleOpenApproveModal(item)}
                               disabled={approveMutation.isPending}
                               className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs transition-all cursor-pointer shadow-xs disabled:opacity-50"
                             >
@@ -411,11 +451,7 @@ export default function AdminRegistrationsPage() {
                     Reject Application
                   </button>
                   <button
-                    onClick={() => {
-                      setApproveItem(detailModalItem);
-                      setApproveWithholdingPct(detailModalItem.withholdingPercentage ? String(detailModalItem.withholdingPercentage) : '20');
-                      setShowApproveModal(true);
-                    }}
+                    onClick={() => handleOpenApproveModal(detailModalItem)}
                     disabled={approveMutation.isPending}
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
                   >
@@ -428,7 +464,7 @@ export default function AdminRegistrationsPage() {
         </div>
       )}
 
-      {/* Approve Modal with Withholding Percentage Configuration */}
+      {/* Approve Modal with Initial Password & Withholding Percentage Configuration */}
       {showApproveModal && approveItem && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl">
@@ -450,10 +486,54 @@ export default function AdminRegistrationsPage() {
               <div><strong className="text-muted-foreground">Account Type:</strong> <span className="font-bold text-foreground">{approveItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</span></div>
             </div>
 
-            <div className="space-y-2 text-xs">
+            {/* Initial Password Configuration - Required for ALL shareholders */}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5 text-brand-primary" /> Initial Account Password * (Min. 6 chars)
+                </label>
+                <button
+                  type="button"
+                  onClick={generateRandomPassword}
+                  className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles className="w-3 h-3" /> Auto-generate
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  type={showApprovePassword ? 'text' : 'password'}
+                  required
+                  value={approvePassword}
+                  onChange={(e) => {
+                    setApprovePassword(e.target.value);
+                    if (e.target.value.trim().length >= 6) setApprovePasswordError(null);
+                  }}
+                  placeholder="Enter initial password (e.g. Star@9876)"
+                  className="w-full px-3.5 py-2 pr-10 rounded-xl border border-border bg-background text-xs font-medium font-mono focus:outline-none focus:border-brand-500 text-foreground"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApprovePassword(!showApprovePassword)}
+                  className="absolute right-3 top-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                  title={showApprovePassword ? "Hide password" : "Show password"}
+                >
+                  {showApprovePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {approvePasswordError && (
+                <span className="text-[11px] text-red-500 font-semibold block">{approvePasswordError}</span>
+              )}
+              <p className="text-[10px] text-muted-foreground leading-relaxed">
+                Admin sets the initial password. The shareholder will receive login credentials via SMS and can change their password anytime in <strong>Profile & Security</strong>.
+              </p>
+            </div>
+
+            {/* Withholding Percentage for Zero Contribution Accounts */}
+            <div className="space-y-1.5 text-xs pt-2 border-t border-border">
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider">
-                  Gratitude Share Withholding Percentage (%) *
+                  Gratitude Share Withholding Percentage (%)
                 </label>
                 {approveItem.accountType !== 'ZERO_CONTRIBUTION' && (
                   <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-2 py-0.5 rounded">Not Applicable</span>
@@ -469,33 +549,42 @@ export default function AdminRegistrationsPage() {
                   value={approveItem.accountType === 'ZERO_CONTRIBUTION' ? approveWithholdingPct : ''}
                   onChange={(e) => setApproveWithholdingPct(e.target.value)}
                   className={`w-full px-3.5 py-2 rounded-xl border border-border bg-background text-sm font-bold focus:outline-none focus:border-brand-500 font-mono ${approveItem.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-50 cursor-not-allowed bg-muted/40' : ''}`}
-                  placeholder={approveItem.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"}
+                  placeholder={approveItem.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - 100% Payout)" : "20"}
                 />
                 <span className="text-sm font-bold text-muted-foreground">%</span>
               </div>
               <p className="text-[10px] text-muted-foreground leading-normal">
                 {approveItem.accountType === 'ZERO_CONTRIBUTION'
-                  ? "Admin setting: Percentage of gratitude share withheld by the system for this Zero Contribution account."
-                  : "Not applicable for Standard Contribution accounts (100% of profit & gratitude payouts are released)."}
+                  ? "Admin setting: Percentage of gratitude share withheld by system for this Zero Contribution account."
+                  : "Not applicable for Standard Contribution accounts (100% profit & gratitude payouts released)."}
               </p>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <div className="flex justify-end gap-2 pt-3 border-t border-border">
               <button
+                type="button"
                 onClick={() => { setShowApproveModal(false); setApproveItem(null); }}
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
               >
                 Cancel
               </button>
               <button
-                onClick={() => approveMutation.mutate({
-                  id: approveItem.id,
-                  withholdingPercentage: parseFloat(approveWithholdingPct) || 20,
-                })}
+                type="button"
+                onClick={() => {
+                  if (!approvePassword.trim() || approvePassword.trim().length < 6) {
+                    setApprovePasswordError('Please enter an initial password with at least 6 characters.');
+                    return;
+                  }
+                  approveMutation.mutate({
+                    id: approveItem.id,
+                    password: approvePassword.trim(),
+                    withholdingPercentage: approveItem.accountType === 'ZERO_CONTRIBUTION' ? (parseFloat(approveWithholdingPct) || 20) : 0,
+                  });
+                }}
                 disabled={approveMutation.isPending}
                 className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
               >
-                {approveMutation.isPending ? 'Activating...' : 'Confirm Approval'}
+                {approveMutation.isPending ? 'Activating...' : 'Confirm Approval & Setup'}
               </button>
             </div>
           </div>
@@ -536,36 +625,66 @@ export default function AdminRegistrationsPage() {
         </div>
       )}
 
-      {/* Proof Preview Modal */}
+      {/* Proof Preview Modal with Authenticated Streaming */}
       {proofPreviewUrl && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-3xl max-w-2xl w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-black text-foreground flex items-center gap-2">
-                <FileText className="w-4 h-4 text-brand-primary" /> Bank Transfer Receipt Viewer
+                <FileText className="w-4 h-4 text-brand-primary" /> Payment Receipt Viewer
               </h3>
               <button onClick={() => setProofPreviewUrl(null)} className="p-1 text-muted-foreground hover:text-foreground cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-muted/20 rounded-2xl p-4 border border-border">
-              {proofPreviewUrl.endsWith('.pdf') ? (
-                <iframe src={proofPreviewUrl} className="w-full h-[500px] rounded-xl" />
+            <div className="max-h-[70vh] min-h-[300px] overflow-auto flex items-center justify-center bg-muted/20 rounded-2xl p-4 border border-border">
+              {proofPreviewUrl.toLowerCase().endsWith('.pdf') ? (
+                <iframe 
+                  src={getProofUrl(proofPreviewUrl)} 
+                  className="w-full h-[500px] rounded-xl border border-border bg-white" 
+                  title="PDF Payment Proof"
+                />
               ) : (
-                <img src={proofPreviewUrl} alt="Payment Receipt" className="max-h-[500px] w-auto rounded-xl object-contain shadow-md" />
+                <img 
+                  src={getProofUrl(proofPreviewUrl)} 
+                  alt="Payment Deposit Receipt" 
+                  className="max-h-[500px] max-w-full w-auto rounded-xl object-contain shadow-md mx-auto" 
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    const parent = target.parentElement;
+                    if (parent && !parent.querySelector('.img-error-notice')) {
+                      const notice = document.createElement('div');
+                      notice.className = 'img-error-notice text-center p-6 text-muted-foreground space-y-2';
+                      notice.innerHTML = `<p class="font-bold text-xs text-red-500">Could not render inline image preview.</p><p class="text-[11px]">Click "Open in New Tab" or "Download" below to view the original file.</p>`;
+                      parent.appendChild(notice);
+                    }
+                  }}
+                />
               )}
             </div>
 
-            <div className="flex justify-between items-center pt-2">
-              <a 
-                href={proofPreviewUrl} 
-                target="_blank" 
-                rel="noreferrer" 
-                className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1"
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> Open in New Tab
-              </a>
+            <div className="flex justify-between items-center pt-2 border-t border-border">
+              <div className="flex items-center gap-4">
+                <a 
+                  href={getProofUrl(proofPreviewUrl)} 
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="text-xs font-bold text-brand-primary hover:underline flex items-center gap-1.5 cursor-pointer"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" /> Open in New Tab
+                </a>
+                <a 
+                  href={getProofUrl(proofPreviewUrl)} 
+                  download="payment-receipt"
+                  target="_blank" 
+                  rel="noreferrer" 
+                  className="text-xs font-bold text-muted-foreground hover:text-foreground flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5" /> Download File
+                </a>
+              </div>
               <button
                 onClick={() => setProofPreviewUrl(null)}
                 className="px-4 py-2 rounded-xl text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"

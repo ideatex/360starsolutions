@@ -462,14 +462,14 @@ export default function ProfilePage() {
                     </div>
                     
                     <div className="pt-2 flex justify-end">
-                      <Button 
+                      <button 
                         type="submit" 
-                        className="px-5 bg-brand-500 hover:bg-brand-600 text-white shadow-theme-xs text-xs h-9 flex items-center gap-2 rounded-xl"
+                        className="px-5 bg-brand-500 hover:bg-brand-600 text-white shadow-theme-xs text-xs h-9 flex items-center gap-2 rounded-xl font-semibold cursor-pointer disabled:opacity-50"
                         disabled={isPasswordLoading}
                       >
                         <Send className="w-3.5 h-3.5" />
                         {isPasswordLoading ? 'Sending OTP...' : 'Send Verification OTP'}
-                      </Button>
+                      </button>
                     </div>
                   </form>
                 ) : (
@@ -504,13 +504,13 @@ export default function ProfilePage() {
                       >
                         Resend Code
                       </button>
-                      <Button
+                      <button
                         type="submit"
                         disabled={isPasswordLoading || otpCode.length !== 6}
-                        className="px-5 bg-success-500 hover:bg-success-600 text-white shadow-theme-xs text-xs h-9 rounded-xl"
+                        className="px-5 bg-success-500 hover:bg-success-600 text-white shadow-theme-xs text-xs h-9 rounded-xl font-semibold cursor-pointer disabled:opacity-50"
                       >
                         {isPasswordLoading ? 'Verifying...' : 'Confirm & Update Password'}
-                      </Button>
+                      </button>
                     </div>
                   </form>
                 )}
