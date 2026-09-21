@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "sync-public": "node -e \"const fs=require('fs'); fs.mkdirSync('src/client/public', {recursive:true}); fs.cpSync('public', 'src/client/public', {recursive:true});\"",
+    "sync-public": "node -e \"const fs=require('fs'); if(fs.existsSync('public')){ fs.mkdirSync('src/client/public', {recursive:true}); fs.cpSync('public', 'src/client/public', {recursive:true}); }\"",
     "dev:next": "npm run sync-public && next dev src/client",
     "dev:nest": "node --env-file=.env node_modules/@nestjs/cli/bin/nest.js start --watch",
     "dev": "concurrently \"npm run dev:next\" \"npm run dev:nest\"",
