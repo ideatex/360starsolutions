@@ -1,12 +1,16 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { AuditService } from '@server/engines/audit/audit.service';
+import { MessagingGateway } from '@server/messaging/messaging.gateway';
+import { Cron } from '@nestjs/schedule';
 
 @Injectable()
 export class FounderCmsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditService: AuditService,
+    @Inject(forwardRef(() => MessagingGateway))
+    private readonly messagingGateway?: MessagingGateway,
   ) {}
 
   private slugify(text: string): string {
@@ -57,6 +61,10 @@ export class FounderCmsService {
       entityId: article.id,
       newValue: JSON.stringify(article),
     });
+
+    if (status === 'PUBLISHED') {
+      await this.dispatchNotificationsForArticle(article);
+    }
 
     return article;
   }
@@ -168,6 +176,10 @@ export class FounderCmsService {
       newValue: JSON.stringify(updated),
     });
 
+    if (updated.status === 'PUBLISHED') {
+      await this.dispatchNotificationsForArticle(updated);
+    }
+
     return updated;
   }
 
@@ -191,4 +203,72 @@ export class FounderCmsService {
 
     return updated;
   }
+
+  // Cron job to publish scheduled founder articles every minute
+  @Cron('* * * * *')
+  async publishScheduledArticles() {
+    const now = new Date();
+    const scheduled = await this.prisma.founderArticle.findMany({
+      where: {
+        status: 'SCHEDULED',
+        scheduledFor: {
+          lte: now,
+        },
+      },
+    });
+
+    for (const a of scheduled) {
+      const updated = await this.prisma.founderArticle.update({
+        where: { id: a.id },
+        data: { status: 'PUBLISHED', publishedAt: new Date() },
+      });
+      await this.dispatchNotificationsForArticle(updated);
+      console.log(`Published scheduled founder article: ${a.title}`);
+    }
+  }
+
+  private async dispatchNotificationsForArticle(article: any) {
+    if (article.status !== 'PUBLISHED') return;
+
+    const shareholders = await this.prisma.shareholder.findMany({
+      where: {
+        status: { notIn: ['DELETED', 'AUTO_ARCHIVED'] },
+      },
+      select: { id: true, shareholderId: true },
+    });
+
+    const refTag = `(FounderRef: ${article.slug})`;
+    const cleanContent = article.content ? article.content.replace(/<[^>]*>?/gm, '').trim() : '';
+    const snippet = cleanContent.length > 150 ? cleanContent.substring(0, 150) + '...' : cleanContent || "A new note has been published in Founder's Thoughts.";
+
+    for (const u of shareholders) {
+      const existing = await this.prisma.notification.findFirst({
+        where: {
+          shareholderId: u.id,
+          message: { contains: refTag },
+        },
+      });
+
+      if (!existing) {
+        const notif = await this.prisma.notification.create({
+          data: {
+            shareholderId: u.id,
+            title: `Founder's Thought: ${article.title}`,
+            message: `${snippet} ${refTag}`,
+            priority: 'HIGH',
+            type: 'SYSTEM',
+          },
+        });
+
+        if (this.messagingGateway) {
+          this.messagingGateway.sendMessageToUser(u.id, 'notification:received', notif);
+        }
+      }
+    }
+
+    if (this.messagingGateway && this.messagingGateway.server) {
+      this.messagingGateway.server.emit('notification:received', { founderSlug: article.slug });
+    }
+  }
 }
+

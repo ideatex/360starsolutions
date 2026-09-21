@@ -239,6 +239,11 @@ export default function AdminReportsPage() {
       { header: 'L5 Commission (₹)', key: 'l5Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'L6 Commission (₹)', key: 'l6Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'L7 Commission (₹)', key: 'l7Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L8 Commission (₹)', key: 'l8Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L9 Commission (₹)', key: 'l9Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L10 Commission (₹)', key: 'l10Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L11 Commission (₹)', key: 'l11Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L12 Commission (₹)', key: 'l12Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'Total Commissions (₹)', key: 'totalCommission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'Total Payout (₹)', key: 'totalPayout', formatter: (v) => Number(v || 0).toFixed(2) },
     ];
@@ -321,13 +326,18 @@ export default function AdminReportsPage() {
       { header: 'L5 (₹)', key: 'l5Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'L6 (₹)', key: 'l6Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'L7 (₹)', key: 'l7Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L8 (₹)', key: 'l8Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L9 (₹)', key: 'l9Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L10 (₹)', key: 'l10Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L11 (₹)', key: 'l11Commission', formatter: (v) => Number(v || 0).toFixed(2) },
+      { header: 'L12 (₹)', key: 'l12Commission', formatter: (v) => Number(v || 0).toFixed(2) },
       { header: 'Total Payout (₹)', key: 'totalPayout', formatter: (v) => Number(v || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 }) },
     ];
     const grandPayout = data.reduce((acc: number, r: any) => acc + Number(r.totalPayout || 0), 0);
 
     exportToPDF(
       'payout_cycle_report',
-      'Payout Cycle Breakdown Report (Profit + L1-L7 Commissions)',
+      'Payout Cycle Breakdown Report (Profit + L1-L12 Commissions)',
       `Payout Cycle Batch: ${selectedBatchId ? `Batch ${selectedBatchId}` : 'All Cycles'}`,
       columns,
       data,
@@ -914,6 +924,11 @@ export default function AdminReportsPage() {
                   <th className="px-2.5 py-3.5 text-right font-mono">L5</th>
                   <th className="px-2.5 py-3.5 text-right font-mono">L6</th>
                   <th className="px-2.5 py-3.5 text-right font-mono">L7</th>
+                  <th className="px-2.5 py-3.5 text-right font-mono">L8</th>
+                  <th className="px-2.5 py-3.5 text-right font-mono">L9</th>
+                  <th className="px-2.5 py-3.5 text-right font-mono">L10</th>
+                  <th className="px-2.5 py-3.5 text-right font-mono">L11</th>
+                  <th className="px-2.5 py-3.5 text-right font-mono">L12</th>
                   <th onClick={() => handleSort('totalCommission')} className="px-3 py-3.5 text-right cursor-pointer hover:text-gray-900 dark:hover:text-white select-none">
                     <div className="flex items-center justify-end gap-1">Commissions <ArrowUpDown size={12} /></div>
                   </th>
@@ -928,13 +943,13 @@ export default function AdminReportsPage() {
               <tbody className="divide-y divide-gray-150 dark:divide-gray-800 text-xs text-gray-700 dark:text-gray-300 font-medium">
                 {loadingPayouts ? (
                   <tr>
-                    <td colSpan={15} className="text-center py-20">
+                    <td colSpan={20} className="text-center py-20">
                       <Loader2 size={20} className="animate-spin text-brand-600 mx-auto" />
                     </td>
                   </tr>
                 ) : (payoutsData || []).length === 0 ? (
                   <tr>
-                    <td colSpan={15} className="text-center py-20 text-gray-500">
+                    <td colSpan={20} className="text-center py-20 text-gray-500">
                       <Landmark className="w-10 h-10 mx-auto mb-2 opacity-30" />
                       <p className="text-xs font-semibold">No Payout Records Found Matching Filter Criteria</p>
                     </td>
@@ -966,6 +981,11 @@ export default function AdminReportsPage() {
                       <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l5Commission).toFixed(2)}</td>
                       <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l6Commission).toFixed(2)}</td>
                       <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l7Commission).toFixed(2)}</td>
+                      <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l8Commission).toFixed(2)}</td>
+                      <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l9Commission).toFixed(2)}</td>
+                      <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l10Commission).toFixed(2)}</td>
+                      <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l11Commission).toFixed(2)}</td>
+                      <td className="px-2.5 py-3.5 text-right font-mono text-xs text-gray-500 dark:text-gray-400">₹{Number(p.l12Commission).toFixed(2)}</td>
                       <td className="px-3 py-3.5 text-right font-bold text-brand-600 dark:text-brand-400">
                         ₹{Number(p.totalCommission).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>

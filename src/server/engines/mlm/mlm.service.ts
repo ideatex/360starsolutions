@@ -102,6 +102,7 @@ export class MlmService implements OnModuleInit {
         data: {
           levelOpeningVolume,
           levelWiseProfitSharing,
+          gratitudeShareConfig: levelWiseProfitSharing,
           referralLevelSettings,
         },
       });
@@ -163,6 +164,7 @@ export class MlmService implements OnModuleInit {
         data: {
           levelOpeningVolume,
           levelWiseProfitSharing,
+          gratitudeShareConfig: levelWiseProfitSharing,
           referralLevelSettings,
         },
       });

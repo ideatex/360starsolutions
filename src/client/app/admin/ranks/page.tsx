@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Button } from '@/components/ui/button';
 
 export default function AdminRanksPage() {
   const queryClient = useQueryClient();

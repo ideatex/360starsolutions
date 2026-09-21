@@ -4,9 +4,10 @@ import { ReferralProgressService } from '@server/engines/referral-progress/refer
 import { PrismaModule } from '@server/prisma/prisma.module';
 import { AuditModule } from '@server/engines/audit/audit.module';
 import { ReferralTreeModule } from '@server/engines/referral-tree/referral-tree.module';
+import { CommissionModule } from '@server/engines/commission/commission.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, ReferralTreeModule],
+  imports: [PrismaModule, AuditModule, ReferralTreeModule, CommissionModule],
   controllers: [ReferralProgressController],
   providers: [ReferralProgressService],
   exports: [ReferralProgressService],

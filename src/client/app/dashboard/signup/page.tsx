@@ -14,8 +14,7 @@ import {
 import { 
   getIndianStates, 
   getDistrictsByState, 
-  getCitiesByDistrict, 
-  getPincodesByCity 
+  lookupPincode 
 } from '@/lib/indianLocations';
 
 const DEFAULT_INDIAN_BANKS = [
@@ -50,7 +49,6 @@ export default function ShareholderSignupPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedRequest, setSubmittedRequest] = useState<any>(null);
-  const [showPassword, setShowPassword] = useState(false);
 
   // Form State
   const [form, setForm] = useState({
@@ -59,10 +57,6 @@ export default function ShareholderSignupPage() {
     phone: '',
     dob: '',
     pan: '',
-    // Password Setting
-    passwordType: 'auto' as 'auto' | 'custom',
-    password: '',
-    confirmPassword: '',
     // Step 2: Address
     addressBuilding: '',
     addressArea: '',
@@ -86,6 +80,8 @@ export default function ShareholderSignupPage() {
 
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isLookingUpPincode, setIsLookingUpPincode] = useState(false);
+  const [pincodePostOffices, setPincodePostOffices] = useState<string[]>([]);
 
   // PAN format validation: AAAAA9999A
   const isPanValid = (pan: string) => {
@@ -96,10 +92,39 @@ export default function ShareholderSignupPage() {
   // Indian locations cascading
   const indianStates = getIndianStates();
   const districts = form.addressState ? getDistrictsByState(form.addressState) : [];
-  const cities = (form.addressState && form.addressDistrict) ? getCitiesByDistrict(form.addressState, form.addressDistrict) : [];
-  const pincodes = (form.addressState && form.addressDistrict && form.addressCity) 
-    ? getPincodesByCity(form.addressState, form.addressDistrict, form.addressCity) 
-    : [];
+
+  // Real-time Pincode Lookup
+  const handlePincodeChange = async (pinValue: string) => {
+    const cleanPin = pinValue.replace(/\D/g, '').slice(0, 6);
+    setForm((prev) => ({ ...prev, addressPincode: cleanPin }));
+
+    if (cleanPin.length === 6) {
+      setIsLookingUpPincode(true);
+      try {
+        const result = await lookupPincode(cleanPin);
+        if (result) {
+          setPincodePostOffices(result.postOffices || []);
+          setForm((prev) => ({
+            ...prev,
+            addressState: result.state || prev.addressState,
+            addressDistrict: result.district || prev.addressDistrict,
+            addressCity: prev.addressCity || result.city || (result.postOffices && result.postOffices[0]) || '',
+          }));
+          toast({ 
+            title: "Pincode Verified", 
+            description: `Auto-filled: ${result.district}, ${result.state}`, 
+            type: "success" 
+          });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLookingUpPincode(false);
+      }
+    } else {
+      setPincodePostOffices([]);
+    }
+  };
 
   // File Upload Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,8 +172,8 @@ export default function ShareholderSignupPage() {
       return false;
     }
     const cleanPhone = form.phone.replace(/[^0-9]/g, '');
-    if (cleanPhone.length !== 10) {
-      toast({ title: "Invalid Mobile", description: "Please enter a valid 10-digit mobile number.", type: "warning" });
+    if (!/^[6-9]\d{9}$/.test(cleanPhone)) {
+      toast({ title: "Invalid Mobile Number", description: "Please enter a valid 10-digit mobile number starting with 6, 7, 8, or 9.", type: "warning" });
       return false;
     }
     if (!form.pan.trim() || !isPanValid(form.pan)) {
@@ -159,22 +184,16 @@ export default function ShareholderSignupPage() {
       toast({ title: "Date of Birth Required", description: "Please select applicant's date of birth.", type: "warning" });
       return false;
     }
-    if (form.passwordType === 'custom') {
-      if (!form.password || form.password.length < 6) {
-        toast({ title: "Weak Password", description: "Custom password must be at least 6 characters.", type: "warning" });
-        return false;
-      }
-      if (form.password !== form.confirmPassword) {
-        toast({ title: "Passwords Do Not Match", description: "Password and Confirm Password must match exactly.", type: "warning" });
-        return false;
-      }
-    }
     return true;
   };
 
   const validateStep2 = () => {
-    if (!form.addressBuilding.trim() || !form.addressState || !form.addressDistrict || !form.addressCity || !form.addressPincode) {
+    if (!form.addressBuilding.trim() || !form.addressState || !form.addressDistrict || !form.addressCity.trim() || !form.addressPincode.trim()) {
       toast({ title: "Incomplete Address", description: "Please complete all address fields.", type: "warning" });
+      return false;
+    }
+    if (form.addressPincode.replace(/\D/g, '').length !== 6) {
+      toast({ title: "Invalid Pincode", description: "Pincode must be exactly 6 digits.", type: "warning" });
       return false;
     }
     return true;
@@ -183,6 +202,11 @@ export default function ShareholderSignupPage() {
   const validateStep3 = () => {
     if (!form.bankName || !form.bankAccountName.trim() || !form.bankAccountNumber.trim() || !form.bankIfsc.trim()) {
       toast({ title: "Banking Details Required", description: "Please complete all bank account details.", type: "warning" });
+      return false;
+    }
+    const cleanAcc = form.bankAccountNumber.replace(/\D/g, '');
+    if (!/^\d{10,16}$/.test(cleanAcc)) {
+      toast({ title: "Invalid Account Number", description: "Bank account number must be between 10 and 16 digits containing only numbers.", type: "warning" });
       return false;
     }
     const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -204,17 +228,6 @@ export default function ShareholderSignupPage() {
       }
       if (!form.paymentProofUrl) {
         toast({ title: "Payment Proof Required", description: "Please upload the payment deposit receipt (photo or PDF).", type: "warning" });
-        return;
-      }
-    }
-
-    if (form.passwordType === 'custom') {
-      if (!form.password || form.password.length < 6) {
-        toast({ title: "Weak Password", description: "Custom password must be at least 6 characters.", type: "warning" });
-        return;
-      }
-      if (form.password !== form.confirmPassword) {
-        toast({ title: "Passwords Do Not Match", description: "Password and Confirm Password must match exactly.", type: "warning" });
         return;
       }
     }
@@ -241,10 +254,6 @@ export default function ShareholderSignupPage() {
         bankBranch: form.bankBranch.trim(),
         bankIfsc: form.bankIfsc.trim().toUpperCase(),
       };
-
-      if (form.passwordType === 'custom' && form.password.trim()) {
-        payload.password = form.password.trim();
-      }
 
       if (form.accountType === 'CONTRIBUTION') {
         payload.contributionAmount = Number(form.contributionAmount);
@@ -278,9 +287,6 @@ export default function ShareholderSignupPage() {
       phone: '',
       dob: '',
       pan: '',
-      passwordType: 'auto',
-      password: '',
-      confirmPassword: '',
       addressBuilding: '',
       addressArea: '',
       addressState: '',
@@ -510,110 +516,21 @@ export default function ShareholderSignupPage() {
                 </div>
               </div>
 
-              {/* Password Setting Option */}
-              <div className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-3">
-                <div>
-                  <h4 className="text-xs font-bold text-gray-900 dark:text-white flex items-center gap-1.5">
-                    <Key className="w-3.5 h-3.5 text-brand-600 dark:text-brand-400" /> Account Password & Access
-                  </h4>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Choose password assignment method for new shareholder account.</p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div
-                    onClick={() => setForm({ ...form, passwordType: 'auto', password: '', confirmPassword: '' })}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                      form.passwordType === 'auto'
-                        ? 'border-brand-500 bg-brand-50/40 dark:bg-brand-950/20 text-gray-900 dark:text-white shadow-theme-xs'
-                        : 'border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-gray-500 hover:border-brand-500/40'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="passwordType"
-                      checked={form.passwordType === 'auto'}
-                      onChange={() => setForm({ ...form, passwordType: 'auto', password: '', confirmPassword: '' })}
-                      className="mt-0.5 text-brand-600"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Auto-generate Password</span>
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-0.5">
-                        System generates a secure temporary password and sends it via SMS upon approval.
-                      </span>
-                    </div>
+              {/* Account Provisioning Notice */}
+              <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                <div className="p-3.5 rounded-xl bg-brand-50/60 dark:bg-brand-950/20 border border-brand-200 dark:border-brand-900/40 flex items-start gap-3">
+                  <div className="p-1.5 bg-brand-100 dark:bg-brand-900/50 text-brand-600 dark:text-brand-400 rounded-lg shrink-0 mt-0.5">
+                    <ShieldCheck className="w-4 h-4" />
                   </div>
-
-                  <div
-                    onClick={() => setForm({ ...form, passwordType: 'custom' })}
-                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                      form.passwordType === 'custom'
-                        ? 'border-brand-500 bg-brand-50/40 dark:bg-brand-950/20 text-gray-900 dark:text-white shadow-theme-xs'
-                        : 'border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/40 text-gray-500 hover:border-brand-500/40'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="passwordType"
-                      checked={form.passwordType === 'custom'}
-                      onChange={() => setForm({ ...form, passwordType: 'custom' })}
-                      className="mt-0.5 text-brand-600"
-                    />
-                    <div>
-                      <span className="text-xs font-bold text-gray-900 dark:text-white block">Set Custom Password</span>
-                      <span className="text-[11px] text-gray-500 dark:text-gray-400 block mt-0.5">
-                        Specify a custom login password for the shareholder account immediately.
-                      </span>
-                    </div>
+                  <div>
+                    <span className="text-xs font-bold text-gray-900 dark:text-white block">
+                      Admin Security & Credential Setup
+                    </span>
+                    <span className="text-[11px] text-gray-600 dark:text-gray-300 block mt-0.5 leading-relaxed">
+                      Initial login credentials and security parameters will be securely provisioned by the Super Admin in the Registration Queue upon document and payment verification. Credentials will be dispatched directly to the applicant's mobile number via SMS.
+                    </span>
                   </div>
                 </div>
-
-                {form.passwordType === 'custom' && (
-                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-gray-50 dark:bg-gray-900/60 border border-gray-200 dark:border-gray-800">
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                        Custom Password * (Min. 6 chars)
-                      </label>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? 'text' : 'password'}
-                          required
-                          value={form.password}
-                          onChange={(e) => setForm({ ...form, password: e.target.value })}
-                          placeholder="••••••••"
-                          className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:border-brand-500 text-xs font-medium pr-10 text-gray-900 dark:text-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 cursor-pointer"
-                        >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                        Confirm Password *
-                      </label>
-                      <input
-                        type={showPassword ? 'text' : 'password'}
-                        required
-                        value={form.confirmPassword}
-                        onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
-                        placeholder="••••••••"
-                        className={`w-full px-3.5 py-2 bg-white dark:bg-gray-900 border rounded-lg focus:outline-none text-xs font-medium text-gray-900 dark:text-white ${
-                          form.confirmPassword && form.password !== form.confirmPassword
-                            ? 'border-rose-500 focus:border-rose-500'
-                            : 'border-gray-200 dark:border-gray-800 focus:border-brand-500'
-                        }`}
-                      />
-                      {form.confirmPassword && form.password !== form.confirmPassword && (
-                        <span className="text-[11px] text-rose-500 font-medium block mt-1">Passwords do not match</span>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
               </div>
 
               <div className="flex justify-end pt-4 border-t border-gray-100 dark:border-gray-800">
@@ -667,16 +584,41 @@ export default function ShareholderSignupPage() {
                 </div>
 
                 <div>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      Pincode (6 Digits) *
+                    </label>
+                    {isLookingUpPincode && (
+                      <span className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold animate-pulse">
+                        Resolving location...
+                      </span>
+                    )}
+                  </div>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    required
+                    value={form.addressPincode}
+                    onChange={(e) => handlePincodeChange(e.target.value)}
+                    placeholder="e.g. 110001 (Auto-resolves district & state)"
+                    className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-bold font-mono text-gray-900 dark:text-white"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Entering a 6-digit pincode automatically fills State, District & City.
+                  </p>
+                </div>
+
+                <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    State *
+                    State (India) *
                   </label>
                   <select
                     required
                     value={form.addressState}
-                    onChange={(e) => setForm({ ...form, addressState: e.target.value, addressDistrict: '', addressCity: '', addressPincode: '' })}
+                    onChange={(e) => setForm({ ...form, addressState: e.target.value, addressDistrict: '' })}
                     className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white cursor-pointer"
                   >
-                    <option value="">Select State</option>
+                    <option value="">Select Indian State / UT</option>
                     {indianStates.map((s) => (
                       <option key={s} value={s}>{s}</option>
                     ))}
@@ -690,11 +632,11 @@ export default function ShareholderSignupPage() {
                   <select
                     required
                     value={form.addressDistrict}
-                    onChange={(e) => setForm({ ...form, addressDistrict: e.target.value, addressCity: '', addressPincode: '' })}
+                    onChange={(e) => setForm({ ...form, addressDistrict: e.target.value })}
                     disabled={!form.addressState}
                     className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white disabled:opacity-50 cursor-pointer"
                   >
-                    <option value="">Select District</option>
+                    <option value="">{form.addressState ? "Select District" : "Select State First"}</option>
                     {districts.map((d) => (
                       <option key={d} value={d}>{d}</option>
                     ))}
@@ -703,47 +645,33 @@ export default function ShareholderSignupPage() {
 
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    City / Town *
+                    City / Town / Area *
                   </label>
-                  <select
-                    required
-                    value={form.addressCity}
-                    onChange={(e) => setForm({ ...form, addressCity: e.target.value, addressPincode: '' })}
-                    disabled={!form.addressDistrict}
-                    className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white disabled:opacity-50 cursor-pointer"
-                  >
-                    <option value="">Select City</option>
-                    {cities.map((c) => (
-                      <option key={c} value={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                    Pincode *
-                  </label>
-                  {pincodes.length > 0 ? (
-                    <select
-                      required
-                      value={form.addressPincode}
-                      onChange={(e) => setForm({ ...form, addressPincode: e.target.value })}
-                      className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white cursor-pointer"
-                    >
-                      <option value="">Select Pincode</option>
-                      {pincodes.map((p) => (
-                        <option key={p} value={p}>{p}</option>
-                      ))}
-                    </select>
+                  {pincodePostOffices.length > 0 ? (
+                    <div className="space-y-1.5">
+                      <input
+                        type="text"
+                        required
+                        list="postOfficeList"
+                        value={form.addressCity}
+                        onChange={(e) => setForm({ ...form, addressCity: e.target.value })}
+                        placeholder="Select or enter city/locality"
+                        className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white"
+                      />
+                      <datalist id="postOfficeList">
+                        {pincodePostOffices.map((po) => (
+                          <option key={po} value={po} />
+                        ))}
+                      </datalist>
+                    </div>
                   ) : (
                     <input
                       type="text"
-                      maxLength={6}
                       required
-                      value={form.addressPincode}
-                      onChange={(e) => setForm({ ...form, addressPincode: e.target.value.replace(/[^0-9]/g, '') })}
-                      placeholder="e.g. 400001"
-                      className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium font-mono text-gray-900 dark:text-white"
+                      value={form.addressCity}
+                      onChange={(e) => setForm({ ...form, addressCity: e.target.value })}
+                      placeholder="e.g. Connaught Place or Andheri"
+                      className="w-full px-3.5 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 text-xs font-medium text-gray-900 dark:text-white"
                     />
                   )}
                 </div>

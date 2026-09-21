@@ -32,6 +32,8 @@ export interface PayoutPreviewItem {
   grossGratitudeShare: number;
   withheldAmount: number;
   netGratitudeShare: number;
+  withholdingPercentage?: number;
+  gratitudeDetails?: any[];
   
   // Final Net
   netPayable: number;
@@ -211,6 +213,15 @@ export class PayoutService {
         const principal = Number(contrib.amount);
         if (principal <= 0) continue;
 
+        // Check if contribution has expired (validityMonths, default 12)
+        const contribDate = new Date(contrib.date);
+        const validityMonths = contrib.validityMonths || 12;
+        const expiryDate = new Date(contribDate);
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+        if (cycle.periodStart >= expiryDate) {
+          continue; // Expired contribution
+        }
+
         const calc = this.prorationService.calculateContributionProfitForCycle(
           contrib.id,
           sh.id,
@@ -231,7 +242,10 @@ export class PayoutService {
       }
     }
 
-    // 4. Evaluate Gratitude Share (L1–L12) across downline contributions
+    const maxReferralLevels = Math.max(12, Number((config?.referralLevelSettings as any)?.levels || 12));
+    const activeLevelMap = (config?.referralLevelSettings as any)?.active || {};
+
+    // 4. Evaluate Gratitude Share (L1–L12+) across downline contributions
     const gratitudeByShareholder = new Map<string, { grossGratitude: number; details: any[] }>();
 
     for (const sh of shareholders) {
@@ -243,10 +257,20 @@ export class PayoutService {
         const contribAmount = Number(contrib.amount);
         if (contribAmount <= 0) continue;
 
-        // Walk up to 12 levels upstream
-        const ancestors = await this.referralTreeService.getUpstreamAncestors(sh.id, 12);
+        // Check if downline contribution has expired
+        const contribDate = new Date(contrib.date);
+        const validityMonths = contrib.validityMonths || 12;
+        const expiryDate = new Date(contribDate);
+        expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+        if (cycle.periodStart >= expiryDate) {
+          continue; // Expired downline contribution generates no gratitude share
+        }
+
+        // Walk up to maxReferralLevels upstream
+        const ancestors = await this.referralTreeService.getUpstreamAncestors(sh.id, maxReferralLevels);
         for (const item of ancestors) {
           const { level, shareholder: ancestor } = item;
+          if (activeLevelMap[String(level)] === false) continue;
           const rate = gratitudeRates[level] || 0;
           if (rate <= 0) continue;
 
@@ -262,19 +286,27 @@ export class PayoutService {
             continue;
           }
 
-          const rawGratitude = contribAmount * rate;
-          const roundedGratitude = Math.round(rawGratitude * 100) / 100;
+          const gratitudeCalc = this.prorationService.calculateContributionGratitudeForCycle(
+            contribAmount,
+            contrib.date,
+            cycle,
+            rate, // monthly rate from config (e.g. 0.01 for L1)
+            prorationBasis,
+          );
 
-          if (roundedGratitude > 0) {
+          if (gratitudeCalc.gratitudeAmount > 0) {
             const current = gratitudeByShareholder.get(ancestor.id) || { grossGratitude: 0, details: [] };
-            current.grossGratitude += roundedGratitude;
+            current.grossGratitude += gratitudeCalc.gratitudeAmount;
             current.details.push({
               sourceShareholderId: sh.id,
               sourceContributionId: contrib.id,
               level,
-              rate,
+              rate: gratitudeCalc.cycleRate,
+              monthlyRate: rate,
+              isFirstPayout: gratitudeCalc.isFirstPayout,
+              activeDays: gratitudeCalc.activeDays,
               calculationBase: contribAmount,
-              amount: roundedGratitude,
+              amount: gratitudeCalc.gratitudeAmount,
             });
             gratitudeByShareholder.set(ancestor.id, current);
           }
@@ -316,14 +348,16 @@ export class PayoutService {
       if (isFirstPayout) firstPayoutCount++;
       else if (grossProfit > 0) fullCyclePayoutCount++;
 
-      // Zero Contribution 20% withholding rule
+      // Zero Contribution dynamic withholding rule
       let withheldAmount = 0;
       let netGratitude = grossGratitude;
       const holdingBefore = Number(sh.holdingBalance || 0);
+      const withholdingPercent = Number((sh as any).withholdingPercentage ?? 20);
 
       if (sh.accountType === AccountType.ZERO_CONTRIBUTION) {
         zeroContributionCount++;
-        withheldAmount = Math.round(grossGratitude * 0.2 * 100) / 100;
+        const withheldRate = withholdingPercent / 100;
+        withheldAmount = Math.round(grossGratitude * withheldRate * 100) / 100;
         netGratitude = Math.round((grossGratitude - withheldAmount) * 100) / 100;
       }
 
@@ -354,6 +388,8 @@ export class PayoutService {
         grossGratitudeShare: grossGratitude,
         withheldAmount,
         netGratitudeShare: netGratitude,
+        withholdingPercentage: withholdingPercent,
+        gratitudeDetails: gratitudeData.details,
         netPayable,
         holdingBalanceBefore: holdingBefore,
         holdingBalanceAfter: holdingAfter,
@@ -478,6 +514,7 @@ export class PayoutService {
               const currentBal = Number(sh.holdingBalance || 0);
               const newBal = currentBal + item.withheldAmount;
 
+              const withheldPct = item.withholdingPercentage ?? 20;
               await tx.holdingLedger.create({
                 data: {
                   shareholderId: item.shareholderId,
@@ -486,7 +523,7 @@ export class PayoutService {
                   balanceBefore: new Prisma.Decimal(currentBal),
                   balanceAfter: new Prisma.Decimal(newBal),
                   type: 'WITHHOLDING',
-                  remarks: `20% Gratitude Share withholding for cycle ${cycleIdentifier}`,
+                  remarks: `${withheldPct}% Gratitude Share withholding for cycle ${cycleIdentifier}`,
                 },
               });
 
@@ -576,8 +613,25 @@ export class PayoutService {
             });
           }
 
-          // Persist CommissionLedger entry if gratitude > 0
-          if (item.grossGratitudeShare > 0) {
+          // Persist CommissionLedger entries for every level in gratitudeDetails (L1 through L12)
+          if (item.gratitudeDetails && item.gratitudeDetails.length > 0) {
+            for (const detail of item.gratitudeDetails) {
+              await tx.commissionLedger.create({
+                data: {
+                  shareholderId: item.shareholderId,
+                  sourceShareholderId: detail.sourceShareholderId,
+                  fromContributionId: detail.sourceContributionId,
+                  cycleIdentifier,
+                  level: detail.level,
+                  rate: new Prisma.Decimal(detail.rate),
+                  amount: new Prisma.Decimal(detail.amount),
+                  calculationBase: new Prisma.Decimal(detail.calculationBase),
+                  status: CommissionStatus.PROCESSED,
+                  payoutBatchId: batchId,
+                },
+              });
+            }
+          } else if (item.grossGratitudeShare > 0) {
             await tx.commissionLedger.create({
               data: {
                 shareholderId: item.shareholderId,

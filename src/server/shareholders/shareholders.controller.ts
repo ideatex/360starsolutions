@@ -186,5 +186,13 @@ export class UsersController {
   async unblockUser(@Request() req: any, @Param('id') id: string) {
     return this.usersService.setStatus(id, 'ACTIVE', req.shareholder.id);
   }
+
+  @Patch(':id/restore')
+  @Roles('ADMIN', 'SUPER_ADMIN')
+  @HttpCode(HttpStatus.OK)
+  async restoreUser(@Request() req: any, @Param('id') id: string) {
+    return this.usersService.setStatus(id, 'ACTIVE', req.shareholder.id);
+  }
 }
+
 

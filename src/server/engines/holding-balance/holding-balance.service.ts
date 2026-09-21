@@ -66,8 +66,10 @@ export class HoldingBalanceService {
       };
     }
 
-    // Zero-Contribution account: 20% withheld, 80% net payable
-    const withheldAmount = Math.round(grossCommissionAmount * ZERO_CONTRIBUTION_WITHHOLDING_RATE * 100) / 100;
+    // Zero-Contribution account dynamic withholding
+    const withholdingPercent = Number((shareholder as any).withholdingPercentage ?? 20);
+    const withholdingRate = withholdingPercent / 100;
+    const withheldAmount = Math.round(grossCommissionAmount * withholdingRate * 100) / 100;
     const netPayable = Math.round((grossCommissionAmount - withheldAmount) * 100) / 100;
     const newBalance = Math.round((currentBalance + withheldAmount) * 100) / 100;
 
@@ -89,14 +91,14 @@ export class HoldingBalanceService {
             balanceBefore: new Prisma.Decimal(currentBalance),
             balanceAfter: new Prisma.Decimal(newBalance),
             type: HoldingLedgerType.WITHHOLDING,
-            remarks: `20% Gratitude Share withholding for Zero-Contribution account. Batch: ${payoutBatchId || 'MANUAL'}`,
+            remarks: `${withholdingPercent}% Gratitude Share withholding for Zero-Contribution account. Batch: ${payoutBatchId || 'MANUAL'}`,
           },
         });
       }
     });
 
     this.logger.log(
-      `Applied 20% withholding on ₹${grossCommissionAmount} for Zero-Contribution user ${shareholder.shareholderId}. Withheld: ₹${withheldAmount}, New Holding Balance: ₹${newBalance}`
+      `Applied ${withholdingPercent}% withholding on ₹${grossCommissionAmount} for Zero-Contribution user ${shareholder.shareholderId}. Withheld: ₹${withheldAmount}, New Holding Balance: ₹${newBalance}`
     );
 
     // Check Auto-Conversion Threshold (>= ₹1,00,000)

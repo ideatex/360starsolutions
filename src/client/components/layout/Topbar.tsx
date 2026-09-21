@@ -443,49 +443,66 @@ export default function Topbar() {
       {/* Announcement / Notification Full View Modal */}
       <AnimatePresence>
         {selectedNotifForModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div key={selectedNotifForModal.id || 'notif-modal'} className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 max-w-lg w-full shadow-theme-xl relative space-y-4 max-h-[85vh] flex flex-col"
+              className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-3xl p-6 max-w-lg w-full shadow-theme-xl relative space-y-4 max-h-[85vh] flex flex-col font-outfit"
             >
               <div className="flex justify-between items-start border-b border-gray-100 dark:border-gray-800 pb-3 shrink-0">
-                <div>
-                  <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full mb-1.5 ${
-                    selectedNotifForModal.priority === 'HIGH' 
-                      ? 'badge-error' 
-                      : selectedNotifForModal.priority === 'MEDIUM' 
-                      ? 'badge-warning' 
-                      : 'badge-brand'
-                  }`}>
-                    {selectedNotifForModal.priority || 'NORMAL'} PRIORITY
-                  </span>
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className={`inline-block text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${
+                      selectedNotifForModal.priority === 'HIGH' 
+                        ? 'badge-error' 
+                        : selectedNotifForModal.priority === 'MEDIUM' 
+                        ? 'badge-warning' 
+                        : 'badge-brand'
+                    }`}>
+                      {selectedNotifForModal.priority || 'NORMAL'} PRIORITY
+                    </span>
+                    {((selectedNotifForModal.message || '').includes('(FounderRef:') || selectedNotifForModal.title?.toLowerCase().includes("founder")) && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 border border-purple-200 dark:border-purple-800/40">
+                        FOUNDER'S THOUGHTS
+                      </span>
+                    )}
+                  </div>
                   <h3 className="text-base font-bold text-gray-900 dark:text-white leading-snug">{selectedNotifForModal.title}</h3>
-                  <p className="text-[10px] text-gray-400 font-mono mt-1">
+                  <p className="text-[10px] text-gray-400 font-mono">
                     Received: {new Date(selectedNotifForModal.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at {new Date(selectedNotifForModal.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
                 </div>
                 <button
                   onClick={() => setSelectedNotifForModal(null)}
-                  className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+                  className="p-1.5 text-gray-400 hover:text-gray-700 dark:hover:text-white rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer shrink-0"
                 >
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3 py-2 text-sm text-gray-700 dark:text-gray-300 leading-relaxed whitespace-pre-wrap bg-gray-50/70 dark:bg-gray-800/40 p-4 rounded-2xl border border-gray-100 dark:border-gray-800">
-                {selectedNotifForModal.message}
+                {(selectedNotifForModal.message || '').replace(/\(FounderRef:[^\)]+\)/gi, '').replace(/\(Ref:[^\)]+\)/gi, '').trim() || selectedNotifForModal.message}
               </div>
 
               <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 pt-3 shrink-0">
-                <Link
-                  href="/dashboard/announcements"
-                  onClick={() => setSelectedNotifForModal(null)}
-                  className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
-                >
-                  View All Announcements <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                {((selectedNotifForModal.message || '').includes('(FounderRef:') || selectedNotifForModal.title?.toLowerCase().includes("founder")) ? (
+                  <Link
+                    href="/dashboard/founder"
+                    onClick={() => setSelectedNotifForModal(null)}
+                    className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+                  >
+                    Open Founder's Thoughts <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                ) : (
+                  <Link
+                    href="/dashboard/announcements"
+                    onClick={() => setSelectedNotifForModal(null)}
+                    className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
+                  >
+                    Open Notifications & Notices <ChevronRight className="w-3.5 h-3.5" />
+                  </Link>
+                )}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -508,6 +525,8 @@ export default function Topbar() {
           </div>
         )}
       </AnimatePresence>
+
+
     </header>
   );
 }

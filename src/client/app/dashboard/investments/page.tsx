@@ -7,7 +7,7 @@ import { useAuthStore } from '@/store/useAuthStore';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Wallet, Plus, Calendar, Activity, X, CircleDollarSign, Loader2 } from 'lucide-react';
+import { Wallet, Plus, Calendar, Activity, X, Coins, Loader2 } from 'lucide-react';
 
 export default function InvestmentsPage() {
   const shareholder = useAuthStore((state) => state.shareholder);
@@ -44,7 +44,7 @@ export default function InvestmentsPage() {
       setAmount('');
       toast({ 
         title: "Capital Placement Initialized", 
-        description: `Successfully placed $${Number(amount).toLocaleString()} into the ROI cycle.`, 
+        description: `Successfully placed ₹${Number(amount).toLocaleString('en-IN')} into the ROI cycle.`, 
         type: "success" 
       });
     },
@@ -63,13 +63,13 @@ export default function InvestmentsPage() {
   const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!amount || Number(amount) <= 0) {
-      toast({ title: "Invalid Amount", description: "Please enter a valid amount greater than $0.", type: "warning" });
+      toast({ title: "Invalid Amount", description: "Please enter a valid amount greater than ₹0.", type: "warning" });
       return;
     }
 
     const ok = await confirm({
       title: "Confirm Capital Placement",
-      description: `You are about to authorize an active capital placement of $${Number(amount).toLocaleString()}. This amount will be locked in the sequential ROI cycle. Do you wish to proceed?`,
+      description: `You are about to authorize an active capital placement of ₹${Number(amount).toLocaleString('en-IN')}. This amount will be locked in the sequential ROI cycle. Do you wish to proceed?`,
       confirmText: "Confirm & Invest",
       variant: "success"
     });
@@ -225,7 +225,7 @@ export default function InvestmentsPage() {
               <form onSubmit={handleCreateSubmit} className="space-y-4 mt-2">
                 <div className="flex gap-3 items-center">
                   <div className="p-2.5 bg-brand-50 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 rounded-xl shrink-0">
-                    <CircleDollarSign className="w-5 h-5" />
+                    <Coins className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="text-base font-bold text-gray-900 dark:text-white leading-tight">Create Capital Placement</h3>

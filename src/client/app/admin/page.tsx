@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import { useToast } from '@/components/ui/ToastProvider';
 import { motion } from 'framer-motion';
 import { 
-  BarChart3, Users, DollarSign, Wallet, FileDown, Database, 
+  BarChart3, Users, Coins, Wallet, FileDown, Database, 
   Loader2, Search, Filter, ArrowUp, ArrowDown, X, FileText, 
   TrendingUp, ShieldCheck, ArrowUpRight
 } from 'lucide-react';
@@ -28,6 +28,9 @@ export default function AdminDashboardPage() {
   const [chequeIssued, setChequeIssued] = useState(false);
   const [isFiltersOpen, setIsFiltersOpen] = useState(false);
 
+  const [page, setPage] = useState(1);
+  const pageSize = 10;
+
   const resetFilters = () => {
     setSearch('');
     setSortBy('createdAt');
@@ -38,6 +41,7 @@ export default function AdminDashboardPage() {
     setStatus('');
     setAgreementIssued(false);
     setChequeIssued(false);
+    setPage(1);
   };
 
   // Dashboard Summary Metrics
@@ -275,7 +279,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">Released</span>
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-success-50 dark:bg-success-500/15 text-success-600 dark:text-success-400">
-              <DollarSign size={18} />
+              <Coins size={18} />
             </div>
           </div>
           <div className="mt-4">
@@ -439,199 +443,237 @@ export default function AdminDashboardPage() {
               <p className="text-xs font-bold text-gray-600 dark:text-gray-300">No Records Found</p>
               <p className="text-[11px] text-gray-400 mt-0.5">Try clearing or broadening your search filters</p>
             </div>
-          ) : (
-            <div className="overflow-x-auto min-h-[380px]">
-              {activeTab === 'shareholders' && (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('name')}>
-                        Shareholder <SortIcon field="name" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('role')}>
-                        Role <SortIcon field="role" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
-                        Status <SortIcon field="status" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsCount')}>
-                        Active Placements <SortIcon field="activeInvestmentsCount" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsVolume')}>
-                        Total Contribution <SortIcon field="activeInvestmentsVolume" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('createdAt')}>
-                        Joined Date <SortIcon field="createdAt" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
-                    {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{r.name || 'N/A'}</div>
-                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.shareholderId}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={
-                            r.role === 'SUPER_ADMIN' ? 'badge-brand' :
-                            r.role === 'ADMIN' ? 'badge-warning' : 'badge-brand'
-                          }>
-                            {r.role}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className={
-                            r.status === 'ACTIVE' || r.status === 'RESTORED' ? 'badge-success' : 'badge-warning'
-                          }>
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 font-semibold">{r.activeInvestmentsCount}</td>
-                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.activeInvestmentsVolume?.toLocaleString() || '0'}</td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+          ) : (() => {
+            const totalItems = reportData?.length || 0;
+            const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+            const paginatedData = reportData ? reportData.slice((page - 1) * pageSize, page * pageSize) : [];
 
-              {activeTab === 'investments' && (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
-                        Investment ID <SortIcon field="id" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
-                        Shareholder <SortIcon field="userShareholderId" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
-                        Amount <SortIcon field="amount" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('dailyProfitRate')}>
-                        Daily Rate <SortIcon field="dailyProfitRate" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
-                        Status <SortIcon field="status" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('startDate')}>
-                        Start Date <SortIcon field="startDate" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
-                    {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
-                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
-                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.amount?.toLocaleString() || '0'}</td>
-                        <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">{(r.dailyProfitRate * 100).toFixed(2)}%</td>
-                        <td className="px-6 py-4">
-                          <span className={r.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}>
-                            {r.status}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.startDate).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+            return (
+              <div className="overflow-x-auto min-h-[380px] flex flex-col justify-between">
+                <div>
+                  {activeTab === 'shareholders' && (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('name')}>
+                            Shareholder <SortIcon field="name" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('role')}>
+                            Role <SortIcon field="role" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
+                            Status <SortIcon field="status" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsCount')}>
+                            Active Placements <SortIcon field="activeInvestmentsCount" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('activeInvestmentsVolume')}>
+                            Total Contribution <SortIcon field="activeInvestmentsVolume" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('createdAt')}>
+                            Joined Date <SortIcon field="createdAt" />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
+                        {paginatedData.map((r: any) => (
+                          <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900 dark:text-white">{r.name || 'N/A'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.shareholderId}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={
+                                r.role === 'SUPER_ADMIN' ? 'badge-brand' :
+                                r.role === 'ADMIN' ? 'badge-warning' : 'badge-brand'
+                              }>
+                                {r.role}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className={
+                                r.status === 'ACTIVE' || r.status === 'RESTORED' ? 'badge-success' : 'badge-warning'
+                              }>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-semibold">{r.activeInvestmentsCount}</td>
+                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.activeInvestmentsVolume?.toLocaleString() || '0'}</td>
+                            <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.createdAt).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
 
-              {activeTab === 'profits' && (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
-                        Ledger ID <SortIcon field="id" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
-                        Shareholder <SortIcon field="userShareholderId" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('investmentAmount')}>
-                        Investment <SortIcon field="investmentAmount" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('cycleStart')}>
-                        Cycle Period <SortIcon field="cycleStart" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('eligibleDays')}>
-                        Eligible Days <SortIcon field="eligibleDays" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
-                        Amount <SortIcon field="amount" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
-                    {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
-                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
-                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.investmentAmount?.toLocaleString() || '0'}</td>
-                        <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
-                          {new Date(r.cycleStart).toLocaleDateString()} - {new Date(r.cycleEnd).toLocaleDateString()}
-                        </td>
-                        <td className="px-6 py-4 font-semibold">{r.eligibleDays} days</td>
-                        <td className="px-6 py-4 font-bold text-success-600 dark:text-success-400">+₹{r.amount?.toLocaleString() || '0'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  {activeTab === 'investments' && (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
+                            Investment ID <SortIcon field="id" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
+                            Shareholder <SortIcon field="userShareholderId" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
+                            Amount <SortIcon field="amount" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('dailyProfitRate')}>
+                            Daily Rate <SortIcon field="dailyProfitRate" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('status')}>
+                            Status <SortIcon field="status" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('startDate')}>
+                            Start Date <SortIcon field="startDate" />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
+                        {paginatedData.map((r: any) => (
+                          <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.amount?.toLocaleString() || '0'}</td>
+                            <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">{(r.dailyProfitRate * 100).toFixed(2)}%</td>
+                            <td className="px-6 py-4">
+                              <span className={r.status === 'ACTIVE' ? 'badge-success' : 'badge-warning'}>
+                                {r.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{new Date(r.startDate).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
 
-              {activeTab === 'commissions' && (
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
-                    <tr>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
-                        Commission ID <SortIcon field="id" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('recipientShareholderId')}>
-                        Recipient <SortIcon field="recipientShareholderId" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('sourceShareholderId')}>
-                        From Shareholder <SortIcon field="sourceShareholderId" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('level')}>
-                        Level <SortIcon field="level" />
-                      </th>
-                      <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
-                        Amount <SortIcon field="amount" />
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
-                    {reportData.map((r: any) => (
-                      <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
-                        <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{r.recipientName || 'N/A'}</div>
-                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.recipientShareholderId}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="font-bold text-gray-900 dark:text-white">{r.sourceName || 'N/A'}</div>
-                          <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.sourceShareholderId}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <span className="badge-brand">
-                            Level {r.level}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">+₹{r.amount?.toLocaleString() || '0'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
+                  {activeTab === 'profits' && (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
+                            Ledger ID <SortIcon field="id" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('userShareholderId')}>
+                            Shareholder <SortIcon field="userShareholderId" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('investmentAmount')}>
+                            Investment <SortIcon field="investmentAmount" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('cycleStart')}>
+                            Cycle Period <SortIcon field="cycleStart" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('eligibleDays')}>
+                            Eligible Days <SortIcon field="eligibleDays" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
+                            Amount <SortIcon field="amount" />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
+                        {paginatedData.map((r: any) => (
+                          <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900 dark:text-white">{r.userName || 'N/A'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.userShareholderId}</div>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-gray-900 dark:text-white">₹{r.investmentAmount?.toLocaleString() || '0'}</td>
+                            <td className="px-6 py-4 text-gray-500 dark:text-gray-400">
+                              {new Date(r.cycleStart).toLocaleDateString()} - {new Date(r.cycleEnd).toLocaleDateString()}
+                            </td>
+                            <td className="px-6 py-4 font-semibold">{r.eligibleDays} days</td>
+                            <td className="px-6 py-4 font-bold text-success-600 dark:text-success-400">+₹{r.amount?.toLocaleString() || '0'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+
+                  {activeTab === 'commissions' && (
+                    <table className="w-full text-left border-collapse">
+                      <thead className="bg-gray-50/80 dark:bg-white/[0.02] text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider border-b border-gray-200 dark:border-gray-800">
+                        <tr>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('id')}>
+                            Commission ID <SortIcon field="id" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('recipientShareholderId')}>
+                            Recipient <SortIcon field="recipientShareholderId" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('sourceShareholderId')}>
+                            From Shareholder <SortIcon field="sourceShareholderId" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('level')}>
+                            Level <SortIcon field="level" />
+                          </th>
+                          <th className="px-6 py-3.5 cursor-pointer hover:bg-gray-100/50 dark:hover:bg-gray-800/40 select-none" onClick={() => handleSort('amount')}>
+                            Amount <SortIcon field="amount" />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
+                        {paginatedData.map((r: any) => (
+                          <tr key={r.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.02] transition-colors">
+                            <td className="px-6 py-4 font-mono text-[11px] text-gray-500">{r.id}</td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900 dark:text-white">{r.recipientName || 'N/A'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.recipientShareholderId}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="font-bold text-gray-900 dark:text-white">{r.sourceName || 'N/A'}</div>
+                              <div className="text-[11px] text-gray-400 font-mono mt-0.5">{r.sourceShareholderId}</div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="badge-brand">
+                                Level {r.level}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-bold text-brand-600 dark:text-brand-400">+₹{r.amount?.toLocaleString() || '0'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* Pagination Controls */}
+                {totalItems > 0 && (
+                  <div className="flex flex-col sm:flex-row justify-between items-center p-4 border-t border-gray-200 dark:border-gray-800 bg-gray-50/50 dark:bg-white/[0.01] gap-3 select-none">
+                    <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                      Showing <strong className="text-gray-900 dark:text-white">{(page - 1) * pageSize + 1}</strong> to{' '}
+                      <strong className="text-gray-900 dark:text-white">{Math.min(totalItems, page * pageSize)}</strong> of{' '}
+                      <strong className="text-gray-900 dark:text-white">{totalItems}</strong> records
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        className="px-3.5 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl text-xs font-bold disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer disabled:cursor-not-allowed transition-all shadow-theme-xs"
+                      >
+                        Previous
+                      </button>
+                      <span className="text-xs font-extrabold px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-700 dark:text-gray-300">
+                        {page} / {totalPages}
+                      </span>
+                      <button
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page >= totalPages}
+                        className="px-3.5 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 rounded-xl text-xs font-bold disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer disabled:cursor-not-allowed transition-all shadow-theme-xs"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </div>
       </div>
     </motion.div>

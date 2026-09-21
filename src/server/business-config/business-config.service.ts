@@ -163,26 +163,26 @@ export class BusinessConfigService implements OnModuleInit {
         } else {
           const existingRefSettings = (latestConfig.referralLevelSettings as any) || {};
           const currentLevels = existingRefSettings.levels || 0;
-          const needsReferralUpdate = currentLevels < 12;
-          const needsGratitudeUpdate = !latestConfig.gratitudeShareConfig;
+          const needsReferralUpdate = !latestConfig.referralLevelSettings || currentLevels < 12;
+          const needsGratitudeUpdate = !latestConfig.gratitudeShareConfig || !latestConfig.levelWiseProfitSharing || !latestConfig.levelOpeningVolume;
 
           if (needsReferralUpdate || needsGratitudeUpdate) {
             const mergedOpening = { ...DEFAULT_LEVEL_OPENING_VOLUMES, ...((latestConfig.levelOpeningVolume as any) || {}) };
-            const mergedSharing = { ...DEFAULT_LEVEL_WISE_PROFIT_SHARING, ...((latestConfig.levelWiseProfitSharing as any) || {}) };
+            const mergedSharing = { ...DEFAULT_LEVEL_WISE_PROFIT_SHARING, ...((latestConfig.levelWiseProfitSharing as any) || (latestConfig.gratitudeShareConfig as any) || {}) };
             const mergedActive = { ...DEFAULT_REFERRAL_ACTIVE_MAP, ...(existingRefSettings.active || {}) };
             const mergedDescs = { ...DEFAULT_REFERRAL_DESCRIPTIONS, ...(existingRefSettings.descriptions || {}) };
 
             await (this.prisma as any).businessConfiguration.update({
               where: { id: latestConfig.id },
               data: {
-                profitSharingPercentage: new Prisma.Decimal('0.0500'),
-                gratitudeShareConfig: DEFAULT_GRATITUDE_SHARE_RATES,
-                levelUnlockConfig: DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
-                rankConfig: DEFAULT_RANKS,
+                profitSharingPercentage: latestConfig.profitSharingPercentage || new Prisma.Decimal('0.0500'),
+                gratitudeShareConfig: mergedSharing,
+                levelUnlockConfig: latestConfig.levelUnlockConfig || DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
+                rankConfig: latestConfig.rankConfig || DEFAULT_RANKS,
                 levelOpeningVolume: mergedOpening,
                 levelWiseProfitSharing: mergedSharing,
                 referralLevelSettings: {
-                  levels: 12,
+                  levels: Math.max(12, currentLevels || 12),
                   active: mergedActive,
                   descriptions: mergedDescs,
                 },
@@ -200,8 +200,8 @@ export class BusinessConfigService implements OnModuleInit {
                   contributionMultiple: 100000,
                   zeroContributionWithholding: 0.20,
                   zeroContributionActivationThreshold: 100000,
-                  monthlyProfitRate: 0.05,
-                  sequentialLevelQualification: true,
+                  monthlyProfitRate: Number(latestConfig.profitSharingPercentage || 0.05),
+                  sequentialLevelQualification: (latestConfig.systemDefaults as any)?.sequentialLevelQualification !== false,
                 },
               },
             });
@@ -226,10 +226,23 @@ export class BusinessConfigService implements OnModuleInit {
 
   async getGratitudeShareRates(): Promise<Record<number, number>> {
     const config = await this.getLatest();
-    const stored = (config.gratitudeShareConfig as Record<string, number>) || {};
+    const stored = (config.levelWiseProfitSharing || config.gratitudeShareConfig || {}) as Record<string, number>;
+    const refSettings = (config.referralLevelSettings as any) || {};
+    const activeMap = refSettings.active || {};
+    const totalLevels = Math.max(12, Number(refSettings.levels || 12));
+
     const rates: Record<number, number> = {};
-    for (let l = 1; l <= 12; l++) {
-      rates[l] = stored[String(l)] !== undefined ? Number(stored[String(l)]) : (DEFAULT_GRATITUDE_SHARE_RATES[l] ?? 0.0025);
+    for (let l = 1; l <= totalLevels; l++) {
+      const isActive = activeMap[String(l)] !== false;
+      if (!isActive) {
+        rates[l] = 0;
+      } else if (stored[String(l)] !== undefined) {
+        rates[l] = Number(stored[String(l)]);
+      } else if ((config.gratitudeShareConfig as any)?.[String(l)] !== undefined) {
+        rates[l] = Number((config.gratitudeShareConfig as any)[String(l)]);
+      } else {
+        rates[l] = DEFAULT_LEVEL_WISE_PROFIT_SHARING[l] ?? DEFAULT_GRATITUDE_SHARE_RATES[l] ?? 0.0025;
+      }
     }
     return rates;
   }
@@ -261,6 +274,18 @@ export class BusinessConfigService implements OnModuleInit {
 
     const nextNum = data.resetCounter ? 1 : latest.userIdNextNumber;
 
+    const sharingConfig = data.levelWiseProfitSharing ?? data.gratitudeShareConfig ?? latest.levelWiseProfitSharing ?? latest.gratitudeShareConfig ?? DEFAULT_LEVEL_WISE_PROFIT_SHARING;
+    const openingVolumes = data.levelOpeningVolume ?? latest.levelOpeningVolume ?? DEFAULT_LEVEL_OPENING_VOLUMES;
+    const refLevelSettings = data.referralLevelSettings ?? latest.referralLevelSettings ?? {
+      levels: 12,
+      active: DEFAULT_REFERRAL_ACTIVE_MAP,
+      descriptions: DEFAULT_REFERRAL_DESCRIPTIONS,
+    };
+
+    const profitPct = data.profitSharingPercentage
+      ? new Prisma.Decimal(data.profitSharingPercentage)
+      : (latest.profitSharingPercentage || new Prisma.Decimal('0.0500'));
+
     const newConfig = await this.prisma.businessConfiguration.create({
       data: {
         version: nextVersion,
@@ -268,10 +293,11 @@ export class BusinessConfigService implements OnModuleInit {
         userIdStartingNumber: data.userIdStartingNumber ?? latest.userIdStartingNumber,
         userIdNextNumber: nextNum,
         userIdLength: data.userIdLength ?? latest.userIdLength,
-        profitSharingPercentage: data.profitSharingPercentage
-          ? new Prisma.Decimal(data.profitSharingPercentage)
-          : latest.profitSharingPercentage,
-        gratitudeShareConfig: data.gratitudeShareConfig ?? latest.gratitudeShareConfig ?? DEFAULT_GRATITUDE_SHARE_RATES,
+        profitSharingPercentage: profitPct,
+        gratitudeShareConfig: sharingConfig,
+        levelOpeningVolume: openingVolumes,
+        levelWiseProfitSharing: sharingConfig,
+        referralLevelSettings: refLevelSettings,
         levelUnlockConfig: data.levelUnlockConfig ?? latest.levelUnlockConfig ?? DEFAULT_DYNAMIC_LEVEL_UNLOCKS,
         rankConfig: data.rankConfig ?? latest.rankConfig ?? DEFAULT_RANKS,
         payoutConfig: data.payoutConfig ?? latest.payoutConfig ?? {
@@ -282,12 +308,10 @@ export class BusinessConfigService implements OnModuleInit {
           status: 'PENDING_CLIENT_CONFIRMATION',
           basis: 'CALENDAR_DAYS',
         },
-        systemDefaults: data.systemDefaults ?? latest.systemDefaults ?? {
-          minContribution: 100000,
-          contributionMultiple: 100000,
-          zeroContributionWithholding: 0.20,
-          zeroContributionActivationThreshold: 100000,
-          monthlyProfitRate: 0.05,
+        systemDefaults: {
+          ...(latest.systemDefaults as any || {}),
+          ...(data.systemDefaults || {}),
+          monthlyProfitRate: Number(profitPct),
         },
         futureBusinessParameters: data.futureBusinessParameters ?? latest.futureBusinessParameters ?? Prisma.JsonNull,
         createdById: adminId,
@@ -314,11 +338,15 @@ export class BusinessConfigService implements OnModuleInit {
       if (!latest) {
         throw new BadRequestException('Business configuration not initialized');
       }
-      const currentNum = latest.userIdNextNumber;
+      let currentNum = latest.userIdNextNumber;
       const prefix = latest.userIdPrefix;
       const length = latest.userIdLength;
 
-      const customId = `${prefix}${String(currentNum).padStart(length, '0')}`;
+      let customId = `${prefix}${String(currentNum).padStart(length, '0')}`;
+      while (await tx.shareholder.findFirst({ where: { shareholderId: { equals: customId, mode: 'insensitive' } } })) {
+        currentNum++;
+        customId = `${prefix}${String(currentNum).padStart(length, '0')}`;
+      }
 
       await tx.businessConfiguration.update({
         where: { id: latest.id },
@@ -336,10 +364,16 @@ export class BusinessConfigService implements OnModuleInit {
     if (!latest) {
       throw new BadRequestException('Business configuration not initialized');
     }
-    const currentNum = latest.userIdNextNumber;
+    let currentNum = latest.userIdNextNumber;
     const prefix = latest.userIdPrefix;
     const length = latest.userIdLength;
 
-    return `${prefix}${String(currentNum).padStart(length, '0')}`;
+    let customId = `${prefix}${String(currentNum).padStart(length, '0')}`;
+    while (await this.prisma.shareholder.findFirst({ where: { shareholderId: { equals: customId, mode: 'insensitive' } } })) {
+      currentNum++;
+      customId = `${prefix}${String(currentNum).padStart(length, '0')}`;
+    }
+
+    return customId;
   }
 }

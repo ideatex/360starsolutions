@@ -9,7 +9,7 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ArrowRightLeft, Search, Filter, Calendar, FileSpreadsheet, FileText, 
-  Plus, Loader2, ArrowRight, ShieldAlert, CheckCircle2, DollarSign, Wallet,
+  Plus, Loader2, ArrowRight, ShieldAlert, CheckCircle2, Coins, Wallet,
   User, RefreshCw, X, AlertTriangle
 } from 'lucide-react';
 import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';

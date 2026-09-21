@@ -8,6 +8,9 @@ interface Shareholder {
   role: string;
   referralCode?: string;
   materializedPath?: string;
+  phone?: string;
+  email?: string;
+  rank?: string;
 }
 
 interface AuthState {

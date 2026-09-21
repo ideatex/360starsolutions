@@ -9,15 +9,14 @@ import { useConfirm } from '@/components/ui/ConfirmModal';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, UserPlus, ShieldAlert, Edit3, X, Check, Eye, Trash2, Key, 
-  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, DollarSign, Wallet, Plus, FileText, FileSpreadsheet,
+  RotateCcw, AlertTriangle, ArrowRight, ArrowLeft, Loader2, Landmark, MapPin, User, Coins, Wallet, Plus, FileText, FileSpreadsheet,
   ShieldCheck, UserCheck, CheckSquare, Square, Settings, Sliders, CheckCircle2, Clock
 } from 'lucide-react';
 import { exportToCSV, exportToPDF, ExportColumn } from '@/lib/exportUtils';
 import { 
   getIndianStates, 
   getDistrictsByState, 
-  getCitiesByDistrict, 
-  getPincodesByCity 
+  lookupPincode 
 } from '@/lib/indianLocations';
 
 const DEFAULT_INDIAN_BANKS = [
@@ -139,7 +138,8 @@ export default function AdminUsersPage() {
 
   const isAccountNumberValid = (accNum: string) => {
     if (!accNum) return true;
-    return /^\d{15}$/.test(accNum);
+    const clean = accNum.replace(/\D/g, '');
+    return /^\d{10,16}$/.test(clean);
   };
 
   const isPanValid = (panStr: string) => {
@@ -153,12 +153,76 @@ export default function AdminUsersPage() {
   const [referrerName, setReferrerName] = useState('');
   const [isValidatingReferrer, setIsValidatingReferrer] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLookingUpCreatePincode, setIsLookingUpCreatePincode] = useState(false);
+  const [createPincodePostOffices, setCreatePincodePostOffices] = useState<string[]>([]);
+  const [isLookingUpEditPincode, setIsLookingUpEditPincode] = useState(false);
+  const [editPincodePostOffices, setEditPincodePostOffices] = useState<string[]>([]);
+
+  // Pincode lookup helper for creation wizard
+  const handleCreatePincodeChange = async (pinValue: string) => {
+    const cleanPin = pinValue.replace(/\D/g, '').slice(0, 6);
+    setCreateForm(prev => ({ ...prev, addressPincode: cleanPin }));
+
+    if (cleanPin.length === 6) {
+      setIsLookingUpCreatePincode(true);
+      try {
+        const result = await lookupPincode(cleanPin);
+        if (result) {
+          setCreatePincodePostOffices(result.postOffices || []);
+          setCreateForm(prev => ({
+            ...prev,
+            addressState: result.state || prev.addressState,
+            addressDistrict: result.district || prev.addressDistrict,
+            addressCity: prev.addressCity || result.city || (result.postOffices && result.postOffices[0]) || '',
+          }));
+          toast({ title: "Pincode Verified", description: `Auto-filled: ${result.district}, ${result.state}`, type: "success" });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLookingUpCreatePincode(false);
+      }
+    } else {
+      setCreatePincodePostOffices([]);
+    }
+  };
+
+  // Pincode lookup helper for edit modal
+  const handleEditPincodeChange = async (pinValue: string) => {
+    const cleanPin = pinValue.replace(/\D/g, '').slice(0, 6);
+    setEditForm((prev: any) => ({ ...prev, addressPincode: cleanPin }));
+
+    if (cleanPin.length === 6) {
+      setIsLookingUpEditPincode(true);
+      try {
+        const result = await lookupPincode(cleanPin);
+        if (result) {
+          setEditPincodePostOffices(result.postOffices || []);
+          setEditForm((prev: any) => ({
+            ...prev,
+            addressState: result.state || prev.addressState,
+            addressDistrict: result.district || prev.addressDistrict,
+            addressCity: prev.addressCity || result.city || (result.postOffices && result.postOffices[0]) || '',
+          }));
+          toast({ title: "Pincode Verified", description: `Auto-filled: ${result.district}, ${result.state}`, type: "success" });
+        }
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setIsLookingUpEditPincode(false);
+      }
+    } else {
+      setEditPincodePostOffices([]);
+    }
+  };
 
   // Form states
   const [createForm, setCreateForm] = useState({
     shareholderId: '',
     password: '',
     role: 'SHAREHOLDER',
+    accountType: 'CONTRIBUTION',
+    withholdingPercentage: '20',
     status: 'ACTIVE',
     name: '',
     phone: '',
@@ -190,6 +254,8 @@ export default function AdminUsersPage() {
     lastName: '',
     phone: '',
     pan: '',
+    accountType: 'CONTRIBUTION',
+    withholdingPercentage: '20',
     dob: '',
     addressBuilding: '',
     addressArea: '',
@@ -211,14 +277,28 @@ export default function AdminUsersPage() {
     validityMonths: '12',
   });
 
+  const [viewMode, setViewMode] = useState<'active' | 'deleted'>('active');
+
   // Fetch Shareholders
   const { data: usersData, isLoading } = useQuery({
-    queryKey: ['adminUsers', search, roleFilter, statusFilter, page],
+    queryKey: ['adminUsers', viewMode, search, roleFilter, statusFilter, page],
     queryFn: async () => {
+      const effectiveStatus = viewMode === 'deleted' ? 'DELETED' : (statusFilter || undefined);
       const res = await api.get('/shareholders', {
-        params: { search, role: roleFilter || undefined, status: statusFilter || undefined, page, limit: 15 },
+        params: { search, role: roleFilter || undefined, status: effectiveStatus, page, limit: 15 },
       });
       return res.data;
+    },
+  });
+
+  // Fetch Deleted Shareholders Count
+  const { data: deletedCountData } = useQuery({
+    queryKey: ['adminDeletedCount'],
+    queryFn: async () => {
+      const res = await api.get('/shareholders', {
+        params: { status: 'DELETED', page: 1, limit: 1 },
+      });
+      return res.data?.total || 0;
     },
   });
 
@@ -236,7 +316,7 @@ export default function AdminUsersPage() {
     },
   });
 
-  // Enable / Restore Mutation
+  // Enable / Activate Mutation
   const enableMutation = useMutation({
     mutationFn: async (id: string) => {
       await api.patch(`/shareholders/${id}/enable`);
@@ -250,6 +330,21 @@ export default function AdminUsersPage() {
     },
   });
 
+  // Restore Deleted Mutation
+  const restoreMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await api.patch(`/shareholders/${id}/restore`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['adminDeletedCount'] });
+      toast({ title: "Account Restored", description: "The shareholder account has been restored to Active status.", type: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Operation Failed", description: err.response?.data?.message || 'Error restoring shareholder', type: "error" });
+    },
+  });
+
   // Delete Mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -257,14 +352,27 @@ export default function AdminUsersPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
+      queryClient.invalidateQueries({ queryKey: ['adminDeletedCount'] });
       setIsDeleteOpen(false);
       setSelectedUser(null);
-      toast({ title: "Account Deleted", description: "The shareholder has been soft-deleted from active system indices.", type: "success" });
+      toast({ title: "Account Deleted", description: "The shareholder has been soft-deleted and moved to Deleted Accounts.", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Operation Failed", description: err.response?.data?.message || 'Error deleting shareholder', type: "error" });
     },
   });
+
+  const handleRestore = async (u: any) => {
+    const ok = await confirm({
+      title: "Restore Shareholder Account",
+      description: `Are you sure you want to restore ${u.name || u.shareholderId} (${u.shareholderId}) back to Active status?`,
+      confirmText: "Restore Account",
+      variant: "success",
+    });
+    if (ok) {
+      restoreMutation.mutate(u.id);
+    }
+  };
 
   // Fetch Pending Financial Requests
   const { data: financialRequestsData } = useQuery({
@@ -418,9 +526,12 @@ export default function AdminUsersPage() {
         shareholderId: '',
         password: '',
         role: 'SHAREHOLDER',
+        accountType: 'CONTRIBUTION',
+        withholdingPercentage: '20',
         status: 'ACTIVE',
         name: '',
         phone: '',
+        pan: '',
         dob: '',
         addressBuilding: '',
         addressArea: '',
@@ -446,7 +557,7 @@ export default function AdminUsersPage() {
     onError: (err: any) => {
       const errors = err.response?.data?.errors;
       if (errors) {
-        const errorList = Object.entries(errors).map(([field, msg]) => `Ã¢â‚¬Â¢ ${field}: ${msg}`).join('\n');
+        const errorList = Object.entries(errors).map(([field, msg]) => `• ${field}: ${msg}`).join('\n');
         toast({ title: "Validation Failed", description: `Please check creation values:\n${errorList}`, type: "error" });
       } else {
         toast({ title: "Registration Error", description: err.response?.data?.message || 'Error creating shareholder', type: "error" });
@@ -526,9 +637,12 @@ export default function AdminUsersPage() {
     setSelectedUser(u);
     setEditForm({
       shareholderId: u.shareholderId,
-      firstName: u.firstName || '',
-      lastName: u.lastName || '',
+      firstName: u.firstName || (u.name ? u.name.split(' ')[0] : ''),
+      lastName: u.lastName || (u.name ? u.name.split(' ').slice(1).join(' ') : ''),
       phone: u.phone || '',
+      pan: u.pan || '',
+      accountType: u.accountType || 'CONTRIBUTION',
+      withholdingPercentage: u.withholdingPercentage != null ? String(u.withholdingPercentage) : (u.accountType === 'ZERO_CONTRIBUTION' ? '20' : '0'),
       dob: u.dob ? u.dob.split('T')[0] : '',
       addressBuilding: u.addressBuilding || '',
       addressArea: u.addressArea || '',
@@ -590,6 +704,8 @@ export default function AdminUsersPage() {
       { header: 'Name', key: 'name' },
       { header: 'Phone', key: 'phone' },
       { header: 'Role', key: 'role' },
+      { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
+      { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
       { header: 'Status', key: 'status' },
       { header: 'Referral Code', key: 'referralCode' },
       { header: 'Bank Name', key: 'bankName' },
@@ -611,6 +727,8 @@ export default function AdminUsersPage() {
       { header: 'Name', key: 'name' },
       { header: 'Phone', key: 'phone', formatter: (v) => v || '-' },
       { header: 'Role', key: 'role' },
+      { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
+      { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
       { header: 'Status', key: 'status' },
       { header: 'Bank Name', key: 'bankName', formatter: (v) => v || '-' },
       { header: 'Account No.', key: 'bankAccountNumber', formatter: (v) => v || '-' },
@@ -681,13 +799,50 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      {/* View Mode Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800 pb-2">
+        <button
+          onClick={() => { setViewMode('active'); setStatusFilter(''); setPage(1); }}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            viewMode === 'active'
+              ? 'bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-800/60 shadow-theme-xs'
+              : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <User className="w-4 h-4" />
+          <span>Active Directory</span>
+          {viewMode === 'active' && usersData?.total !== undefined && (
+            <span className="bg-brand-100 dark:bg-brand-900/60 text-brand-700 dark:text-brand-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+              {usersData.total}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => { setViewMode('deleted'); setStatusFilter('DELETED'); setPage(1); }}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+            viewMode === 'deleted'
+              ? 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800/60 shadow-theme-xs'
+              : 'text-gray-500 hover:text-red-600 dark:hover:text-red-400'
+          }`}
+        >
+          <Trash2 className="w-4 h-4" />
+          <span>Deleted Accounts</span>
+          {((deletedCountData ?? 0) > 0 || (viewMode === 'deleted' && (usersData?.total ?? 0) > 0)) && (
+            <span className="bg-red-100 dark:bg-red-900/60 text-red-700 dark:text-red-300 text-[10px] font-extrabold px-2 py-0.5 rounded-full">
+              {viewMode === 'deleted' ? usersData?.total : deletedCountData}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Filters Panel */}
       <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-theme-xs dark:border-gray-800 dark:bg-gray-900/60 flex flex-col md:flex-row gap-3 items-center select-none">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3.5 top-2.5 text-gray-400 w-4 h-4" />
           <input
             type="text"
-            placeholder="Search ID, shareholder ID, name, or referral code..."
+            placeholder={viewMode === 'deleted' ? "Search deleted shareholder by name, ID, or phone..." : "Search ID, shareholder ID, name, or referral code..."}
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             className="w-full pl-10 pr-4 py-2 rounded-xl border border-gray-200 bg-gray-50/50 dark:bg-gray-800/50 dark:border-gray-700 focus:outline-none focus:border-brand-500 text-xs font-medium dark:text-white"
@@ -704,19 +859,20 @@ export default function AdminUsersPage() {
             <option value="ADMIN">Admin</option>
             <option value="SUPER_ADMIN">Super Admin</option>
           </select>
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-white dark:bg-gray-900 font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-brand-500 cursor-pointer shadow-theme-xs"
-          >
-            <option value="">All Statuses</option>
-            <option value="ACTIVE">Active</option>
-            <option value="DISABLED">Disabled</option>
-            <option value="AUTO_ARCHIVED">Auto Archived</option>
-            <option value="RESTORED">Restored</option>
-            <option value="BLOCKED">Blocked</option>
-            <option value="DELETED">Deleted</option>
-          </select>
+          {viewMode === 'active' && (
+            <select
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+              className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-white dark:bg-gray-900 font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-brand-500 cursor-pointer shadow-theme-xs"
+            >
+              <option value="">All Active Statuses</option>
+              <option value="ACTIVE">Active</option>
+              <option value="DISABLED">Disabled</option>
+              <option value="AUTO_ARCHIVED">Auto Archived</option>
+              <option value="RESTORED">Restored</option>
+              <option value="BLOCKED">Blocked</option>
+            </select>
+          )}
         </div>
       </div>
 
@@ -725,42 +881,128 @@ export default function AdminUsersPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-500">
             <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
-            <p className="text-xs font-semibold">Loading shareholder database...</p>
+            <p className="text-xs font-semibold">Loading shareholder records...</p>
           </div>
         ) : usersData?.data?.length === 0 ? (
           <div className="text-center py-20 text-gray-400">
             <User className="w-10 h-10 mx-auto mb-2.5 opacity-30" />
-            <p className="text-xs font-bold text-gray-600 dark:text-gray-300">No Shareholders Found</p>
-            <p className="text-[11px] text-gray-400 mt-0.5">No accounts found matching query filters.</p>
+            <p className="text-xs font-bold text-gray-600 dark:text-gray-300">
+              {viewMode === 'deleted' ? 'No Deleted Accounts' : 'No Shareholders Found'}
+            </p>
+            <p className="text-[11px] text-gray-400 mt-0.5">
+              {viewMode === 'deleted' ? 'No soft-deleted shareholder accounts found.' : 'No accounts found matching query filters.'}
+            </p>
+          </div>
+        ) : viewMode === 'deleted' ? (
+          /* DELETED ACCOUNTS DEDICATED TABLE */
+          <div className="overflow-x-auto font-sans">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-red-50/50 dark:bg-red-950/10 border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider">
+                <tr>
+                  <th className="px-5 py-3.5">Deleted Shareholder</th>
+                  <th className="px-5 py-3.5">Shareholder ID</th>
+                  <th className="px-5 py-3.5">Contact / City</th>
+                  <th className="px-5 py-3.5">Role</th>
+                  <th className="px-5 py-3.5">Account Type</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Historical Capital</th>
+                  <th className="px-5 py-3.5 text-right">Restore Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
+                {usersData?.data?.map((u: any) => (
+                  <tr key={u.id} className="hover:bg-red-50/20 dark:hover:bg-red-950/10 transition-colors">
+                    <td className="px-5 py-4">
+                      <div className="font-extrabold text-gray-950 dark:text-white line-through opacity-75">{u.name || 'N/A'}</div>
+                      <div className="text-[10px] text-red-500 font-semibold">Deleted Account</div>
+                    </td>
+                    <td className="px-5 py-4 font-mono font-bold text-gray-600 dark:text-gray-400">
+                      {u.shareholderId}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-gray-700 dark:text-gray-300">{u.phone || '-'}</div>
+                      {u.addressCity && <div className="text-[10px] text-muted-foreground">{u.addressCity}{u.addressState ? `, ${u.addressState}` : ''}</div>}
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="px-2 py-0.5 rounded text-[9px] font-bold border bg-gray-50 dark:bg-secondary/40 text-gray-700 dark:text-gray-300 border-border-subtle">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                        u.accountType === 'ZERO_CONTRIBUTION'
+                          ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                          : 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/40'
+                      }`}>
+                        {u.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-200 dark:border-red-900/40 flex items-center gap-1 w-fit">
+                        <Trash2 size={10} /> DELETED
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-semibold text-gray-900 dark:text-white">
+                      ₹{(u.contributions
+                        ? u.contributions
+                            .filter((c: any) => c.status === 'APPROVED')
+                            .reduce((sum: number, c: any) => sum + Number(c.amount), 0)
+                        : 0
+                      ).toLocaleString('en-IN')}
+                    </td>
+                    <td className="px-5 py-4 text-right space-x-2 whitespace-nowrap">
+                      <button
+                        onClick={() => handleOpenView(u)}
+                        className="p-1.5 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        title="View Details"
+                      >
+                        <Eye size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleRestore(u)}
+                        className="px-3 py-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-theme-xs inline-flex items-center gap-1.5 transition-all cursor-pointer"
+                        title="Restore Account back to Active"
+                      >
+                        <RotateCcw size={13} />
+                        <span>Restore Account</span>
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         ) : (
+          /* ACTIVE SHAREHOLDERS DIRECTORY TABLE */
           <div className="overflow-x-auto font-sans">
             <table className="w-full text-left border-collapse">
               <thead className="bg-gray-50/80 dark:bg-white/[0.02] border-b border-gray-200 dark:border-gray-800 text-gray-500 dark:text-gray-400 text-[11px] font-bold uppercase tracking-wider">
                 <tr>
-                  <th className="px-6 py-3.5">Name</th>
-                  <th className="px-6 py-3.5">Shareholder ID</th>
-                  <th className="px-6 py-3.5">Phone / Location</th>
-                  <th className="px-6 py-3.5">Role</th>
-                  <th className="px-6 py-3.5">Status</th>
-                  <th className="px-6 py-3.5">Total Contribution</th>
-                  <th className="px-6 py-3.5 text-right">Actions</th>
+                  <th className="px-5 py-3.5">Name</th>
+                  <th className="px-5 py-3.5">Shareholder ID</th>
+                  <th className="px-5 py-3.5">Phone / Location</th>
+                  <th className="px-5 py-3.5">Role</th>
+                  <th className="px-5 py-3.5">Account Type</th>
+                  <th className="px-5 py-3.5">Withholding %</th>
+                  <th className="px-5 py-3.5">Status</th>
+                  <th className="px-5 py-3.5">Total Contribution</th>
+                  <th className="px-5 py-3.5 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-xs text-gray-800 dark:text-gray-200 font-medium">
                 {usersData?.data?.map((u: any) => (
                   <tr key={u.id} className="hover:bg-muted/20 transition-colors">
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <div className="font-extrabold text-gray-950 dark:text-white">{u.name || 'N/A'}</div>
                     </td>
-                    <td className="px-6 py-4 font-mono font-extrabold text-brand-primary">
+                    <td className="px-5 py-4 font-mono font-extrabold text-brand-primary">
                       {u.shareholderId}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <div className="font-semibold text-gray-900 dark:text-white">{u.phone || '-'}</div>
                       {u.addressCity && <div className="text-[10px] text-muted-foreground">{u.addressCity}{u.addressState ? `, ${u.addressState}` : ''}</div>}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
                         u.role === 'SUPER_ADMIN' 
                           ? 'bg-purple-50 dark:bg-purple-950/20 text-purple-700 dark:text-purple-400 border-purple-100 dark:border-purple-900/40' 
@@ -771,7 +1013,30 @@ export default function AdminUsersPage() {
                         {u.role}
                       </span>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-5 py-4">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold border ${
+                        u.accountType === 'ZERO_CONTRIBUTION'
+                          ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                          : 'bg-blue-50 dark:bg-blue-950/20 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800/40'
+                      }`}>
+                        {u.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      {u.accountType === 'ZERO_CONTRIBUTION' ? (
+                        <button
+                          onClick={() => handleOpenEdit(u)}
+                          className="inline-flex items-center gap-1 font-mono font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/40 hover:bg-amber-100 cursor-pointer text-[10px]"
+                          title="Click to edit withholding %"
+                        >
+                          <span>{u.withholdingPercentage != null ? `${u.withholdingPercentage}%` : '20%'}</span>
+                          <Edit3 size={10} className="opacity-60" />
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground font-semibold">0% (N/A)</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border ${
                         u.status === 'ACTIVE' || u.status === 'RESTORED'
                           ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' 
@@ -782,33 +1047,33 @@ export default function AdminUsersPage() {
                         {u.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 font-semibold text-gray-900 dark:text-white">
-                      ${(u.contributions
+                    <td className="px-5 py-4 font-semibold text-gray-900 dark:text-white">
+                      ₹{(u.contributions
                         ? u.contributions
                             .filter((c: any) => c.status === 'APPROVED')
                             .reduce((sum: number, c: any) => sum + Number(c.amount), 0)
                         : 0
-                      ).toLocaleString()}
+                      ).toLocaleString('en-IN')}
                     </td>
-                    <td className="px-6 py-4 text-right space-x-1.5 whitespace-nowrap">
+                    <td className="px-5 py-4 text-right space-x-1 whitespace-nowrap">
                       <button
                         onClick={() => { setSelectedUser(u); setIsResetOpen(true); }}
-                        className="px-2.5 py-1 text-[11px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800/40 inline-flex items-center gap-1.5 transition-all cursor-pointer shadow-theme-xs"
+                        className="px-2 py-1 text-[10px] font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg border border-amber-200 dark:border-amber-800/40 inline-flex items-center gap-1 transition-all cursor-pointer shadow-theme-xs"
                         title="Reset Shareholder Password"
                       >
-                        <Key size={12} />
-                        <span>Reset Password</span>
+                        <Key size={11} />
+                        <span>Reset</span>
                       </button>
                       <button
                         onClick={() => handleOpenView(u)}
-                        className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        className="p-1.5 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                         title="View Details"
                       >
                         <Eye size={14} />
                       </button>
                       <button
                         onClick={() => handleOpenEdit(u)}
-                        className="p-2 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                        className="p-1.5 hover:bg-muted dark:hover:bg-secondary rounded-xl text-muted-foreground hover:text-foreground transition-all cursor-pointer"
                         title="Edit Shareholder"
                       >
                         <Edit3 size={14} />
@@ -842,23 +1107,32 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Pagination Footer */}
-      {!isLoading && usersData?.lastPage > 1 && (
-        <div className="flex justify-between items-center bg-white dark:bg-card p-4 rounded-2xl shadow-sm border border-border-subtle mt-4">
-          <button
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-          >
-            Previous
-          </button>
-          <span className="text-[11px] font-bold text-muted-foreground">Page {page} of {usersData?.lastPage || 1}</span>
-          <button
-            onClick={() => setPage(p => Math.min(usersData?.lastPage || 1, p + 1))}
-            disabled={page >= (usersData?.lastPage || 1)}
-            className="px-4 py-2 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-50 hover:bg-muted dark:hover:bg-secondary cursor-pointer select-none"
-          >
-            Next
-          </button>
+      {!isLoading && usersData && usersData.total > 0 && (
+        <div className="flex flex-col sm:flex-row justify-between items-center bg-white dark:bg-card p-4 rounded-2xl shadow-theme-xs border border-border-subtle gap-3 select-none">
+          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+            Showing <strong className="text-gray-900 dark:text-white">{(page - 1) * 15 + 1}</strong> to{' '}
+            <strong className="text-gray-900 dark:text-white">{Math.min(usersData.total, page * 15)}</strong> of{' '}
+            <strong className="text-gray-900 dark:text-white">{usersData.total}</strong> accounts
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="px-3.5 py-1.5 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-40 hover:bg-muted dark:hover:bg-secondary cursor-pointer disabled:cursor-not-allowed transition-all"
+            >
+              Previous
+            </button>
+            <span className="text-xs font-extrabold px-3 py-1 bg-gray-100 dark:bg-gray-800 rounded-lg text-gray-700 dark:text-gray-300">
+              {page} / {usersData.lastPage || 1}
+            </span>
+            <button
+              onClick={() => setPage(p => Math.min(usersData.lastPage || 1, p + 1))}
+              disabled={page >= (usersData.lastPage || 1)}
+              className="px-3.5 py-1.5 border border-border-subtle rounded-xl text-xs font-bold disabled:opacity-40 hover:bg-muted dark:hover:bg-secondary cursor-pointer disabled:cursor-not-allowed transition-all"
+            >
+              Next
+            </button>
+          </div>
         </div>
       )}
 
@@ -935,6 +1209,56 @@ export default function AdminUsersPage() {
                         <option value="SUPER_ADMIN">Super Admin</option>
                       </select>
                     </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Type *</label>
+                        <select 
+                          value={createForm.accountType} 
+                          onChange={e => {
+                            const newType = e.target.value;
+                            setCreateForm(prev => ({
+                              ...prev,
+                              accountType: newType,
+                              withholdingPercentage: newType === 'ZERO_CONTRIBUTION' ? (prev.withholdingPercentage && prev.withholdingPercentage !== '0' ? prev.withholdingPercentage : '20') : '0',
+                            }));
+                          }} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                        >
+                          <option value="CONTRIBUTION">Standard Contribution Account</option>
+                          <option value="ZERO_CONTRIBUTION">Zero Contribution Account</option>
+                        </select>
+                        <p className="text-[9px] text-muted-foreground">Standard gets full profit & gratitude share; Zero Contribution applies gratitude withholding.</p>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gratitude Share Withholding (%)</label>
+                          {createForm.accountType !== 'ZERO_CONTRIBUTION' && (
+                            <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-1.5 py-0.5 rounded">Not Applicable</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <input 
+                            type="number" 
+                            min="0" 
+                            max="100" 
+                            step="0.1"
+                            disabled={createForm.accountType !== 'ZERO_CONTRIBUTION'}
+                            value={createForm.accountType === 'ZERO_CONTRIBUTION' ? createForm.withholdingPercentage : ''} 
+                            onChange={e => setCreateForm({...createForm, withholdingPercentage: e.target.value})} 
+                            className={`w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-40 cursor-not-allowed bg-muted/40' : ''}`} 
+                            placeholder={createForm.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"} 
+                          />
+                          <span className="text-xs font-bold text-gray-500">%</span>
+                        </div>
+                        <p className="text-[9px] text-muted-foreground">
+                          {createForm.accountType === 'ZERO_CONTRIBUTION' 
+                            ? "Admin setting for % of gratitude share withheld by system for zero contribution accounts." 
+                            : "Withholding is not applicable for Standard Contribution accounts."}
+                        </p>
+                      </div>
+                    </div>
                   </motion.div>
                 )}
 
@@ -974,12 +1298,27 @@ export default function AdminUsersPage() {
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
+                        <div className="flex justify-between items-center">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode (6 Digits) *</label>
+                          {isLookingUpCreatePincode && <span className="text-[9px] text-brand-primary animate-pulse font-bold">Looking up...</span>}
+                        </div>
+                        <input 
+                          type="text" 
+                          maxLength={6}
+                          value={createForm.addressPincode} 
+                          onChange={e => handleCreatePincodeChange(e.target.value)} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                          placeholder="e.g. 110001" 
+                        />
+                      </div>
+
+                      <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State (India) *</label>
                         <select 
                           value={createForm.addressState} 
                           onChange={e => {
                             const val = e.target.value;
-                            setCreateForm(prev => ({ ...prev, addressState: val, addressDistrict: '', addressCity: '', addressPincode: '' }));
+                            setCreateForm(prev => ({ ...prev, addressState: val, addressDistrict: '' }));
                           }} 
                           className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer"
                         >
@@ -989,14 +1328,16 @@ export default function AdminUsersPage() {
                           ))}
                         </select>
                       </div>
+                    </div>
 
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">District *</label>
                         <select 
                           value={createForm.addressDistrict} 
                           onChange={e => {
                             const val = e.target.value;
-                            setCreateForm(prev => ({ ...prev, addressDistrict: val, addressCity: '', addressPincode: '' }));
+                            setCreateForm(prev => ({ ...prev, addressDistrict: val }));
                           }} 
                           disabled={!createForm.addressState}
                           className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer disabled:opacity-50"
@@ -1007,53 +1348,32 @@ export default function AdminUsersPage() {
                           ))}
                         </select>
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Locality *</label>
-                        <select 
-                          value={createForm.addressCity} 
-                          onChange={e => {
-                            const val = e.target.value;
-                            const pins = getPincodesByCity(createForm.addressState, createForm.addressDistrict, val);
-                            setCreateForm(prev => ({ 
-                              ...prev, 
-                              addressCity: val, 
-                              addressPincode: pins.length > 0 ? pins[0] : prev.addressPincode 
-                            }));
-                          }} 
-                          disabled={!createForm.addressDistrict}
-                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer disabled:opacity-50"
-                        >
-                          <option value="">{createForm.addressDistrict ? "Select City..." : "Select District First"}</option>
-                          {getCitiesByDistrict(createForm.addressState, createForm.addressDistrict).map(ct => (
-                            <option key={ct} value={ct}>{ct}</option>
-                          ))}
-                        </select>
-                      </div>
 
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode *</label>
-                        {getPincodesByCity(createForm.addressState, createForm.addressDistrict, createForm.addressCity).length > 0 ? (
-                          <select 
-                            value={createForm.addressPincode} 
-                            onChange={e => setCreateForm({ ...createForm, addressPincode: e.target.value })} 
-                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 bg-white cursor-pointer"
-                          >
-                            <option value="">Select Pincode...</option>
-                            {getPincodesByCity(createForm.addressState, createForm.addressDistrict, createForm.addressCity).map(pin => (
-                              <option key={pin} value={pin}>{pin}</option>
-                            ))}
-                          </select>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Town / Area *</label>
+                        {createPincodePostOffices.length > 0 ? (
+                          <div className="space-y-1">
+                            <input 
+                              type="text"
+                              list="createPostOfficesList"
+                              value={createForm.addressCity} 
+                              onChange={e => setCreateForm({...createForm, addressCity: e.target.value})} 
+                              className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                              placeholder="Select or enter city" 
+                            />
+                            <datalist id="createPostOfficesList">
+                              {createPincodePostOffices.map(po => (
+                                <option key={po} value={po} />
+                              ))}
+                            </datalist>
+                          </div>
                         ) : (
                           <input 
-                            type="text" 
-                            maxLength={6}
-                            value={createForm.addressPincode} 
-                            onChange={e => setCreateForm({ ...createForm, addressPincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} 
-                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
-                            placeholder="6-digit Pincode" 
+                            type="text"
+                            value={createForm.addressCity} 
+                            onChange={e => setCreateForm({...createForm, addressCity: e.target.value})} 
+                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                            placeholder="Enter city / town" 
                           />
                         )}
                       </div>
@@ -1165,9 +1485,16 @@ export default function AdminUsersPage() {
                 {wizardStep === 5 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
                     <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 5: Capital Contribution</h4>
+                    
+                    {createForm.accountType === 'ZERO_CONTRIBUTION' && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
+                        <strong>Zero Contribution Account:</strong> Capital deposit is optional (can be ₹0). The system will withhold {createForm.withholdingPercentage}% of Gratitude commissions into holding ledger until requirements are met.
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund ($)</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund (₹)</label>
                         <input type="number" value={createForm.contributionAmount} onChange={e => setCreateForm({...createForm, contributionAmount: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-extrabold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="5000" />
                       </div>
                       <div className="space-y-1.5">
@@ -1225,6 +1552,10 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">shareholderId:</strong> {createForm.shareholderId}</div>
                         <div><strong className="text-muted-foreground">Role:</strong> {createForm.role}</div>
                       </div>
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
+                        <div><strong className="text-muted-foreground">Account Type:</strong> {createForm.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</div>
+                        <div><strong className="text-muted-foreground">Withholding Rate:</strong> {createForm.withholdingPercentage}%</div>
+                      </div>
                       <div className="pb-2 border-b border-border-subtle">
                         <strong className="text-muted-foreground">Full Name:</strong> {createForm.name || '-'}
                       </div>
@@ -1258,7 +1589,7 @@ export default function AdminUsersPage() {
                         <strong className="text-muted-foreground">Referrer Identifier:</strong> {createForm.referrerId || 'None'}
                       </div>
                       <div className="grid grid-cols-3 gap-2">
-                        <div><strong className="text-muted-foreground">Fund Amount:</strong> ${createForm.contributionAmount || '0'}</div>
+                        <div><strong className="text-muted-foreground">Fund Amount:</strong> ₹{createForm.contributionAmount || '0'}</div>
                         <div><strong className="text-muted-foreground">Mode:</strong> {createForm.contributionMode}</div>
                         <div><strong className="text-muted-foreground">Validity:</strong> {createForm.validityMonths} Mos</div>
                       </div>
@@ -1307,12 +1638,21 @@ export default function AdminUsersPage() {
                           toast({ title: "Input Required", description: "Name field is required.", type: "warning" });
                           return;
                         }
+                        const cleanPhone = (createForm.phone || '').replace(/\D/g, '');
+                        if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+                          toast({ title: "Invalid Phone Number", description: "Phone number must be exactly 10 digits starting with 6, 7, 8, or 9.", type: "warning" });
+                          return;
+                        }
                         if (createForm.pan) {
                           const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
                           if (!panRegex.test(createForm.pan.trim().toUpperCase())) {
                             toast({ title: "Invalid PAN Format", description: "Standard Indian PAN format: AAAAA9999A (e.g. ABCDE1234F).", type: "warning" });
                             return;
                           }
+                        }
+                        if (createForm.addressPincode && createForm.addressPincode.replace(/\D/g, '').length !== 6) {
+                          toast({ title: "Invalid Pincode", description: "Pincode must be exactly 6 digits.", type: "warning" });
+                          return;
                         }
                         if (createForm.dob) {
                           const age = (new Date().getTime() - new Date(createForm.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
@@ -1324,7 +1664,7 @@ export default function AdminUsersPage() {
                       }
                       if (wizardStep === 3) {
                         if (createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber)) {
-                          toast({ title: "Account Number Mismatch", description: "Bank Account Number must be strictly 15 numeric digits.", type: "warning" });
+                          toast({ title: "Account Number Mismatch", description: "Bank Account Number must be between 10 and 16 digits containing only numbers.", type: "warning" });
                           return;
                         }
                         if (createForm.bankIfsc && !isIfscValid(createForm.bankIfsc)) {
@@ -1400,6 +1740,55 @@ export default function AdminUsersPage() {
                       <input type="date" value={editForm.dob} onChange={e => setEditForm({...editForm, dob: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground" />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Type</label>
+                      <select 
+                        value={editForm.accountType} 
+                        onChange={e => {
+                          const newType = e.target.value;
+                          setEditForm(prev => ({
+                            ...prev,
+                            accountType: newType,
+                            withholdingPercentage: newType === 'ZERO_CONTRIBUTION' ? (prev.withholdingPercentage && prev.withholdingPercentage !== '0' ? prev.withholdingPercentage : '20') : '0',
+                          }));
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none cursor-pointer"
+                      >
+                        <option value="CONTRIBUTION">Standard Contribution Account</option>
+                        <option value="ZERO_CONTRIBUTION">Zero Contribution Account</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Gratitude Share Withholding (%)</label>
+                        {editForm.accountType !== 'ZERO_CONTRIBUTION' && (
+                          <span className="text-[9px] font-semibold text-gray-500 bg-secondary px-1.5 py-0.5 rounded">Not Applicable</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="number" 
+                          min="0" 
+                          max="100" 
+                          step="0.1"
+                          disabled={editForm.accountType !== 'ZERO_CONTRIBUTION'}
+                          value={editForm.accountType === 'ZERO_CONTRIBUTION' ? editForm.withholdingPercentage : ''} 
+                          onChange={e => setEditForm({...editForm, withholdingPercentage: e.target.value})} 
+                          className={`w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-secondary/35 ${editForm.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-40 cursor-not-allowed bg-muted/40' : ''}`} 
+                          placeholder={editForm.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"} 
+                        />
+                        <span className="text-xs font-bold text-gray-500">%</span>
+                      </div>
+                      <p className="text-[9px] text-muted-foreground">
+                        {editForm.accountType === 'ZERO_CONTRIBUTION' 
+                          ? "Saved percentage is applied during all subsequent payout calculations." 
+                          : "Withholding is not applicable for Standard Contribution accounts."}
+                      </p>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Complete Address */}
@@ -1417,29 +1806,46 @@ export default function AdminUsersPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode (6 Digits)</label>
+                        {isLookingUpEditPincode && <span className="text-[9px] text-brand-primary animate-pulse font-bold">Looking up...</span>}
+                      </div>
+                      <input 
+                        type="text" 
+                        maxLength={6}
+                        value={editForm.addressPincode} 
+                        onChange={e => handleEditPincodeChange(e.target.value)} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none" 
+                        placeholder="e.g. 110001" 
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">State (India)</label>
                       <select 
                         value={editForm.addressState} 
                         onChange={e => {
                           const val = e.target.value;
-                          setEditForm(prev => ({ ...prev, addressState: val, addressDistrict: '', addressCity: '', addressPincode: '' }));
+                          setEditForm((prev: any) => ({ ...prev, addressState: val, addressDistrict: '' }));
                         }} 
                         className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer"
                       >
-                        <option value="">Select Indian State...</option>
+                        <option value="">Select Indian State / UT...</option>
                         {getIndianStates().map(st => (
                           <option key={st} value={st}>{st}</option>
                         ))}
                       </select>
                     </div>
+                  </div>
 
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">District</label>
                       <select 
                         value={editForm.addressDistrict} 
                         onChange={e => {
                           const val = e.target.value;
-                          setEditForm(prev => ({ ...prev, addressDistrict: val, addressCity: '', addressPincode: '' }));
+                          setEditForm((prev: any) => ({ ...prev, addressDistrict: val }));
                         }} 
                         disabled={!editForm.addressState}
                         className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer disabled:opacity-50"
@@ -1450,53 +1856,32 @@ export default function AdminUsersPage() {
                         ))}
                       </select>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Locality</label>
-                      <select 
-                        value={editForm.addressCity} 
-                        onChange={e => {
-                          const val = e.target.value;
-                          const pins = getPincodesByCity(editForm.addressState, editForm.addressDistrict, val);
-                          setEditForm(prev => ({ 
-                            ...prev, 
-                            addressCity: val, 
-                            addressPincode: pins.length > 0 ? pins[0] : prev.addressPincode 
-                          }));
-                        }} 
-                        disabled={!editForm.addressDistrict}
-                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none dark:bg-card bg-white cursor-pointer disabled:opacity-50"
-                      >
-                        <option value="">{editForm.addressDistrict ? "Select City..." : "Select District First"}</option>
-                        {getCitiesByDistrict(editForm.addressState, editForm.addressDistrict).map(ct => (
-                          <option key={ct} value={ct}>{ct}</option>
-                        ))}
-                      </select>
-                    </div>
 
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Pincode</label>
-                      {getPincodesByCity(editForm.addressState, editForm.addressDistrict, editForm.addressCity).length > 0 ? (
-                        <select 
-                          value={editForm.addressPincode} 
-                          onChange={e => setEditForm({ ...editForm, addressPincode: e.target.value })} 
-                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-card bg-white cursor-pointer"
-                        >
-                          <option value="">Select Pincode...</option>
-                          {getPincodesByCity(editForm.addressState, editForm.addressDistrict, editForm.addressCity).map(pin => (
-                            <option key={pin} value={pin}>{pin}</option>
-                          ))}
-                        </select>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">City / Town / Area</label>
+                      {editPincodePostOffices.length > 0 ? (
+                        <div className="space-y-1">
+                          <input 
+                            type="text" 
+                            list="editPostOfficesList"
+                            value={editForm.addressCity} 
+                            onChange={e => setEditForm({...editForm, addressCity: e.target.value})} 
+                            className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" 
+                            placeholder="Select or enter city" 
+                          />
+                          <datalist id="editPostOfficesList">
+                            {editPincodePostOffices.map(po => (
+                              <option key={po} value={po} />
+                            ))}
+                          </datalist>
+                        </div>
                       ) : (
                         <input 
                           type="text" 
-                          maxLength={6}
-                          value={editForm.addressPincode} 
-                          onChange={e => setEditForm({ ...editForm, addressPincode: e.target.value.replace(/\D/g, '').slice(0, 6) })} 
-                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-semibold focus:outline-none" 
-                          placeholder="6-digit Pincode" 
+                          value={editForm.addressCity} 
+                          onChange={e => setEditForm({...editForm, addressCity: e.target.value})} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" 
+                          placeholder="Enter city / town" 
                         />
                       )}
                     </div>
@@ -1578,10 +1963,10 @@ export default function AdminUsersPage() {
 
                 {/* Additional Contribution */}
                 <div className="space-y-4">
-                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1"><DollarSign size={13} className="inline mr-1" /> Additional Capital Placement</h4>
+                  <h4 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1"><Coins size={13} className="inline mr-1 text-brand-primary" /> Additional Capital Placement</h4>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Amount ($)</label>
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Amount (₹)</label>
                       <input type="number" value={editForm.contributionAmount} onChange={e => setEditForm({...editForm, contributionAmount: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-extrabold focus:outline-none" placeholder="0" />
                     </div>
                     <div className="space-y-1.5">
@@ -1807,7 +2192,7 @@ export default function AdminUsersPage() {
                         <div key={c.id} className="p-3.5 border border-border-subtle rounded-2xl flex flex-col sm:flex-row justify-between sm:items-center gap-2 text-xs bg-white dark:bg-card">
                           <div>
                             <div className="flex items-center gap-2">
-                              <span className="font-extrabold text-gray-900 dark:text-white">${Number(c.amount).toLocaleString()}</span>
+                              <span className="font-extrabold text-gray-900 dark:text-white">₹{Number(c.amount).toLocaleString()}</span>
                               <span className="text-gray-300 dark:text-gray-700">|</span>
                               <span className="text-muted-foreground font-semibold">{c.mode}</span>
                               <span className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase border ${

@@ -62,6 +62,8 @@ export class UsersService {
           disabledAt: true,
           
           
+          accountType: true,
+          withholdingPercentage: true,
           dob: true,
           pan: true,
           permissions: true,
@@ -174,12 +176,22 @@ export class UsersService {
 
     const isAdminRole = data.role === 'ADMIN' || data.role === 'SUPER_ADMIN';
 
-    // PAN Card validation (AAAAA9999A)
+    // PAN Card validation (AAAAA9999A) & Uniqueness
     if (data.pan) {
       const panClean = data.pan.trim().toUpperCase();
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panClean)) {
         errors.pan = 'Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)';
+      } else {
+        const existingPan = await this.prisma.shareholder.findFirst({
+          where: {
+            pan: { equals: panClean, mode: 'insensitive' },
+            ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
+          },
+        });
+        if (existingPan) {
+          errors.pan = `PAN card "${panClean}" is already registered to shareholder ${existingPan.shareholderId}. Every shareholder must use a unique PAN card.`;
+        }
       }
     }
 
@@ -209,41 +221,61 @@ export class UsersService {
       }
     }
 
-    // shareholderId uniqueness validation
-    if (!shareholderId) {
-      errors.shareholderId = 'Shareholder ID is required';
-    } else {
+    // shareholderId uniqueness validation (if explicitly supplied)
+    if (shareholderId) {
       const existingshareholderId = await this.prisma.shareholder.findFirst({
-        where: { shareholderId },
+        where: {
+          shareholderId: { equals: shareholderId, mode: 'insensitive' },
+          ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
+        },
       });
       if (existingshareholderId) {
-        // Only error if the ID already exists in the system (though it will be regenerated on save anyway)
-        errors.shareholderId = 'Shareholder ID already exists';
+        errors.shareholderId = `Shareholder ID "${shareholderId.toUpperCase()}" already exists. Please choose a different ID.`;
       }
     }
 
-    // Phone validation
+
+    // Phone validation & Uniqueness (Strictly 10 digits starting with 6-9)
     if (!phone) {
       if (!isAdminRole) {
         errors.phone = 'Phone number is required';
         errors.phoneNumber = 'Phone number is required';
       }
     } else {
-      const digitsOnly = phone.replace('+', '');
-      if (digitsOnly.length < 10 || digitsOnly.length > 15) {
-        errors.phone = 'Phone number must be between 10 and 15 digits';
-        errors.phoneNumber = 'Phone number must be between 10 and 15 digits';
+      let digitsOnly = phone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        digitsOnly = digitsOnly.slice(2);
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        digitsOnly = digitsOnly.slice(1);
+      }
+
+      if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
+        errors.phone = 'Phone number must be exactly 10 digits starting with 6, 7, 8, or 9';
+        errors.phoneNumber = errors.phone;
       } else {
         const existingPhone = await this.prisma.shareholder.findFirst({
-          where: { phone },
+          where: {
+            OR: [
+              { phone: digitsOnly },
+              { phone: `+91${digitsOnly}` },
+            ],
+            ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
+          },
         });
         if (existingPhone) {
-          errors.phone = 'Phone number already exists';
-          errors.phoneNumber = 'Phone number already exists';
+          errors.phone = `Phone number ${digitsOnly} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`;
+          errors.phoneNumber = errors.phone;
         }
       }
     }
 
+    // Bank Account Number validation: only numbers, 10 to 16 digits
+    if (data.bankAccountNumber && String(data.bankAccountNumber).trim()) {
+      const cleanAcc = String(data.bankAccountNumber).trim().replace(/\D/g, '');
+      if (!/^\d{10,16}$/.test(cleanAcc)) {
+        errors.bankAccountNumber = 'Bank account number must be between 10 and 16 digits containing only numbers.';
+      }
+    }
 
     // Address validation
     if (!isAdminRole) {
@@ -329,6 +361,13 @@ export class UsersService {
     // Referral code is equal to Shareholder ID
     const referralCode = finalShareholderId;
 
+    const accountType = data.accountType || (data.contributionAmount && Number(data.contributionAmount) > 0 ? 'CONTRIBUTION' : 'ZERO_CONTRIBUTION');
+    const withholdingPercentage = accountType === 'ZERO_CONTRIBUTION'
+      ? (data.withholdingPercentage !== undefined && data.withholdingPercentage !== null && data.withholdingPercentage !== ''
+          ? Number(data.withholdingPercentage)
+          : 20)
+      : 0;
+
     const shareholder = await this.prisma.shareholder.create({
       data: {
         shareholderId: finalShareholderId,
@@ -339,7 +378,9 @@ export class UsersService {
         permissions: data.permissions || null,
         dob: data.dob ? new Date(data.dob) : null,
         role: data.role ?? 'SHAREHOLDER',
-        status: data.status ?? 'ACTIVE',
+        status: data.status ?? (accountType === 'ZERO_CONTRIBUTION' ? 'ZERO_ACTIVE' : 'ACTIVE'),
+        accountType: accountType as any,
+        withholdingPercentage: new Prisma.Decimal(withholdingPercentage),
         referralCode: finalShareholderId,
         addressBuilding: data.addressBuilding || '',
         addressArea: data.addressArea || '',
@@ -352,7 +393,7 @@ export class UsersService {
         bankName: data.bankName || '',
         bankBranch: data.bankBranch || '',
         bankIfsc: data.bankIfsc || '',
-      },
+      } as any,
     });
 
     if (parentUser) {
@@ -477,19 +518,66 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    // Validate PAN if provided
+    // Validate PAN if provided & enforce uniqueness
     if (updates.pan) {
       const panClean = updates.pan.trim().toUpperCase();
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panClean)) {
-        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A');
+        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
       }
+      const existingPan = await this.prisma.shareholder.findFirst({
+        where: {
+          pan: { equals: panClean, mode: 'insensitive' },
+          id: { not: id },
+        },
+      });
+      if (existingPan) {
+        throw new BadRequestException(`PAN card "${panClean}" is already registered to shareholder ${existingPan.shareholderId}. Every shareholder must use a unique PAN card.`);
+      }
+      updates.pan = panClean;
+    }
+
+    // Validate Phone if provided & enforce uniqueness
+    // Validate Phone if provided & enforce uniqueness (strictly 10 digits starting with 6-9)
+    if (updates.phone) {
+      let digitsOnly = updates.phone.replace(/[^0-9]/g, '');
+      if (digitsOnly.length === 12 && digitsOnly.startsWith('91')) {
+        digitsOnly = digitsOnly.slice(2);
+      } else if (digitsOnly.length === 11 && digitsOnly.startsWith('0')) {
+        digitsOnly = digitsOnly.slice(1);
+      }
+
+      if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
+        throw new BadRequestException('Phone number must be exactly 10 digits starting with 6, 7, 8, or 9');
+      }
+      const existingPhone = await this.prisma.shareholder.findFirst({
+        where: {
+          OR: [
+            { phone: digitsOnly },
+            { phone: `+91${digitsOnly}` },
+          ],
+          id: { not: id },
+        },
+      });
+      if (existingPhone) {
+        throw new BadRequestException(`Phone number ${digitsOnly} is already registered to shareholder ${existingPhone.shareholderId}. Every shareholder must use a unique mobile number.`);
+      }
+      updates.phone = digitsOnly;
+    }
+
+    // Validate Bank Account Number if provided (only numbers, 10 to 16 digits)
+    if (updates.bankAccountNumber && String(updates.bankAccountNumber).trim()) {
+      const cleanAcc = String(updates.bankAccountNumber).trim().replace(/\D/g, '');
+      if (!/^\d{10,16}$/.test(cleanAcc)) {
+        throw new BadRequestException('Bank account number must be between 10 and 16 digits containing only numbers.');
+      }
+      updates.bankAccountNumber = cleanAcc;
     }
 
     // Validate IFSC format if provided
     if (updates.bankIfsc) {
       const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      if (!ifscRegex.test(updates.bankIfsc)) {
+      if (!ifscRegex.test(updates.bankIfsc.trim().toUpperCase())) {
         throw new BadRequestException('Invalid IFSC format. Expected pattern: ABCD0123456');
       }
     }
@@ -528,7 +616,7 @@ export class UsersService {
 
     // Copy updates to clean data object
     const fields = [
-      'shareholderId', 'name', 'phone', 'role', 'status', 'dob', 'pan', 'permissions',
+      'shareholderId', 'name', 'phone', 'role', 'status', 'accountType', 'dob', 'pan', 'permissions',
       'addressBuilding', 'addressArea', 'addressCity', 'addressDistrict', 'addressPincode', 'addressState',
       'bankAccountName', 'bankAccountNumber', 'bankName', 'bankBranch', 'bankIfsc'
     ];
@@ -545,6 +633,10 @@ export class UsersService {
           data[f] = updates[f];
         }
       }
+    }
+
+    if (updates.withholdingPercentage !== undefined && updates.withholdingPercentage !== null && updates.withholdingPercentage !== '') {
+      data.withholdingPercentage = new Prisma.Decimal(updates.withholdingPercentage);
     }
 
     if (updates.status !== undefined) {
@@ -1042,20 +1134,8 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    if (dto.pan) {
-      const panClean = dto.pan.trim().toUpperCase();
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      if (!panRegex.test(panClean)) {
-        throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
-      }
-    }
-
-    if (dto.bankIfsc) {
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      if (!ifscRegex.test(dto.bankIfsc.trim().toUpperCase())) {
-        throw new BadRequestException('Invalid IFSC format. Expected pattern: ABCD0123456');
-      }
-    }
+    // Shareholder PAN card is permanent and cannot be altered via change requests
+    const pan = shareholder.pan;
 
     // Cancel any previous PENDING request
     await this.prisma.financialChangeRequest.updateMany({
@@ -1071,7 +1151,7 @@ export class UsersService {
         bankName: dto.bankName || shareholder.bankName,
         bankBranch: dto.bankBranch || shareholder.bankBranch,
         bankIfsc: dto.bankIfsc ? dto.bankIfsc.trim().toUpperCase() : shareholder.bankIfsc,
-        pan: dto.pan ? dto.pan.trim().toUpperCase() : shareholder.pan,
+        pan,
         status: 'PENDING',
       },
     });

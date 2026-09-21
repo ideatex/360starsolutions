@@ -7,7 +7,10 @@ import { PrismaService } from '@server/prisma/prisma.service';
 export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor(private readonly prisma: PrismaService) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter('token'),
+      ]),
       ignoreExpiration: false,
       secretOrKey: process.env.JWT_SECRET || 'super-secret-key-for-dev',
       passReqToCallback: true,
@@ -15,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: any, payload: any) {
-    const rawToken = req.headers.authorization?.split(' ')[1];
+    const rawToken = req.headers.authorization?.split(' ')[1] || req.query?.token;
     if (rawToken) {
       const blacklisted = await this.prisma.jwtBlacklist.findUnique({
         where: { token: rawToken },

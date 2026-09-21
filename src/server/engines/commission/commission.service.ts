@@ -45,25 +45,16 @@ export class CommissionService {
   ) {}
 
   /**
-   * Retrieves configured Gratitude Share rates from BusinessConfiguration or falls back to Product 360 defaults.
+   * Retrieves configured Gratitude Share / Referral Level Profit Sharing rates from BusinessConfiguration.
+   * Respects active flags, dynamic depth count, and configured percentages.
    */
   async getGratitudeRates(): Promise<Record<number, number>> {
     try {
-      const config = await this.businessConfigService.getLatest();
-      if (config?.gratitudeShareConfig && typeof config.gratitudeShareConfig === 'object') {
-        const ratesObj = config.gratitudeShareConfig as Record<string, number>;
-        const rates: Record<number, number> = {};
-        for (let l = 1; l <= 12; l++) {
-          rates[l] = ratesObj[String(l)] !== undefined
-            ? Number(ratesObj[String(l)])
-            : CommissionService.DEFAULT_GRATITUDE_RATES[l] || 0;
-        }
-        return rates;
-      }
+      return await this.businessConfigService.getGratitudeShareRates();
     } catch {
       this.logger.warn('Could not load dynamic gratitude config, using Product 360 defaults.');
+      return { ...CommissionService.DEFAULT_GRATITUDE_RATES };
     }
-    return { ...CommissionService.DEFAULT_GRATITUDE_RATES };
   }
 
   /**

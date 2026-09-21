@@ -11,7 +11,6 @@ import {
 } from 'lucide-react';
 import { useToast } from '@/components/ui/ToastProvider';
 import { useAuthStore } from '@/store/useAuthStore';
-import { Button } from '@/components/ui/button';
 
 export default function ProfilePage() {
   const { toast } = useToast();
@@ -44,7 +43,6 @@ export default function ProfilePage() {
     bankAccountNumber: '',
     bankBranch: '',
     bankIfsc: '',
-    pan: '',
   });
   const [isSubmittingFinancial, setIsSubmittingFinancial] = useState(false);
 
@@ -56,26 +54,12 @@ export default function ProfilePage() {
       bankAccountNumber: profile?.bankDetails?.accountNumber || '',
       bankBranch: profile?.bankDetails?.branch || '',
       bankIfsc: profile?.bankDetails?.ifsc || '',
-      pan: profile?.pan || '',
     });
     setIsFinancialModalOpen(true);
   };
 
   const handleFinancialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (financialForm.pan) {
-      const panClean = financialForm.pan.trim().toUpperCase();
-      const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-      if (!panRegex.test(panClean)) {
-        toast({
-          title: 'Invalid PAN Format',
-          description: 'Standard format: AAAAA9999A (e.g. ABCDE1234F)',
-          type: 'warning',
-        });
-        return;
-      }
-    }
 
     if (financialForm.bankIfsc) {
       const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
@@ -93,7 +77,6 @@ export default function ProfilePage() {
     try {
       await api.post('/shareholders/me/financial-change-request', {
         ...financialForm,
-        pan: financialForm.pan.trim().toUpperCase(),
         bankIfsc: financialForm.bankIfsc.trim().toUpperCase(),
       });
 
@@ -479,14 +462,14 @@ export default function ProfilePage() {
                     </div>
                     
                     <div className="pt-2 flex justify-end">
-                      <Button 
+                      <button 
                         type="submit" 
-                        className="px-5 bg-brand-500 hover:bg-brand-600 text-white shadow-theme-xs text-xs h-9 flex items-center gap-2 rounded-xl"
+                        className="px-5 bg-brand-500 hover:bg-brand-600 text-white shadow-theme-xs text-xs h-9 flex items-center gap-2 rounded-xl font-semibold cursor-pointer disabled:opacity-50"
                         disabled={isPasswordLoading}
                       >
                         <Send className="w-3.5 h-3.5" />
                         {isPasswordLoading ? 'Sending OTP...' : 'Send Verification OTP'}
-                      </Button>
+                      </button>
                     </div>
                   </form>
                 ) : (
@@ -521,13 +504,13 @@ export default function ProfilePage() {
                       >
                         Resend Code
                       </button>
-                      <Button
+                      <button
                         type="submit"
                         disabled={isPasswordLoading || otpCode.length !== 6}
-                        className="px-5 bg-success-500 hover:bg-success-600 text-white shadow-theme-xs text-xs h-9 rounded-xl"
+                        className="px-5 bg-success-500 hover:bg-success-600 text-white shadow-theme-xs text-xs h-9 rounded-xl font-semibold cursor-pointer disabled:opacity-50"
                       >
                         {isPasswordLoading ? 'Verifying...' : 'Confirm & Update Password'}
-                      </Button>
+                      </button>
                     </div>
                   </form>
                 )}
@@ -564,21 +547,8 @@ export default function ProfilePage() {
 
               <form onSubmit={handleFinancialSubmit} className="p-6 space-y-4">
                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                  Updates to banking credentials and PAN require approval from the Super Admin before taking effect on your payout distributions.
+                  Updates to banking credentials require approval from the Super Admin before taking effect on your payout distributions. (PAN card is permanent and cannot be modified).
                 </p>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">PAN Card Number</label>
-                  <input
-                    type="text"
-                    value={financialForm.pan}
-                    onChange={(e) => setFinancialForm({ ...financialForm, pan: e.target.value.toUpperCase() })}
-                    placeholder="e.g. ABCDE1234F"
-                    maxLength={10}
-                    className="w-full px-3.5 py-2 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs uppercase font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:border-brand-500"
-                  />
-                  <span className="text-[10px] text-gray-400 dark:text-gray-500">Standard 10-character Indian PAN format.</span>
-                </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">

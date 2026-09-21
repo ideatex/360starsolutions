@@ -11,7 +11,8 @@ import {
   LayoutDashboard, UserPlus, Megaphone, Network, Target, 
   Landmark, UserCircle, BarChart3, UserCheck, Users, Award, 
   ArrowRightLeft, FileSpreadsheet, FileText, Edit3, Settings, 
-  LogOut, ChevronLeft, ChevronRight, ShieldAlert, ArrowLeftRight
+  LogOut, ChevronLeft, ChevronRight, ShieldAlert, ArrowLeftRight,
+  BookOpen, Bell
 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,9 +35,11 @@ const userGroups: NavGroup[] = [
     items: [
       { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
       { name: 'Add Referral', href: '/dashboard/signup', icon: UserPlus },
-      { name: 'Announcements', href: '/dashboard/announcements', icon: Megaphone },
+      { name: 'Notifications', href: '/dashboard/announcements', icon: Bell },
+      { name: 'Founder\'s Thoughts', href: '/dashboard/founder', icon: BookOpen },
     ],
   },
+
   {
     title: "GROWTH & EARNINGS",
     items: [
