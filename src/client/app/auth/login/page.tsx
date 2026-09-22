@@ -13,9 +13,21 @@ export default function LoginPage() {
   const [shareholderId, setshareholderId] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const shareholder = useAuthStore((state) => state.shareholder);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
   const login = useAuthStore((state) => state.login);
   const router = useRouter();
   const { toast } = useToast();
+
+  React.useEffect(() => {
+    if (isHydrated && shareholder) {
+      if (shareholder.role === 'ADMIN' || shareholder.role === 'SUPER_ADMIN') {
+        router.replace('/admin');
+      } else {
+        router.replace('/dashboard');
+      }
+    }
+  }, [isHydrated, shareholder, router]);
 
   // Forgot Password modal state
   const [isForgotOpen, setIsForgotOpen] = useState(false);

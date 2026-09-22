@@ -29,13 +29,13 @@ api.interceptors.request.use((config) => {
   let token = useAuthStore.getState().token;
   if (!token && typeof window !== 'undefined') {
     try {
-      const stored = localStorage.getItem('auth-storage');
+      const stored = sessionStorage.getItem('auth-storage') || localStorage.getItem('auth-storage');
       if (stored) {
         const parsed = JSON.parse(stored);
         token = parsed?.state?.token || null;
       }
     } catch (e) {
-      console.error('Error reading token from localStorage', e);
+      console.error('Error reading token from storage', e);
     }
   }
   if (token) {

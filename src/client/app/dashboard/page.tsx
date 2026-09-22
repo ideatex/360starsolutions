@@ -26,12 +26,6 @@ export default function DashboardPage() {
     enabled: !!shareholder,
   });
 
-  React.useEffect(() => {
-    if (!shareholder) {
-      router.push('/auth/login');
-    }
-  }, [shareholder, router]);
-
   if (!shareholder) {
     return null;
   }

@@ -4,13 +4,33 @@ import React from 'react';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 import { useSidebarStore } from '@/store/useSidebarStore';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useRouter } from 'next/navigation';
 
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const shareholder = useAuthStore((state) => state.shareholder);
+  const isHydrated = useAuthStore((state) => state.isHydrated);
+  const router = useRouter();
   const { isCollapsed } = useSidebarStore();
+
+  React.useEffect(() => {
+    if (!isHydrated) return;
+    if (!shareholder) {
+      router.replace('/auth/login');
+    }
+  }, [shareholder, isHydrated, router]);
+
+  if (!isHydrated || !shareholder) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex flex-col">
