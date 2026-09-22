@@ -371,12 +371,12 @@ export class UsersService {
       });
     }
 
-    // Default unentered referrer to the Super Admin / Company root account (SH000000)
+    // Default unentered referrer to the Super Admin / Company root account (360SS001 / SH000000)
     if (!parentUser) {
       parentUser = await this.prisma.shareholder.findFirst({
         where: { role: 'SUPER_ADMIN', status: { not: 'DELETED' } },
         orderBy: { createdAt: 'asc' },
-      }) || await this.prisma.shareholder.findUnique({ where: { shareholderId: 'SH000000' } });
+      }) || await this.prisma.shareholder.findFirst({ where: { shareholderId: { in: ['360SS001', 'SH000000'] } } });
     }
 
     // Use provided Shareholder ID or auto-generate based on business config sequential rules
@@ -777,7 +777,7 @@ export class UsersService {
       const mainAccount = await this.prisma.shareholder.findFirst({
         where: { role: 'SUPER_ADMIN', status: { not: 'DELETED' } },
         orderBy: { createdAt: 'asc' },
-      }) || await this.prisma.shareholder.findUnique({ where: { shareholderId: 'SH000000' } });
+      }) || await this.prisma.shareholder.findFirst({ where: { shareholderId: { in: ['360SS001', 'SH000000'] } } });
 
       if (mainAccount && mainAccount.id !== id) {
         // 1. Record previousParentId on direct children and set parentId to mainAccount.id

@@ -1335,7 +1335,7 @@ export default function AdminUsersPage() {
                     <div className="space-y-1.5 pt-1">
                       <div className="flex items-center justify-between">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Referrer Shareholder ID</label>
-                        <span className="text-[9px] text-muted-foreground">Optional (Defaults to SH000000)</span>
+                        <span className="text-[9px] text-muted-foreground">Optional (Defaults to 360SS001)</span>
                       </div>
                       <input 
                         type="text" 
@@ -1354,12 +1354,12 @@ export default function AdminUsersPage() {
                           if (e.target.value) validateReferrer(e.target.value);
                         }} 
                         className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono uppercase" 
-                        placeholder="e.g. SH000000 or SH100001 (Blank = Super Admin)" 
+                        placeholder="e.g. 360SS001 (Blank = Super Admin)" 
                       />
                       {isValidatingReferrer && <p className="text-[10px] text-brand-primary mt-1">Validating referrer...</p>}
                       {referrerName && <p className="text-[10px] text-emerald-500 mt-1 font-bold">✓ Valid Referrer: {referrerName}</p>}
                       {!createForm.referrerId && (
-                        <p className="text-[9px] text-muted-foreground">If left empty, system automatically links this shareholder under Company Main Account (Super Admin / SH000000).</p>
+                        <p className="text-[9px] text-muted-foreground">If left empty, system automatically links this shareholder under Company Main Account (Super Admin / 360SS001).</p>
                       )}
                     </div>
 
@@ -1698,7 +1698,7 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">Bank & IFSC:</strong> {createForm.bankName || '-'} ({createForm.bankIfsc || '-'})</div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">Referrer ID:</strong> {createForm.referrerId || 'SH000000 (Company Main Account / Super Admin)'}</div>
+                        <div><strong className="text-muted-foreground">Referrer ID:</strong> {createForm.referrerId || '360SS001 (Company Main Account / Super Admin)'}</div>
                         <div><strong className="text-muted-foreground">Contribution Fund:</strong> ₹{createForm.contributionAmount || '0'} ({createForm.contributionMode})</div>
                       </div>
                       <div>
@@ -2221,7 +2221,7 @@ export default function AdminUsersPage() {
                     </strong>
                   </div>
                   <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Account Role</span> <strong className="text-gray-800 dark:text-gray-250 font-bold">{selectedUser.role}</strong></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referrer Shareholder ID</span> <strong className="text-emerald-700 dark:text-emerald-400 font-mono font-bold">{selectedUser.parent?.shareholderId || (selectedUser.parentId ? selectedUser.parentId : 'SH000000 (Super Admin / Direct)')}</strong></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referrer Shareholder ID</span> <strong className="text-emerald-700 dark:text-emerald-400 font-mono font-bold">{selectedUser.parent?.shareholderId || (selectedUser.parentId ? selectedUser.parentId : '360SS001 (Super Admin / Direct)')}</strong></div>
                   {selectedUser.parent?.name && (
                     <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referrer Name</span> <strong className="text-gray-800 dark:text-gray-200 font-bold">{selectedUser.parent.name}</strong></div>
                   )}

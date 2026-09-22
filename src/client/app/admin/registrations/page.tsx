@@ -503,7 +503,7 @@ export default function AdminRegistrationsPage() {
                     <strong className="text-foreground">
                       {detailModalItem.referrer 
                         ? `${detailModalItem.referrer.name} (ID: ${detailModalItem.referrer.shareholderId}${detailModalItem.referrer.phone ? `, Phone: ${detailModalItem.referrer.phone}` : ''})` 
-                        : 'Direct / Root (SH000000)'}
+                        : 'Direct / Root (360SS001)'}
                     </strong>
                   </div>
                   <div className="flex justify-between items-center">

@@ -32,24 +32,24 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting Database Seeding on cPanel...');
 
-  // 1. Seed SH000000 (Super Admin)
-  console.log('Seeding Super Admin 1 (SH000000)...');
+  // 1. Seed 360SS001 (Super Admin)
+  console.log('Seeding Super Admin 1 (360SS001)...');
   const adminPassword1 = await bcrypt.hash('TestPassword123!', 10);
   const admin1 = await prisma.shareholder.upsert({
-    where: { shareholderId: 'SH000000' },
+    where: { shareholderId: '360SS001' },
     update: {
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       passwordHash: adminPassword1,
-      referralCode: 'SH000000',
+      referralCode: '360SS001',
     },
     create: {
-      shareholderId: 'SH000000',
+      shareholderId: '360SS001',
       name: 'Super Admin',
       passwordHash: adminPassword1,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
-      referralCode: 'SH000000',
+      referralCode: '360SS001',
       phone: '9999999999',
     },
   });

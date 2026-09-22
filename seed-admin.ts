@@ -8,22 +8,22 @@ async function main() {
   
   const passwordHash = await bcrypt.hash('TestPassword123!', 10);
   
-  // 1. Ensure SH000000 is active with known password
+  // 1. Ensure 360SS001 is active with known password
   const user0 = await prisma.shareholder.upsert({
-    where: { shareholderId: 'SH000000' },
+    where: { shareholderId: '360SS001' },
     update: {
       passwordHash,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
-      referralCode: 'SH000000',
+      referralCode: '360SS001',
     },
     create: {
-      shareholderId: 'SH000000',
+      shareholderId: '360SS001',
       passwordHash,
       role: 'SUPER_ADMIN',
       status: 'ACTIVE',
       name: 'Super Admin',
-      referralCode: 'SH000000',
+      referralCode: '360SS001',
       phone: '9000000000',
     },
   });
