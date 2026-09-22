@@ -36,13 +36,13 @@ export default function DashboardFounderThoughtsPage() {
           onClick={() => setSelectedSlug(null)}
           className="flex items-center gap-1.5 px-4 py-2 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-xl text-xs font-semibold transition-all bg-white dark:bg-gray-900 shadow-theme-xs cursor-pointer select-none text-gray-700 dark:text-gray-300"
         >
-          <ArrowLeft size={14} /> Back to letters
+          <ArrowLeft size={14} /> Back to thoughts
         </button>
 
         {isDetailLoading ? (
           <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400 app-card">
             <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
-            <p className="text-xs font-semibold">Opening letter...</p>
+            <p className="text-xs font-semibold">Opening thought...</p>
           </div>
         ) : articleDetail ? (
           <motion.article 
@@ -59,7 +59,7 @@ export default function DashboardFounderThoughtsPage() {
             )}
             <div className="p-6 md:p-8 space-y-6">
               <div className="flex justify-between items-center text-[10px] font-semibold text-gray-400 dark:text-gray-500 tracking-wide select-none">
-                <span className="badge-brand">FOUNDER BULLETIN</span>
+                <span className="badge-brand">FOUNDER'S THOUGHTS</span>
                 <span>{new Date(articleDetail.createdAt).toLocaleDateString()}</span>
               </div>
               <h1 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white tracking-tight leading-tight">{articleDetail.title}</h1>
@@ -70,7 +70,7 @@ export default function DashboardFounderThoughtsPage() {
             </div>
           </motion.article>
         ) : (
-          <div className="text-center py-12 text-gray-400 app-card">Letter entry not found.</div>
+          <div className="text-center py-12 text-gray-400 app-card">Thought entry not found.</div>
         )}
       </div>
     );
@@ -83,7 +83,7 @@ export default function DashboardFounderThoughtsPage() {
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
           <BookOpen className="w-6 h-6 text-brand-500 shrink-0" /> Founder's Thoughts
         </h1>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Weekly letters, core company visions, and updates from the CRM leadership team.</p>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Weekly thoughts, core company visions, and updates from the CRM leadership team.</p>
       </div>
 
       {/* Grid of Articles */}
@@ -91,12 +91,12 @@ export default function DashboardFounderThoughtsPage() {
         {isListLoading ? (
           <div className="col-span-full flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
             <Loader2 className="w-6 h-6 animate-spin text-brand-500" />
-            <p className="text-xs font-semibold">Reading letters feed...</p>
+            <p className="text-xs font-semibold">Reading thoughts feed...</p>
           </div>
         ) : articles?.length === 0 ? (
           <div className="col-span-full text-center py-20 text-gray-400 app-card select-none">
             <FileText className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-400 animate-pulse" />
-            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">No letters posted yet.</p>
+            <p className="text-xs font-bold text-gray-700 dark:text-gray-300">No thoughts posted yet.</p>
             <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">Please check back later for updates from CRM founder.</p>
           </div>
         ) : (

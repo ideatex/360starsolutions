@@ -55,7 +55,7 @@ export const useAuthStore = create<AuthState>()(
       shareholder: initialAuth.shareholder,
       token: initialAuth.token,
       isAuthenticated: initialAuth.isAuthenticated,
-      isHydrated: typeof window !== 'undefined',
+      isHydrated: false,
       login: (shareholder, token) => {
         if (typeof window !== 'undefined') {
           try {
@@ -64,7 +64,7 @@ export const useAuthStore = create<AuthState>()(
             localStorage.setItem('auth-storage', payload);
           } catch (e) {}
         }
-        set({ shareholder, token, isAuthenticated: true });
+        set({ shareholder, token, isAuthenticated: true, isHydrated: true });
       },
       logout: () => {
         if (typeof window !== 'undefined') {
@@ -73,7 +73,7 @@ export const useAuthStore = create<AuthState>()(
             localStorage.removeItem('auth-storage');
           } catch (e) {}
         }
-        set({ shareholder: null, token: null, isAuthenticated: false });
+        set({ shareholder: null, token: null, isAuthenticated: false, isHydrated: true });
       },
       setHydrated: (isHydrated) => set({ isHydrated }),
     }),

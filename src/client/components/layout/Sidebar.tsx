@@ -79,7 +79,7 @@ const adminGroups: NavGroup[] = [
       { name: 'Reports', href: '/admin/reports', icon: FileSpreadsheet },
       { name: 'Audit Logs', href: '/admin/audit', icon: FileText },
       { name: 'Announcements', href: '/admin/announcements', icon: Megaphone },
-      { name: 'Founder\'s Letters', href: '/admin/founder', icon: Edit3 },
+      { name: 'Founder\'s Thoughts', href: '/admin/founder', icon: Edit3 },
       { name: 'Business Config', href: '/admin/config', icon: Settings },
     ],
   },

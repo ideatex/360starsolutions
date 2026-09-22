@@ -58,25 +58,43 @@ export default function ProfilePage() {
     setIsFinancialModalOpen(true);
   };
 
+  const isIfscValid = (ifsc: string) => {
+    if (!ifsc) return false;
+    return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.trim().toUpperCase());
+  };
+
+  const isAccountNumberValid = (acc: string) => {
+    if (!acc) return false;
+    const clean = acc.replace(/[^0-9]/g, '');
+    return /^\d{10,16}$/.test(clean);
+  };
+
   const handleFinancialSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (financialForm.bankIfsc) {
-      const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-      if (!ifscRegex.test(financialForm.bankIfsc.trim().toUpperCase())) {
-        toast({
-          title: 'Invalid IFSC Format',
-          description: 'Format: ABCD0123456 (11 characters)',
-          type: 'warning',
-        });
-        return;
-      }
+    if (financialForm.bankAccountNumber && !isAccountNumberValid(financialForm.bankAccountNumber)) {
+      toast({
+        title: 'Invalid Account Number',
+        description: 'Bank account number must be between 10 and 16 digits.',
+        type: 'warning',
+      });
+      return;
+    }
+
+    if (financialForm.bankIfsc && !isIfscValid(financialForm.bankIfsc)) {
+      toast({
+        title: 'Invalid IFSC Format',
+        description: 'Format: ABCD0123456 (11 characters)',
+        type: 'warning',
+      });
+      return;
     }
 
     setIsSubmittingFinancial(true);
     try {
       await api.post('/shareholders/me/financial-change-request', {
         ...financialForm,
+        bankAccountNumber: financialForm.bankAccountNumber.trim(),
         bankIfsc: financialForm.bankIfsc.trim().toUpperCase(),
       });
 
@@ -440,9 +458,20 @@ export default function ProfilePage() {
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="At least 8 characters"
                             required
-                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:outline-none focus:border-brand-500 text-gray-900 dark:text-white"
+                            className={`w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border rounded-xl text-xs font-medium focus:outline-none text-gray-900 dark:text-white ${
+                              newPassword && newPassword.length < 8
+                                ? 'border-rose-500 focus:border-rose-500'
+                                : newPassword && newPassword.length >= 8
+                                ? 'border-emerald-500/60 focus:border-emerald-500'
+                                : 'border-gray-200 dark:border-gray-700 focus:border-brand-500'
+                            }`}
                           />
                         </div>
+                        {newPassword && newPassword.length < 8 && (
+                          <p className="text-[10px] text-rose-500 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3 h-3 shrink-0" /> Minimum 8 characters required
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1.5">
@@ -455,9 +484,20 @@ export default function ProfilePage() {
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Re-type new password"
                             required
-                            className="w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-medium focus:outline-none focus:border-brand-500 text-gray-900 dark:text-white"
+                            className={`w-full pl-9 pr-3 py-2 bg-white dark:bg-gray-800 border rounded-xl text-xs font-medium focus:outline-none text-gray-900 dark:text-white ${
+                              confirmPassword && confirmPassword !== newPassword
+                                ? 'border-rose-500 focus:border-rose-500'
+                                : confirmPassword && confirmPassword === newPassword
+                                ? 'border-emerald-500/60 focus:border-emerald-500'
+                                : 'border-gray-200 dark:border-gray-700 focus:border-brand-500'
+                            }`}
                           />
                         </div>
+                        {confirmPassword && confirmPassword !== newPassword && (
+                          <p className="text-[10px] text-rose-500 flex items-center gap-1 font-medium">
+                            <AlertCircle className="w-3 h-3 shrink-0" /> Passwords do not match
+                          </p>
+                        )}
                       </div>
                     </div>
                     
@@ -552,9 +592,10 @@ export default function ProfilePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Bank Name</label>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Bank Name *</label>
                     <input
                       type="text"
+                      required
                       value={financialForm.bankName}
                       onChange={(e) => setFinancialForm({ ...financialForm, bankName: e.target.value })}
                       placeholder="e.g. HDFC Bank"
@@ -574,9 +615,10 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Account Holder Name</label>
+                  <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Account Holder Name *</label>
                   <input
                     type="text"
+                    required
                     value={financialForm.bankAccountName}
                     onChange={(e) => setFinancialForm({ ...financialForm, bankAccountName: e.target.value })}
                     placeholder="Full name as per bank record"
@@ -586,44 +628,67 @@ export default function ProfilePage() {
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Account Number</label>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Account Number *</label>
                     <input
                       type="text"
+                      required
                       value={financialForm.bankAccountNumber}
-                      onChange={(e) => setFinancialForm({ ...financialForm, bankAccountNumber: e.target.value })}
+                      onChange={(e) => setFinancialForm({ ...financialForm, bankAccountNumber: e.target.value.replace(/\D/g, '') })}
                       placeholder="Account number"
-                      className="w-full px-3.5 py-2 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs font-mono text-gray-900 dark:text-white focus:outline-none focus:border-brand-500"
+                      className={`w-full px-3.5 py-2 bg-gray-50 dark:bg-gray-800/60 border rounded-xl text-xs font-mono text-gray-900 dark:text-white focus:outline-none ${
+                        financialForm.bankAccountNumber && !isAccountNumberValid(financialForm.bankAccountNumber)
+                          ? 'border-rose-500 focus:border-rose-500'
+                          : financialForm.bankAccountNumber && isAccountNumberValid(financialForm.bankAccountNumber)
+                          ? 'border-emerald-500/60 focus:border-emerald-500'
+                          : 'border-gray-200 dark:border-gray-700 focus:border-brand-500'
+                      }`}
                     />
+                    {financialForm.bankAccountNumber && !isAccountNumberValid(financialForm.bankAccountNumber) && (
+                      <p className="text-[10px] text-rose-500 flex items-center gap-1 font-medium">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> 10-16 digits required
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">IFSC Code</label>
+                    <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">IFSC Code *</label>
                     <input
                       type="text"
+                      required
                       value={financialForm.bankIfsc}
                       onChange={(e) => setFinancialForm({ ...financialForm, bankIfsc: e.target.value.toUpperCase() })}
                       placeholder="e.g. HDFC0001234"
                       maxLength={11}
-                      className="w-full px-3.5 py-2 bg-gray-50 dark:bg-gray-800/60 border border-gray-200 dark:border-gray-700 rounded-xl text-xs uppercase font-mono font-bold text-gray-900 dark:text-white focus:outline-none focus:border-brand-500"
+                      className={`w-full px-3.5 py-2 bg-gray-50 dark:bg-gray-800/60 border rounded-xl text-xs uppercase font-mono font-bold text-gray-900 dark:text-white focus:outline-none ${
+                        financialForm.bankIfsc && !isIfscValid(financialForm.bankIfsc)
+                          ? 'border-rose-500 focus:border-rose-500 text-rose-500'
+                          : financialForm.bankIfsc && isIfscValid(financialForm.bankIfsc)
+                          ? 'border-emerald-500/60 focus:border-emerald-500 text-emerald-600 dark:text-emerald-400'
+                          : 'border-gray-200 dark:border-gray-700 focus:border-brand-500'
+                      }`}
                     />
+                    {financialForm.bankIfsc && !isIfscValid(financialForm.bankIfsc) && (
+                      <p className="text-[10px] text-rose-500 flex items-center gap-1 font-medium">
+                        <AlertCircle className="w-3 h-3 shrink-0" /> Invalid IFSC (e.g. HDFC0001234)
+                      </p>
+                    )}
                   </div>
                 </div>
 
                 <div className="pt-4 flex items-center justify-end gap-3 border-t border-gray-100 dark:border-gray-800">
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
                     onClick={() => setIsFinancialModalOpen(false)}
-                    className="text-xs h-9 rounded-xl"
+                    className="px-4 py-2 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-xs font-semibold rounded-xl transition-all hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
                   >
                     Cancel
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="submit"
                     disabled={isSubmittingFinancial}
-                    className="bg-brand-500 hover:bg-brand-600 text-white text-xs h-9 shadow-theme-xs rounded-xl"
+                    className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white text-xs font-semibold shadow-theme-xs rounded-xl transition-all disabled:opacity-50 cursor-pointer"
                   >
                     {isSubmittingFinancial ? 'Submitting...' : 'Submit Change Request'}
-                  </Button>
+                  </button>
                 </div>
               </form>
             </motion.div>

@@ -22,13 +22,21 @@ export class UsersService {
     private readonly smsService: SmsService,
   ) {}
 
-  async getUsers(search?: string, role?: Role, status?: UserStatus, page = 1, limit = 20) {
+  async getUsers(search?: string, role?: Role, status?: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (role) where.role = role;
-    if (status) {
-      where.status = status;
+    if (status === 'DELETED') {
+      where.status = 'DELETED';
+    } else if (status === 'ZERO_CONTRIBUTION') {
+      where.accountType = 'ZERO_CONTRIBUTION';
+      where.status = { not: 'DELETED' };
+    } else if (status === 'ACTIVE') {
+      where.accountType = 'CONTRIBUTION';
+      where.status = { not: 'DELETED' };
+    } else if (status) {
+      where.status = status as UserStatus;
     } else {
       where.status = { not: 'DELETED' };
     }
@@ -36,7 +44,7 @@ export class UsersService {
       where.OR = [
         { shareholderId: { contains: search, mode: 'insensitive' } },
         { name: { contains: search, mode: 'insensitive' } },
-        { shareholderId: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
         { referralCode: { contains: search, mode: 'insensitive' } },
       ];
     }
@@ -57,12 +65,20 @@ export class UsersService {
           status: true,
           referralCode: true,
           parentId: true,
+          parent: {
+            select: {
+              id: true,
+              shareholderId: true,
+              name: true,
+            },
+          },
   
           createdAt: true,
           disabledAt: true,
           
           
           accountType: true,
+          withholdingPercentage: true,
           dob: true,
           pan: true,
           permissions: true,
@@ -353,6 +369,14 @@ export class UsersService {
           ]
         }
       });
+    }
+
+    // Default unentered referrer to the Super Admin / Company root account (SH000000)
+    if (!parentUser) {
+      parentUser = await this.prisma.shareholder.findFirst({
+        where: { role: 'SUPER_ADMIN', status: { not: 'DELETED' } },
+        orderBy: { createdAt: 'asc' },
+      }) || await this.prisma.shareholder.findUnique({ where: { shareholderId: 'SH000000' } });
     }
 
     // Use provided Shareholder ID or auto-generate based on business config sequential rules
@@ -675,6 +699,17 @@ export class UsersService {
     // Save contribution update if present
     if (updates.contributionAmount && Number(updates.contributionAmount) > 0) {
       const validityMonths = updates.validityMonths ? Number(updates.validityMonths) : 12;
+      
+      // Auto-convert Zero Contribution account to Standard Contribution & Active status
+      await this.prisma.shareholder.update({
+        where: { id },
+        data: {
+          accountType: 'CONTRIBUTION',
+          status: 'ACTIVE',
+          withholdingPercentage: new Prisma.Decimal(0),
+        },
+      });
+
       // Contributions are separate ledger records. We always insert a new record for contribution updates.
       const contribution = await this.prisma.contribution.create({
         data: {
@@ -736,6 +771,58 @@ export class UsersService {
       where: { id },
       data,
     });
+
+    if (status === 'DELETED') {
+      // Reassign all direct children (level 1 accounts) of the deleted shareholder to the company main account (Super Admin)
+      const mainAccount = await this.prisma.shareholder.findFirst({
+        where: { role: 'SUPER_ADMIN', status: { not: 'DELETED' } },
+        orderBy: { createdAt: 'asc' },
+      }) || await this.prisma.shareholder.findUnique({ where: { shareholderId: 'SH000000' } });
+
+      if (mainAccount && mainAccount.id !== id) {
+        // 1. Record previousParentId on direct children and set parentId to mainAccount.id
+        await this.prisma.shareholder.updateMany({
+          where: { parentId: id },
+          data: {
+            previousParentId: id,
+            parentId: mainAccount.id,
+          },
+        });
+
+        // 2. Update referral relationships where this user was the direct referrer
+        await this.prisma.referralRelationship.updateMany({
+          where: { parentId: id },
+          data: { parentId: mainAccount.id },
+        });
+      }
+    }
+
+    if (status === 'ACTIVE' || status === 'RESTORED') {
+      // Restore direct referral accounts that were previously linked to super admin when this user was deleted
+      const childrenToRestore = await this.prisma.shareholder.findMany({
+        where: { previousParentId: id },
+        select: { id: true },
+      });
+
+      if (childrenToRestore.length > 0) {
+        const childIds = childrenToRestore.map((c) => c.id);
+
+        // 1. Restore parentId on direct children and clear previousParentId
+        await this.prisma.shareholder.updateMany({
+          where: { id: { in: childIds } },
+          data: {
+            parentId: id,
+            previousParentId: null,
+          },
+        });
+
+        // 2. Update referral relationships for restored children to point back to this referrer
+        await this.prisma.referralRelationship.updateMany({
+          where: { childId: { in: childIds } },
+          data: { parentId: id },
+        });
+      }
+    }
 
     await this.auditService.logAction({
       shareholderId: adminId,
@@ -871,14 +958,22 @@ export class UsersService {
       this.prisma.profitLedger.aggregate({
         where: {
           shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+          status: { not: 'REVERSED' },
+          OR: [
+            { payoutBatchId: null },
+            { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+          ],
         },
         _sum: { amount: true },
       }),
       this.prisma.commissionLedger.aggregate({
         where: {
           shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
+          status: { not: 'REVERSED' },
+          OR: [
+            { payoutBatchId: null },
+            { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+          ],
         },
         _sum: { amount: true },
       }),
@@ -912,13 +1007,17 @@ export class UsersService {
       nextDistributionDate = new Date(year, month + 1, 6);
     }
 
+    const displayStatus = shareholder.accountType === 'ZERO_CONTRIBUTION' 
+      ? 'ZERO_CONTRIBUTION' 
+      : (shareholder.status === 'DELETED' ? 'DELETED' : 'ACTIVE');
+
     return {
       shareholder: {
         id: shareholder.id,
         name: shareholder.name || shareholder.shareholderId,
         shareholderId: shareholder.shareholderId,
         role: shareholder.role,
-        status: shareholder.status,
+        status: displayStatus,
         accountType: shareholder.accountType, // ZERO_CONTRIBUTION or CONTRIBUTION
         referralCode: shareholder.referralCode,
         currentRank: shareholder.currentRank || 'Unranked',
@@ -940,6 +1039,138 @@ export class UsersService {
         nextDistributionDate: nextDistributionDate.toISOString(),
       },
     };
+  }
+
+  // ==========================================
+  // Detailed Profile View for Shareholders
+  // ==========================================
+
+  async getShareholderProfile(shareholderId: string) {
+    const shareholder = await this.prisma.shareholder.findUnique({
+      where: { id: shareholderId },
+      include: {
+        parent: {
+          select: {
+            id: true,
+            shareholderId: true,
+            name: true,
+          },
+        },
+        contributions: {
+          where: { status: 'APPROVED' },
+          orderBy: { date: 'desc' },
+        },
+      },
+    });
+
+    if (!shareholder) {
+      throw new NotFoundException('Shareholder not found');
+    }
+
+    const activeInvestmentsVolume = shareholder.contributions.reduce((sum, c) => sum + Number(c.amount), 0);
+    const activeInvestmentsCount = shareholder.contributions.length;
+    const accountType = shareholder.accountType;
+
+    return {
+      id: shareholder.id,
+      shareholderId: shareholder.shareholderId,
+      name: shareholder.name,
+      phone: shareholder.phone || 'N/A',
+      dob: shareholder.dob ? shareholder.dob.toISOString().split('T')[0] : 'N/A',
+      pan: shareholder.pan || 'N/A',
+      role: shareholder.role,
+      activeInvestmentsCount,
+      activeInvestmentsVolume,
+      personalReferralCode: shareholder.referralCode || 'N/A',
+      referralLink: `https://360star.in/register?ref=${shareholder.referralCode}`,
+      address: {
+        building: shareholder.addressBuilding || '',
+        area: shareholder.addressArea || '',
+        city: shareholder.addressCity || '',
+        district: shareholder.addressDistrict || '',
+        state: shareholder.addressState || '',
+        pincode: shareholder.addressPincode || '',
+      },
+      bankDetails: {
+        accountName: shareholder.bankAccountName || 'N/A',
+        accountNumber: shareholder.bankAccountNumber || 'N/A',
+        bankName: shareholder.bankName || 'N/A',
+        branch: shareholder.bankBranch || 'N/A',
+        ifsc: shareholder.bankIfsc || 'N/A',
+      },
+      referrer: shareholder.parent ? `${shareholder.parent.name || shareholder.parent.shareholderId} (${shareholder.parent.shareholderId || 'No ID'})` : 'None',
+      accountType,
+      status: shareholder.accountType === 'ZERO_CONTRIBUTION' ? 'ZERO_CONTRIBUTION' : (shareholder.status === 'DELETED' ? 'DELETED' : 'ACTIVE'),
+    };
+  }
+
+  async getMeProfits(shareholderId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where: Prisma.ProfitLedgerWhereInput = {
+      shareholderId,
+      status: { not: 'REVERSED' },
+      OR: [
+        { payoutBatchId: null },
+        { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+      ],
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.profitLedger.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.profitLedger.count({ where }),
+    ]);
+    return { data, total, page, lastPage: Math.ceil(total / limit) };
+  }
+
+  async getMeCommissions(shareholderId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where: Prisma.CommissionLedgerWhereInput = {
+      shareholderId,
+      status: { not: 'REVERSED' },
+      OR: [
+        { payoutBatchId: null },
+        { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+      ],
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.commissionLedger.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          fromInvestment: { include: { shareholder: { select: { shareholderId: true, name: true } } } },
+          fromContribution: { include: { shareholder: { select: { shareholderId: true, name: true } } } },
+          sourceShareholder: { select: { shareholderId: true, name: true } },
+        },
+      }),
+      this.prisma.commissionLedger.count({ where }),
+    ]);
+    return { data, total, page, lastPage: Math.ceil(total / limit) };
+  }
+
+  async getMePayouts(shareholderId: string, page = 1, limit = 20) {
+    const skip = (page - 1) * limit;
+    const where: Prisma.PayoutDetailWhereInput = {
+      shareholderId,
+      status: { not: 'REVERSED' },
+      batch: { status: { notIn: ['REVERSED', 'REJECTED'] } },
+    };
+    const [data, total] = await Promise.all([
+      this.prisma.payoutDetail.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: { batch: true },
+      }),
+      this.prisma.payoutDetail.count({ where }),
+    ]);
+    return { data, total, page, lastPage: Math.ceil(total / limit) };
   }
 
   async getReferralTree(shareholderId: string) {
@@ -1003,112 +1234,7 @@ export class UsersService {
     };
   }
 
-  async getProfileDetails(shareholderId: string) {
-    const shareholder = await this.prisma.shareholder.findUnique({
-      where: { id: shareholderId },
-      include: {
-        parent: { select: {  shareholderId: true, name: true } },
-        investorProfile: true,
-      }
-    });
 
-    if (!shareholder) throw new NotFoundException('Shareholder not found');
-
-    const contributions = await this.prisma.contribution.aggregate({
-      where: { shareholderId, status: 'APPROVED' },
-      _sum: { amount: true },
-    });
-
-    const accountType = Number(contributions._sum.amount || 0) > 0 ? 'Investor' : 'Non-Investor';
-
-    return {
-      id: shareholder.id,
-      shareholderId: shareholder.shareholderId,
-      investorId: shareholder.investorProfile?.id || '-',
-      name: shareholder.name || shareholder.shareholderId,
-      phone: shareholder.phone || 'N/A',
-      pan: shareholder.pan || 'N/A',
-      address: [shareholder.addressBuilding, shareholder.addressArea, shareholder.addressCity, shareholder.addressDistrict, shareholder.addressState, shareholder.addressPincode].filter(Boolean).join(', ') || 'N/A',
-      bankDetails: {
-        accountName: shareholder.bankAccountName || 'N/A',
-        accountNumber: shareholder.bankAccountNumber || 'N/A',
-        bankName: shareholder.bankName || 'N/A',
-        branch: shareholder.bankBranch || 'N/A',
-        ifsc: shareholder.bankIfsc || 'N/A',
-      },
-      referrer: shareholder.parent ? `${shareholder.parent.name || shareholder.parent.shareholderId} (${shareholder.parent.shareholderId || 'No ID'})` : 'None',
-      accountType,
-      status: shareholder.status,
-    };
-  }
-
-  async getMeProfits(shareholderId: string, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.prisma.profitLedger.findMany({
-        where: {
-          shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.profitLedger.count({
-        where: {
-          shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-      }),
-    ]);
-    return { data, total, page, lastPage: Math.ceil(total / limit) };
-  }
-
-  async getMeCommissions(shareholderId: string, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.prisma.commissionLedger.findMany({
-        where: {
-          shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: { fromInvestment: { include: { shareholder: { select: { shareholderId: true } } } } },
-      }),
-      this.prisma.commissionLedger.count({
-        where: {
-          shareholderId,
-          payoutBatch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-      }),
-    ]);
-    return { data, total, page, lastPage: Math.ceil(total / limit) };
-  }
-
-  async getMePayouts(shareholderId: string, page = 1, limit = 20) {
-    const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.prisma.payoutDetail.findMany({
-        where: {
-          shareholderId,
-          batch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: { batch: true },
-      }),
-      this.prisma.payoutDetail.count({
-        where: {
-          shareholderId,
-          batch: { status: { in: ['APPROVED', 'RELEASED'] } },
-        },
-      }),
-    ]);
-    return { data, total, page, lastPage: Math.ceil(total / limit) };
-  }
 
   // ==========================================
   // Financial Information Change Request Workflow

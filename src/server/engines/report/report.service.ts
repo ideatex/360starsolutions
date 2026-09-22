@@ -8,33 +8,89 @@ export class ReportService {
   constructor(private readonly prisma: PrismaService) {}
 
   async getAdminDashboardMetrics() {
-    const activeShareholders = await this.prisma.shareholder.count({ where: { status: 'ACTIVE' } });
-    const totalShareholders = await this.prisma.shareholder.count();
-    
-    const activeCapital = await this.prisma.investment.aggregate({
-      where: { shareholder: { status: 'ACTIVE' } },
-      _sum: { amount: true },
-    });
-
-    const overallCapital = await this.prisma.investment.aggregate({
-      _sum: { amount: true },
-    });
-
-    const grossPayouts = await this.prisma.profitLedger.aggregate({
-      _sum: { amount: true },
-    });
-
-    const releasedFunds = await this.prisma.payoutBatch.aggregate({
-      where: { status: 'RELEASED' },
-      _sum: { totalAmount: true },
-    });
+    const [
+      activeShareholders,
+      totalShareholders,
+      activeContrib,
+      overallContrib,
+      grossProfitLedger,
+      grossCommissionLedger,
+      releasedFunds,
+    ] = await Promise.all([
+      // Count all active shareholders (role: SHAREHOLDER, non-deleted, and active account)
+      this.prisma.shareholder.count({
+        where: {
+          role: 'SHAREHOLDER',
+          status: { not: 'DELETED' },
+          OR: [
+            { accountType: 'CONTRIBUTION' },
+            { status: { in: ['ACTIVE', 'CONTRIBUTION_ACTIVE', 'ZERO_ACTIVE', 'RESTORED'] } },
+          ],
+        },
+      }),
+      // Count total non-deleted shareholder base
+      this.prisma.shareholder.count({
+        where: {
+          role: 'SHAREHOLDER',
+          status: { not: 'DELETED' },
+        },
+      }),
+      // Active approved capital for active non-deleted shareholders
+      this.prisma.contribution.aggregate({
+        where: {
+          status: 'APPROVED',
+          shareholder: {
+            role: 'SHAREHOLDER',
+            status: { not: 'DELETED' },
+          },
+        },
+        _sum: { amount: true },
+      }),
+      // Overall lifetime approved placements across all shareholders
+      this.prisma.contribution.aggregate({
+        where: {
+          status: 'APPROVED',
+          shareholder: {
+            role: 'SHAREHOLDER',
+          },
+        },
+        _sum: { amount: true },
+      }),
+      // Gross Profit Ledgers (excluding reversed batches/ledgers)
+      this.prisma.profitLedger.aggregate({
+        where: {
+          status: { not: 'REVERSED' },
+          OR: [
+            { payoutBatchId: null },
+            { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+          ],
+        },
+        _sum: { amount: true },
+      }),
+      // Gross Commission Ledgers (excluding reversed batches/ledgers)
+      this.prisma.commissionLedger.aggregate({
+        where: {
+          status: { not: 'REVERSED' },
+          OR: [
+            { payoutBatchId: null },
+            { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+          ],
+        },
+        _sum: { amount: true },
+      }),
+      // Batch funds released by Super Admin
+      this.prisma.payoutBatch.aggregate({
+        where: { status: 'RELEASED' },
+        _sum: { totalAmount: true },
+      }),
+    ]);
 
     return {
       activeShareholders,
       totalShareholders,
-      activeCapital: Number(activeCapital._sum.amount || 0),
-      overallCapital: Number(overallCapital._sum.amount || 0),
-      grossPayouts: Number(grossPayouts._sum.amount || 0),
+      activeCapital: Number(activeContrib._sum.amount || 0),
+      overallCapital: Number(overallContrib._sum.amount || 0),
+      grossPayouts: Number(grossProfitLedger._sum.amount || 0) + Number(grossCommissionLedger._sum.amount || 0),
       releasedFunds: Number(releasedFunds._sum.totalAmount || 0),
     };
   }
@@ -61,7 +117,19 @@ export class ReportService {
   async getUsersReport(filters: any = {}) {
     const where: Prisma.ShareholderWhereInput = {};
     
-    if (filters.status) where.status = filters.status as UserStatus;
+    if (filters.status) {
+      if (filters.status === 'ZERO_CONTRIBUTION') {
+        where.accountType = 'ZERO_CONTRIBUTION';
+        where.status = { not: 'DELETED' };
+      } else if (filters.status === 'ACTIVE') {
+        where.accountType = 'CONTRIBUTION';
+        where.status = { not: 'DELETED' };
+      } else {
+        where.status = filters.status as UserStatus;
+      }
+    } else {
+      where.status = { not: 'DELETED' };
+    }
     
     // Only fetch SHAREHOLDERs by default in the admin users dashboard, unless they filter by a specific role
     if (filters.role) {
@@ -93,8 +161,8 @@ export class ReportService {
     const shareholders = await this.prisma.shareholder.findMany({
       where,
       include: {
-        investments: { where: { status: 'ACTIVE' } },
-        children: true,
+        contributions: { where: { status: 'APPROVED' } },
+        children: { where: { status: { not: 'DELETED' } } },
       },
     });
 
@@ -104,9 +172,9 @@ export class ReportService {
       shareholderId: u.shareholderId,
       phone: u.phone ?? '',
       role: u.role,
-      status: u.status,
-      activeInvestmentsCount: u.investments.length,
-      activeInvestmentsVolume: u.investments.reduce((sum, inv) => sum + Number(inv.amount), 0),
+      status: u.accountType === 'ZERO_CONTRIBUTION' ? 'ZERO_CONTRIBUTION' : (u.status === 'DELETED' ? 'DELETED' : 'ACTIVE'),
+      activeInvestmentsCount: u.contributions.length,
+      activeInvestmentsVolume: u.contributions.reduce((sum, c) => sum + Number(c.amount), 0),
       referralsCount: u.children.length,
       createdAt: u.createdAt,
     }));
@@ -118,14 +186,15 @@ export class ReportService {
   }
 
   async getInvestmentsReport(filters: any = {}) {
-    const where: Prisma.InvestmentWhereInput = {};
+    const where: Prisma.ContributionWhereInput = {};
 
     if (filters.status) where.status = filters.status as any;
+
     if (filters.month) {
       const [y, m] = filters.month.split('-');
       const start = new Date(Number(y), Number(m) - 1, 1);
       const end = new Date(Number(y), Number(m), 1);
-      where.startDate = { gte: start, lt: end };
+      where.date = { gte: start, lt: end };
     }
 
     if (filters.search) {
@@ -137,14 +206,8 @@ export class ReportService {
       };
     }
     
-    // In our system, Investments map 1:1 with Contributions but are separate. 
-    // If they filter by cheque/agreement on investments, we filter the shareholder's contributions.
-    if (filters.agreementIssued === 'true' || filters.chequeIssued === 'true') {
-      where.shareholder = where.shareholder || {};
-      where.shareholder.contributions = { some: {} };
-      if (filters.agreementIssued === 'true') (where.shareholder.contributions.some as any).issuedAgreement = true;
-      if (filters.chequeIssued === 'true') (where.shareholder.contributions.some as any).issuedCheque = true;
-    }
+    if (filters.agreementIssued === 'true') where.issuedAgreement = true;
+    if (filters.chequeIssued === 'true') where.issuedCheque = true;
 
     if (filters.minAmount || filters.maxAmount) {
       where.amount = {};
@@ -152,27 +215,33 @@ export class ReportService {
       if (filters.maxAmount) where.amount.lte = Number(filters.maxAmount);
     }
 
-    const investments = await this.prisma.investment.findMany({
+    const contributions = await this.prisma.contribution.findMany({
       where,
       include: { shareholder: { select: { shareholderId: true, name: true } } },
     });
 
-    let result = investments.map(i => ({
-      id: i.id,
-      userShareholderId: i.shareholder.shareholderId,
-      userName: i.shareholder.name,
-      amount: Number(i.amount),
-      dailyProfitRate: Number(i.dailyProfitRate),
-      status: i.status,
-      startDate: i.startDate,
-      createdAt: i.createdAt,
+    let result = contributions.map(c => ({
+      id: c.id,
+      userShareholderId: c.shareholder?.shareholderId || '',
+      userName: c.shareholder?.name || '',
+      amount: Number(c.amount),
+      dailyProfitRate: 0.0033,
+      status: c.status,
+      startDate: c.date || c.createdAt,
+      createdAt: c.createdAt,
     }));
 
     return this.sortResult(result, filters.sortBy, filters.sortOrder);
   }
 
   async getProfitsReport(filters: any = {}) {
-    const where: Prisma.ProfitLedgerWhereInput = {};
+    const where: Prisma.ProfitLedgerWhereInput = {
+      status: { not: 'REVERSED' },
+      OR: [
+        { payoutBatchId: null },
+        { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+      ],
+    };
 
     if (filters.month) {
       const [y, m] = filters.month.split('-');
@@ -198,17 +267,21 @@ export class ReportService {
 
     const profits = await this.prisma.profitLedger.findMany({
       where,
-      include: { shareholder: { select: { shareholderId: true, name: true } }, investment: { select: { amount: true } } },
+      include: {
+        shareholder: { select: { shareholderId: true, name: true } },
+        investment: { select: { amount: true } },
+        contribution: { select: { amount: true } },
+      },
     });
 
     let result = profits.map(p => ({
       id: p.id,
-      userShareholderId: p.shareholder.shareholderId,
-      userName: p.shareholder.name,
-      investmentAmount: Number(p.investment.amount),
+      userShareholderId: p.shareholder?.shareholderId || '',
+      userName: p.shareholder?.name || '',
+      investmentAmount: Number(p.contribution?.amount || p.investment?.amount || 0),
       cycleStart: p.cycleStart,
       cycleEnd: p.cycleEnd,
-      eligibleDays: p.eligibleDays,
+      eligibleDays: p.eligibleDays || 15,
       amount: Number(p.amount),
       createdAt: p.createdAt,
     }));
@@ -217,7 +290,13 @@ export class ReportService {
   }
 
   async getCommissionsReport(filters: any = {}) {
-    const where: Prisma.CommissionLedgerWhereInput = {};
+    const where: Prisma.CommissionLedgerWhereInput = {
+      status: { not: 'REVERSED' },
+      OR: [
+        { payoutBatchId: null },
+        { payoutBatch: { status: { notIn: ['REVERSED', 'REJECTED'] } } },
+      ],
+    };
 
     if (filters.month) {
       const [y, m] = filters.month.split('-');
@@ -247,16 +326,17 @@ export class ReportService {
         shareholder: { select: { shareholderId: true, name: true } },
         sourceShareholder: { select: { shareholderId: true, name: true } },
         fromInvestment: { include: { shareholder: { select: { shareholderId: true, name: true } } } },
+        fromContribution: { include: { shareholder: { select: { shareholderId: true, name: true } } } },
       },
     });
 
     let result = commissions.map(c => ({
       id: c.id,
-      recipientShareholderId: c.shareholder.shareholderId,
-      recipientName: c.shareholder.name,
-      sourceShareholderId: c.sourceShareholder?.shareholderId || c.fromInvestment?.shareholder?.shareholderId || 'N/A',
-      sourceName: c.sourceShareholder?.name || c.fromInvestment?.shareholder?.name || 'N/A',
-      investmentAmount: c.fromInvestment ? Number(c.fromInvestment.amount) : 0,
+      recipientShareholderId: c.shareholder?.shareholderId || '',
+      recipientName: c.shareholder?.name || '',
+      sourceShareholderId: c.sourceShareholder?.shareholderId || c.fromContribution?.shareholder?.shareholderId || c.fromInvestment?.shareholder?.shareholderId || 'N/A',
+      sourceName: c.sourceShareholder?.name || c.fromContribution?.shareholder?.name || c.fromInvestment?.shareholder?.name || 'N/A',
+      investmentAmount: Number(c.fromContribution?.amount || c.fromInvestment?.amount || c.calculationBase || 0),
       level: c.level,
       rate: Number(c.rate),
       amount: Number(c.amount),

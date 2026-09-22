@@ -15,8 +15,9 @@ export class RankController {
 
   @Put('configurations')
   @Roles('SUPER_ADMIN')
-  async updateConfigurations(@Request() req: any, @Body() body: { configs: any[] }) {
-    return this.rankService.updateRankConfigurations(body.configs, req.shareholder.id);
+  async updateConfigurations(@Request() req: any, @Body() body: any) {
+    const list = body?.configs || body?.configurations || (Array.isArray(body) ? body : []);
+    return this.rankService.updateRankConfigurations(list, req.shareholder.id);
   }
 
   @Get('members-status')

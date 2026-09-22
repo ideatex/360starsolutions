@@ -872,13 +872,12 @@ export default function AdminConfigPage() {
                 {[
                   { r: 'Rule 1', text: 'A shareholder becomes an Investor only after the first Approved Contribution Fund.' },
                   { r: 'Rule 2', text: 'Only Investors receive Own Profit Sharing.' },
-                  { r: 'Rule 3', text: 'Referral Profit Sharing is calculated according to configured Referral Levels.' },
-                  { r: 'Rule 4', text: 'Business Volume must be achieved individually for every level.' },
-                  { r: 'Rule 5', text: 'Levels are evaluated sequentially.' },
-                  { r: 'Rule 6', text: 'If one level fails to qualify, all subsequent levels remain locked.' },
-                  { r: 'Rule 7', text: 'Business Volume and Profit Sharing Percentage are independently configurable for every level.' },
-                  { r: 'Rule 8', text: 'Profit Sharing is calculated twice every month.' },
-                  { r: 'Rule 9', text: 'Every Investor is treated as the root of their own independent referral tree for profit-sharing calculations.' },
+                  { r: 'Rule 3', text: 'Business Volume must be achieved individually for every level.' },
+                  { r: 'Rule 4', text: 'Levels are evaluated sequentially.' },
+                  { r: 'Rule 5', text: 'If one level fails to qualify, all subsequent levels remain locked.' },
+                  { r: 'Rule 6', text: 'Business Volume and Profit Sharing Percentage are independently configurable for every level.' },
+                  { r: 'Rule 7', text: 'Profit Sharing is calculated twice every month.' },
+                  { r: 'Rule 8', text: 'Every Investor is treated as the root of their own independent referral tree for profit-sharing calculations.' },
                 ].map((item, idx) => (
                   <div key={idx} className="flex gap-3 text-xs leading-normal select-none">
                     <span className="badge-brand h-max shrink-0">

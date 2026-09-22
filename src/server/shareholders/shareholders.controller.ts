@@ -12,33 +12,38 @@ export class UsersController {
 
   @Get('me')
   async getProfile(@Request() req: any) {
-    return this.usersService.getDashboardMetrics(req.shareholder.id);
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getDashboardMetrics(userId);
   }
 
   @Get('me/profile')
   async getProfileDetails(@Request() req: any) {
-    return this.usersService.getProfileDetails(req.shareholder.id);
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getShareholderProfile(userId);
   }
-
 
   @Get('me/referral-tree')
   async getReferralTree(@Request() req: any) {
-    return this.usersService.getReferralTree(req.shareholder.id);
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getReferralTree(userId);
   }
 
   @Get('me/profits')
   async getMeProfits(@Request() req: any, @Query('page') page = '1', @Query('limit') limit = '20') {
-    return this.usersService.getMeProfits(req.shareholder.id, Number(page), Number(limit));
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getMeProfits(userId, Number(page), Number(limit));
   }
 
   @Get('me/commissions')
   async getMeCommissions(@Request() req: any, @Query('page') page = '1', @Query('limit') limit = '20') {
-    return this.usersService.getMeCommissions(req.shareholder.id, Number(page), Number(limit));
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getMeCommissions(userId, Number(page), Number(limit));
   }
 
   @Get('me/payouts')
   async getMePayouts(@Request() req: any, @Query('page') page = '1', @Query('limit') limit = '20') {
-    return this.usersService.getMePayouts(req.shareholder.id, Number(page), Number(limit));
+    const userId = req.shareholder?.id || req.user?.id;
+    return this.usersService.getMePayouts(userId, Number(page), Number(limit));
   }
 
   @Post('me/change-password')
@@ -54,7 +59,7 @@ export class UsersController {
   async getUsers(
     @Query('search') search?: string,
     @Query('role') role?: Role,
-    @Query('status') status?: UserStatus,
+    @Query('status') status?: string,
     @Query('page') page = '1',
     @Query('limit') limit = '20',
   ) {

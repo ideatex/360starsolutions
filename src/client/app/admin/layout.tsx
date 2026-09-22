@@ -8,21 +8,26 @@ import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = React.useState(false);
   const shareholder = useAuthStore((state) => state.shareholder);
   const isHydrated = useAuthStore((state) => state.isHydrated);
   const router = useRouter();
   const { isCollapsed } = useSidebarStore();
 
   useEffect(() => {
-    if (!isHydrated) return;
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted || !isHydrated) return;
     if (!shareholder) {
       router.replace('/auth/login');
     } else if (shareholder.role !== 'ADMIN' && shareholder.role !== 'SUPER_ADMIN') {
       router.replace('/dashboard');
     }
-  }, [shareholder, isHydrated, router]);
+  }, [mounted, isHydrated, shareholder, router]);
 
-  if (!isHydrated || !shareholder || (shareholder.role !== 'ADMIN' && shareholder.role !== 'SUPER_ADMIN')) {
+  if (!mounted || !isHydrated || !shareholder || (shareholder.role !== 'ADMIN' && shareholder.role !== 'SUPER_ADMIN')) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-950 flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>

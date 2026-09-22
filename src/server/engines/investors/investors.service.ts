@@ -145,6 +145,16 @@ export class InvestorsService {
       data: { status: ContributionStatus.APPROVED },
     });
 
+    // Auto-convert shareholder to Standard Contribution and Active status
+    await this.prisma.shareholder.update({
+      where: { id: contribution.shareholderId },
+      data: {
+        accountType: 'CONTRIBUTION',
+        status: 'ACTIVE',
+        withholdingPercentage: new Prisma.Decimal(0),
+      },
+    });
+
     this.logger.log(`Contribution ${contributionId} approved.`);
 
     // Sync profile & summary

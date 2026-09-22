@@ -384,6 +384,13 @@ export default function AdminRanksPage() {
                   Customizing rank titles will reflect dynamically across all member statements, badges, and qualification rules.
                 </p>
 
+                {updateConfigsMutation.isError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{(updateConfigsMutation.error as any)?.response?.data?.message || 'Failed to save rank configurations.'}</span>
+                  </div>
+                )}
+
                 <div className="space-y-3">
                   {editableConfigs.map((cfg, idx) => (
                     <div key={cfg.id || idx} className="p-4 rounded-2xl border border-border bg-secondary/15 space-y-3">
@@ -428,20 +435,21 @@ export default function AdminRanksPage() {
               </div>
 
               <div className="p-4 border-t border-border bg-secondary/30 flex justify-end gap-3">
-                <Button
-                  variant="outline"
+                <button
+                  type="button"
                   onClick={() => setIsEditConfigsOpen(false)}
-                  className="text-xs h-9"
+                  className="px-4 py-2 border border-border bg-card hover:bg-secondary/50 text-foreground text-xs font-semibold rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
                   onClick={() => updateConfigsMutation.mutate(editableConfigs)}
                   disabled={updateConfigsMutation.isPending}
-                  className="bg-brand-primary text-white text-xs h-9 shadow-sm"
+                  className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   {updateConfigsMutation.isPending ? 'Saving Changes...' : 'Save Rank Configurations'}
-                </Button>
+                </button>
               </div>
             </motion.div>
           </div>
@@ -473,6 +481,13 @@ export default function AdminRanksPage() {
               </div>
 
               <div className="p-6 space-y-4 text-xs">
+                {allotRankMutation.isError && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-600 dark:text-rose-400 rounded-xl text-xs flex items-center gap-2">
+                    <AlertCircle size={15} className="shrink-0" />
+                    <span>{(allotRankMutation.error as any)?.response?.data?.message || 'Failed to allot rank.'}</span>
+                  </div>
+                )}
+
                 <div className="p-3.5 rounded-xl border border-border bg-secondary/20 space-y-1">
                   <p className="text-muted-foreground">Shareholder: <strong className="text-foreground">{selectedMember.name}</strong></p>
                   <p className="text-muted-foreground">ID: <strong className="text-brand-primary font-mono">{selectedMember.shareholderId}</strong></p>
@@ -514,24 +529,25 @@ export default function AdminRanksPage() {
               </div>
 
               <div className="p-4 border-t border-border bg-secondary/30 flex justify-end gap-3">
-                <Button
-                  variant="outline"
+                <button
+                  type="button"
                   onClick={() => { setIsAllotOpen(false); setSelectedMember(null); }}
-                  className="text-xs h-9"
+                  className="px-4 py-2 border border-border bg-card hover:bg-secondary/50 text-foreground text-xs font-semibold rounded-xl transition-all cursor-pointer"
                 >
                   Cancel
-                </Button>
-                <Button
+                </button>
+                <button
+                  type="button"
                   onClick={() => allotRankMutation.mutate({
                     shareholderId: selectedMember.id,
                     rankName: selectedRankName,
                     remarks: allotRemarks || undefined,
                   })}
                   disabled={allotRankMutation.isPending || !selectedRankName}
-                  className="bg-brand-primary text-white text-xs h-9 shadow-sm"
+                  className="px-4 py-2 bg-brand-primary hover:bg-brand-primary/90 text-white text-xs font-semibold rounded-xl transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                 >
                   {allotRankMutation.isPending ? 'Allotting Rank...' : 'Confirm & Allot Rank'}
-                </Button>
+                </button>
               </div>
             </motion.div>
           </div>

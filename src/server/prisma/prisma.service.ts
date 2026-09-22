@@ -35,10 +35,17 @@ function createPrismaOptions() {
 
   try {
     const config = parse(cleanUrl);
+    const isLocal = cleanUrl.includes('127.0.0.1') || cleanUrl.includes('localhost');
+    const ssl = cleanUrl.includes('sslmode=disable')
+      ? false
+      : (cleanUrl.includes('sslmode=require') || cleanUrl.includes('supabase.com') || !isLocal)
+        ? { rejectUnauthorized: false }
+        : false;
+
     const pool = new Pool({
       ...config,
       port: config.port ? parseInt(config.port, 10) : 5432,
-      ssl: { rejectUnauthorized: false },
+      ssl,
       max: 5,
       connectionTimeoutMillis: 15000,
     } as any);

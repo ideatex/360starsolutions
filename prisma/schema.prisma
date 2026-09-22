@@ -103,6 +103,7 @@ model Shareholder {
   parentId         String?
   parent           Shareholder?    @relation("ReferralHierarchy", fields: [parentId], references: [id])
   children         Shareholder[]   @relation("ReferralHierarchy")
+  previousParentId String?
   
   holdingBalance   Decimal  @default(0) @db.Decimal(19, 4)
   withholdingPercentage Decimal? @default(20) @db.Decimal(5, 2)

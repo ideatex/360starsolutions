@@ -44,7 +44,7 @@ export default function AdminFounderArticlesPage() {
       queryClient.invalidateQueries({ queryKey: ['adminArticles'] });
       setIsOpen(false);
       resetForm();
-      toast({ title: "Letter Published", description: "The new founder thought letter has been posted.", type: "success" });
+      toast({ title: "Thought Published", description: "The new founder thought article has been posted.", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Operation Failed", description: err.response?.data?.message || 'Error creating article', type: "error" });
@@ -59,7 +59,7 @@ export default function AdminFounderArticlesPage() {
       queryClient.invalidateQueries({ queryKey: ['adminArticles'] });
       setIsOpen(false);
       resetForm();
-      toast({ title: "Letter Saved", description: "Changes updated and bulletin revised.", type: "success" });
+      toast({ title: "Thought Saved", description: "Changes updated and thought post revised.", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Operation Failed", description: err.response?.data?.message || 'Error updating article', type: "error" });
@@ -72,7 +72,7 @@ export default function AdminFounderArticlesPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['adminArticles'] });
-      toast({ title: "Letter Archived", description: "Bulletin letter removed from client index.", type: "success" });
+      toast({ title: "Thought Archived", description: "Thought article removed from client index.", type: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Operation Failed", description: err.response?.data?.message || 'Error deleting article', type: "error" });
@@ -104,9 +104,9 @@ export default function AdminFounderArticlesPage() {
 
   const handleDelete = async (id: string) => {
     const ok = await confirm({
-      title: "Archive Bulletin Letter",
-      description: "Are you sure you want to delete this bulletin article? This action cannot be undone.",
-      confirmText: "Delete Letter",
+      title: "Archive Founder's Thought",
+      description: "Are you sure you want to delete this thought article? This action cannot be undone.",
+      confirmText: "Delete Article",
       variant: "danger"
     });
     if (ok) {
@@ -131,7 +131,7 @@ export default function AdminFounderArticlesPage() {
 
   const handleSubmit = () => {
     if (!form.title || !form.content || !form.slug) {
-      toast({ title: "Inputs Required", description: "Title, slug, and letter content are required.", type: "warning" });
+      toast({ title: "Inputs Required", description: "Title, slug, and content are required.", type: "warning" });
       return;
     }
 
@@ -157,15 +157,15 @@ export default function AdminFounderArticlesPage() {
             </span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight mt-2 flex items-center gap-2.5">
-            <BookOpen className="w-7 h-7 text-brand-600 dark:text-brand-400" /> Founder's Bulletin Editor
+            <BookOpen className="w-7 h-7 text-brand-600 dark:text-brand-400" /> Founder's Thoughts Editor
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Compose and publish letters, announcements, and vision statement documents.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Compose and publish thoughts, announcements, and vision statement documents.</p>
         </div>
         <button
           onClick={() => { resetForm(); setIsOpen(true); }}
           className="bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white font-semibold px-5 py-2.5 rounded-lg transition-all shadow-theme-xs flex items-center justify-center gap-2 cursor-pointer text-xs"
         >
-          <Plus size={16} /> Write Bulletin Letter
+          <Plus size={16} /> Write Founder's Thought
         </button>
       </div>
 
@@ -174,13 +174,13 @@ export default function AdminFounderArticlesPage() {
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3 text-gray-500">
             <Loader2 className="w-6 h-6 animate-spin text-brand-600" />
-            <p className="text-sm font-medium">Loading bulletin archives...</p>
+            <p className="text-sm font-medium">Loading thought archives...</p>
           </div>
         ) : articles?.length === 0 ? (
           <div className="text-center py-20 text-gray-500">
             <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30 text-brand-600" />
-            <p className="text-sm font-semibold">No Letters Written</p>
-            <p className="text-xs text-gray-400 mt-0.5">Click "Write Bulletin Letter" to record your first vision post.</p>
+            <p className="text-sm font-semibold">No Thoughts Written</p>
+            <p className="text-xs text-gray-400 mt-0.5">Click "Write Founder's Thought" to record your first vision post.</p>
           </div>
         ) : (
           <div className="overflow-x-auto custom-scrollbar">
@@ -237,15 +237,15 @@ export default function AdminFounderArticlesPage() {
             >
               <div className="p-5 sm:p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-900/80">
                 <div>
-                  <h3 className="text-base font-bold text-gray-900 dark:text-white">{selectedArticle ? 'Edit Bulletin Letter' : 'Write Bulletin Letter'}</h3>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Draft letter updates for all shareholder portals</p>
+                  <h3 className="text-base font-bold text-gray-900 dark:text-white">{selectedArticle ? "Edit Founder's Thought" : "Write Founder's Thought"}</h3>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Draft thought updates for all shareholder portals</p>
                 </div>
                 <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-all cursor-pointer"><X size={18} /></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 text-xs custom-scrollbar">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Letter Title *</label>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Thought Title *</label>
                   <input type="text" value={form.title} onChange={e => handleTitleChange(e.target.value)} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="Q3 Leadership Statement" />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
@@ -266,7 +266,7 @@ export default function AdminFounderArticlesPage() {
                   <input type="text" value={form.coverImage} onChange={e => setForm({...form, coverImage: e.target.value})} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-xs font-medium focus:outline-none dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="https://..." />
                 </div>
                 <div className="space-y-1.5 font-sans">
-                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Letter Body Content *</label>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">Thought Body Content *</label>
                   <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} rows={10} className="w-full px-3.5 py-2 border border-gray-200 dark:border-gray-800 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 dark:bg-gray-900 text-gray-900 dark:text-white" placeholder="Dear investors, write vision statements here..." />
                 </div>
               </div>
@@ -274,7 +274,7 @@ export default function AdminFounderArticlesPage() {
               <div className="p-4 sm:p-5 border-t border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-900/80 flex justify-end gap-2.5 select-none">
                 <button onClick={() => setIsOpen(false)} className="px-4 py-2 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold text-gray-600 dark:text-gray-300 cursor-pointer">Cancel</button>
                 <button onClick={handleSubmit} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 active:bg-brand-800 text-white rounded-lg text-xs font-semibold shadow-theme-xs cursor-pointer">
-                  {selectedArticle ? 'Save Letter' : 'Publish Letter'}
+                  {selectedArticle ? "Save Thought" : "Publish Thought"}
                 </button>
               </div>
             </motion.div>

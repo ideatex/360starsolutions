@@ -113,10 +113,12 @@ export default function DashboardPage() {
                   {isZeroContribution ? 'Zero Contribution' : 'Standard Contributor'}
                 </span>
 
-                {/* Rank Badge */}
-                <span className={`badge ${getRankBadgeColor(currentRank)}`}>
-                  <Award className="w-3 h-3 mr-1" /> {currentRank}
-                </span>
+                {/* Rank Badge - only rendered when rank is achieved */}
+                {currentRank && currentRank.toLowerCase() !== 'unranked' && currentRank.toLowerCase() !== 'none' && currentRank.trim() !== '' && (
+                  <span className={`badge ${getRankBadgeColor(currentRank)}`}>
+                    <Award className="w-3 h-3 mr-1" /> {currentRank}
+                  </span>
+                )}
               </div>
 
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white tracking-tight">

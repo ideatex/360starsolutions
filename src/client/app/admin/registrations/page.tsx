@@ -357,105 +357,213 @@ export default function AdminRegistrationsPage() {
 
       {/* Details Modal */}
       {detailModalItem && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-lg w-full p-6 space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border pb-3">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-2xl w-full p-6 space-y-5 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
               <div>
-                <h3 className="text-base font-black text-foreground">Registration Request Details</h3>
-                <p className="text-[11px] font-mono text-muted-foreground">ID: {detailModalItem.id}</p>
+                <h3 className="text-base font-black text-foreground flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-brand-primary" /> Application Dossier & Referrer Submission
+                </h3>
+                <p className="text-[11px] font-mono text-muted-foreground mt-0.5">Request ID: {detailModalItem.id}</p>
               </div>
               <button 
                 onClick={() => setDetailModalItem(null)} 
-                className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="p-1 text-muted-foreground hover:text-foreground cursor-pointer rounded-lg hover:bg-secondary transition-all"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="space-y-3 text-xs">
-              <div className="grid grid-cols-2 gap-3 bg-muted/20 p-3.5 rounded-2xl border border-border/60">
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs custom-scrollbar">
+              {/* Summary Status Header */}
+              <div className="p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 flex flex-wrap items-center justify-between gap-3 select-none">
                 <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Applicant Name</span>
-                  <span className="font-bold text-foreground text-sm">{detailModalItem.name}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Phone Number</span>
-                  <span className="font-mono font-bold text-foreground">{detailModalItem.phone}</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Account Type</span>
-                  <span className="font-bold text-foreground">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Account Plan</span>
+                  <span className="font-extrabold text-foreground text-sm">
                     {detailModalItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution Account' : 'Standard Contribution Account'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Contribution Amount</span>
-                  <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Contribution Capital</span>
+                  <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
                     {detailModalItem.contributionAmount ? `₹${Number(detailModalItem.contributionAmount).toLocaleString('en-IN')}` : '₹0 (Zero Contrib)'}
                   </span>
                 </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-muted/20 border border-border/60 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-medium">Sponsor / Referrer:</span>
-                  <span className="font-bold text-foreground">
-                    {detailModalItem.referrer ? `${detailModalItem.referrer.name} (${detailModalItem.referrer.shareholderId})` : 'Direct / No Sponsor'}
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Queue Status</span>
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                    {detailModalItem.status}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-medium">Application Status:</span>
-                  <span className="font-bold uppercase text-brand-primary">{detailModalItem.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground font-medium">Submission Timestamp:</span>
-                  <span className="text-foreground">{new Date(detailModalItem.createdAt).toLocaleString('en-IN')}</span>
-                </div>
-                {detailModalItem.reviewedBy && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground font-medium">Reviewed By:</span>
-                    <span className="font-bold text-foreground">{detailModalItem.reviewedBy.name}</span>
-                  </div>
-                )}
               </div>
 
+              {/* 1. Personal & Contact Information */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border pb-1">
+                  <UserIcon size={14} className="text-brand-primary" /> 1. Personal & Identity Coordinates
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-muted/20 p-3.5 rounded-2xl border border-border/60">
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">Full Applicant Name</span>
+                    <strong className="text-foreground text-sm">{detailModalItem.name}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">Mobile Phone Number</span>
+                    <strong className="font-mono text-foreground text-sm">{detailModalItem.phone}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">PAN Card Number</span>
+                    <strong className="font-mono font-bold text-brand-primary text-xs">{detailModalItem.pan || '-'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground uppercase font-bold block">Date of Birth</span>
+                    <strong className="text-foreground text-xs">{detailModalItem.dob ? new Date(detailModalItem.dob).toLocaleDateString('en-IN') : '-'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Structured Residential Address */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border pb-1">
+                  <Layers size={14} className="text-brand-primary" /> 2. Address & Postal Details
+                </h4>
+                <div className="bg-muted/20 p-3.5 rounded-2xl border border-border/60 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Building / Flat / Street</span>
+                      <strong className="text-foreground">{detailModalItem.addressBuilding || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Area / Locality</span>
+                      <strong className="text-foreground">{detailModalItem.addressArea || '-'}</strong>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1 border-t border-border/40">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">City / Town</span>
+                      <strong className="text-foreground">{detailModalItem.addressCity || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">District</span>
+                      <strong className="text-foreground">{detailModalItem.addressDistrict || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">State</span>
+                      <strong className="text-foreground">{detailModalItem.addressState || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Pincode</span>
+                      <strong className="font-mono font-bold text-foreground">{detailModalItem.addressPincode || '-'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. Banking Coordinates */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border pb-1">
+                  <FileText size={14} className="text-brand-primary" /> 3. Banking & Settlement Coordinates
+                </h4>
+                <div className="bg-muted/20 p-3.5 rounded-2xl border border-border/60 space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Bank Account Holder Name</span>
+                      <strong className="text-foreground">{detailModalItem.bankAccountName || detailModalItem.name}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Bank Account Number</span>
+                      <strong className="font-mono font-bold text-foreground">{detailModalItem.bankAccountNumber || '-'}</strong>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1 border-t border-border/40">
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Bank Name</span>
+                      <strong className="text-foreground">{detailModalItem.bankName || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">Branch</span>
+                      <strong className="text-foreground">{detailModalItem.bankBranch || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold block">IFSC Code</span>
+                      <strong className="font-mono font-bold text-brand-primary">{detailModalItem.bankIfsc || '-'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Sponsor, Investment Date & Submission Info */}
+              <div className="space-y-2">
+                <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5 border-b border-border pb-1">
+                  <Clock size={14} className="text-brand-primary" /> 4. Referral Sponsor & Timeline
+                </h4>
+                <div className="bg-muted/20 p-3.5 rounded-2xl border border-border/60 space-y-2 text-xs">
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-semibold">Sponsor / Referrer:</span>
+                    <strong className="text-foreground">
+                      {detailModalItem.referrer 
+                        ? `${detailModalItem.referrer.name} (ID: ${detailModalItem.referrer.shareholderId}${detailModalItem.referrer.phone ? `, Phone: ${detailModalItem.referrer.phone}` : ''})` 
+                        : 'Direct / Root (SH000000)'}
+                    </strong>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-semibold">Placement Date:</span>
+                    <span className="font-mono text-foreground">{detailModalItem.contributionDate ? new Date(detailModalItem.contributionDate).toLocaleDateString('en-IN') : new Date(detailModalItem.createdAt).toLocaleDateString('en-IN')}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-semibold">Submission Timestamp:</span>
+                    <span className="text-foreground">{new Date(detailModalItem.createdAt).toLocaleString('en-IN')}</span>
+                  </div>
+                  {detailModalItem.reviewedBy && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-muted-foreground font-semibold">Review Completed By:</span>
+                      <strong className="text-foreground">{detailModalItem.reviewedBy.name}</strong>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 5. Payment Receipt Preview */}
               {detailModalItem.paymentProofUrl && (
-                <div className="p-3 rounded-2xl border border-border bg-card flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-brand-primary" />
-                    <span className="font-bold text-xs">Payment Receipt Attached</span>
+                <div className="p-3.5 rounded-2xl border border-border bg-card flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-5 h-5 text-brand-primary" />
+                    <div>
+                      <span className="font-bold text-xs text-foreground block">Deposit Receipt Proof Attached</span>
+                      <span className="text-[10px] text-muted-foreground">{detailModalItem.paymentProofFileName || 'Payment Voucher / Cheque Photo'}</span>
+                    </div>
                   </div>
                   <button
                     onClick={() => setProofPreviewUrl(detailModalItem.paymentProofUrl)}
-                    className="px-3 py-1 bg-brand-primary text-white rounded-lg text-xs font-bold hover:bg-brand-primary/90 transition-all cursor-pointer flex items-center gap-1"
+                    className="px-3.5 py-1.5 bg-brand-primary hover:bg-brand-primary/90 text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-theme-xs"
                   >
-                    <Eye className="w-3.5 h-3.5" /> Preview Receipt
+                    <Eye className="w-3.5 h-3.5" /> Preview Document
                   </button>
                 </div>
               )}
             </div>
 
-            <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <div className="flex justify-end gap-2 pt-3 border-t border-border shrink-0">
               <button
                 onClick={() => setDetailModalItem(null)}
-                className="px-4 py-2 rounded-xl text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer"
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-secondary hover:bg-secondary/80 text-foreground cursor-pointer transition-all"
               >
-                Close
+                Close Dossier
               </button>
               {(detailModalItem.status === 'PENDING_REVIEW' || detailModalItem.status === 'PENDING_ADMIN_REVIEW') && (
                 <>
                   <button
                     onClick={() => { setSelectedRequest(detailModalItem); setShowRejectModal(true); }}
-                    className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600/10 hover:bg-red-600/20 text-red-600 cursor-pointer border border-red-600/20"
+                    className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600/10 hover:bg-red-600/20 text-red-600 cursor-pointer border border-red-600/20 transition-all"
                   >
                     Reject Application
                   </button>
                   <button
                     onClick={() => handleOpenApproveModal(detailModalItem)}
                     disabled={approveMutation.isPending}
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50"
+                    className="px-5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer disabled:opacity-50 transition-all"
                   >
-                    Approve & Activate
+                    Approve & Setup Shareholder
                   </button>
                 </>
               )}
@@ -464,10 +572,10 @@ export default function AdminRegistrationsPage() {
         </div>
       )}
 
-      {/* Approve Modal with Initial Password & Withholding Percentage Configuration */}
+      {/* Approve Modal with In-Dialog Validation & Error Display */}
       {showApproveModal && approveItem && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+          <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div className="flex items-center justify-between border-b border-border pb-3">
               <h3 className="text-base font-extrabold text-foreground flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-emerald-600" /> Approve & Activate Account
@@ -480,13 +588,27 @@ export default function AdminRegistrationsPage() {
               </button>
             </div>
 
+            {/* In-Dialog Error Alert Banner */}
+            {approveMutation.isError && (
+              <div className="p-3.5 bg-red-500/10 border border-red-500/25 text-red-600 dark:text-red-400 rounded-2xl text-xs flex items-start gap-2.5">
+                <AlertCircle size={16} className="shrink-0 mt-0.5 text-red-500" />
+                <div className="space-y-0.5">
+                  <p className="font-bold text-[11px] uppercase tracking-wider text-red-700 dark:text-red-300">Approval Conflict / Error:</p>
+                  <p className="leading-relaxed font-medium">
+                    {(approveMutation.error as any)?.response?.data?.message || 'Approval failed. Please check inputs or duplicate registration parameters.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="p-3 bg-muted/20 rounded-xl border border-border/60 text-xs space-y-1">
               <div><strong className="text-muted-foreground">Applicant:</strong> <span className="font-bold text-foreground">{approveItem.name}</span></div>
               <div><strong className="text-muted-foreground">Phone:</strong> <span className="font-mono text-foreground">{approveItem.phone}</span></div>
+              <div><strong className="text-muted-foreground">PAN:</strong> <span className="font-mono font-bold text-brand-primary">{approveItem.pan || 'Not Provided'}</span></div>
               <div><strong className="text-muted-foreground">Account Type:</strong> <span className="font-bold text-foreground">{approveItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</span></div>
             </div>
 
-            {/* Initial Password Configuration - Required for ALL shareholders */}
+            {/* Initial Password Configuration */}
             <div className="space-y-1.5 text-xs">
               <div className="flex items-center justify-between">
                 <label className="block text-[11px] font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
@@ -510,7 +632,9 @@ export default function AdminRegistrationsPage() {
                     if (e.target.value.trim().length >= 6) setApprovePasswordError(null);
                   }}
                   placeholder="Enter initial password (e.g. Star@9876)"
-                  className="w-full px-3.5 py-2 pr-10 rounded-xl border border-border bg-background text-xs font-medium font-mono focus:outline-none focus:border-brand-500 text-foreground"
+                  className={`w-full px-3.5 py-2 pr-10 rounded-xl border bg-background text-xs font-medium font-mono focus:outline-none text-foreground ${
+                    approvePassword && approvePassword.trim().length < 6 ? 'border-red-500 bg-red-500/5' : 'border-border focus:border-brand-500'
+                  }`}
                 />
                 <button
                   type="button"
@@ -521,6 +645,9 @@ export default function AdminRegistrationsPage() {
                   {showApprovePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+              {approvePassword && approvePassword.trim().length < 6 && (
+                <span className="text-[11px] text-red-500 font-semibold block">Password must be at least 6 characters.</span>
+              )}
               {approvePasswordError && (
                 <span className="text-[11px] text-red-500 font-semibold block">{approvePasswordError}</span>
               )}
@@ -591,14 +718,22 @@ export default function AdminRegistrationsPage() {
         </div>
       )}
 
-      {/* Reject Modal */}
+      {/* Reject Modal with In-Dialog Error Display */}
       {showRejectModal && selectedRequest && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
           <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-extrabold text-foreground">Reject Registration</h3>
             <p className="text-xs text-muted-foreground">
               Rejecting applicant <strong>{selectedRequest.name}</strong> ({selectedRequest.phone}). Provide a reason for the permanent audit trail:
             </p>
+
+            {rejectMutation.isError && (
+              <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs flex items-center gap-2">
+                <AlertCircle size={15} className="shrink-0" />
+                <span>{(rejectMutation.error as any)?.response?.data?.message || 'Rejection failed.'}</span>
+              </div>
+            )}
+
             <textarea
               rows={3}
               value={rejectReason}

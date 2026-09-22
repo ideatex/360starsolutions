@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { 
   Bell, Search, LogOut, Menu, X, Check, Trash, Archive, 
   CheckSquare, ChevronRight, Inbox, User, Shield, ChevronDown, 
-  ExternalLink, Mail
+  ExternalLink, Mail, ArrowRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { io } from 'socket.io-client';
@@ -164,6 +164,41 @@ export default function Topbar() {
   const breadcrumbs = getBreadcrumbs();
   const [selectedNotifForModal, setSelectedNotifForModal] = useState<any>(null);
 
+  const getNotificationTargetRoute = (notif: any) => {
+    const isAdmin = shareholder?.role === 'SUPER_ADMIN' || shareholder?.role === 'ADMIN';
+    if (!notif) return isAdmin ? '/admin' : '/dashboard';
+    const text = `${notif.title || ''} ${notif.message || ''}`.toLowerCase();
+    
+    if (text.includes('founder') || text.includes('thought') || text.includes('vision')) {
+      return isAdmin ? '/admin/founder' : '/dashboard/founder';
+    }
+    if (text.includes('registration') || text.includes('signup') || text.includes('applicant') || text.includes('referral queue')) {
+      return isAdmin ? '/admin/registrations' : '/dashboard/signup';
+    }
+    if (text.includes('shareholder') || text.includes('financial change') || text.includes('bank details') || text.includes('profile')) {
+      return isAdmin ? '/admin/shareholders' : '/dashboard/profile';
+    }
+    if (text.includes('payout') || text.includes('dividend') || text.includes('profit')) {
+      return isAdmin ? '/admin/payouts' : '/dashboard/profit-sharing';
+    }
+    if (text.includes('withdrawal') || text.includes('holding balance')) {
+      return isAdmin ? '/admin/withdrawals' : '/dashboard/profit-sharing';
+    }
+    if (text.includes('rank')) {
+      return isAdmin ? '/admin/ranks' : '/dashboard/referral-progress';
+    }
+    if (text.includes('investor') || text.includes('contribution')) {
+      return isAdmin ? '/admin/shareholders' : '/dashboard/profit-sharing';
+    }
+    return isAdmin ? '/admin' : '/dashboard/announcements';
+  };
+
+  const handleTakeMeThere = (notif: any) => {
+    const route = getNotificationTargetRoute(notif);
+    setSelectedNotifForModal(null);
+    router.push(route);
+  };
+
   return (
     <header className="sticky top-0 z-30 flex h-18 w-full border-b border-gray-200 dark:border-gray-800 bg-white/90 dark:bg-gray-900/90 backdrop-blur-md px-4 sm:px-6">
       <div className="flex grow items-center justify-between gap-4">
@@ -221,15 +256,15 @@ export default function Topbar() {
 
         {/* Right Side: Quick Action Links, Theme Toggle, Notification Bell, User Menu */}
         <div className="flex items-center gap-2.5 sm:gap-3">
-          {/* Quick Letters Link */}
-          <Link href="/dashboard/founder" className="hidden sm:block">
+          {/* Quick Founder's Thoughts Link */}
+          <Link href={shareholder?.role === 'SUPER_ADMIN' || shareholder?.role === 'ADMIN' ? '/admin/founder' : '/dashboard/founder'} className="hidden sm:block">
             <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border transition-all ${
-              pathname === '/dashboard/founder'
+              pathname === '/dashboard/founder' || pathname === '/admin/founder'
                 ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-500/15 dark:text-purple-400 dark:border-purple-500/30'
                 : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300 dark:border-gray-800 dark:hover:bg-gray-800'
             }`}>
               <Mail className="w-3.5 h-3.5" />
-              <span>Letters</span>
+              <span>Founder's Thoughts</span>
             </span>
           </Link>
 
@@ -485,37 +520,27 @@ export default function Topbar() {
                 {(selectedNotifForModal.message || '').replace(/\(FounderRef:[^\)]+\)/gi, '').replace(/\(Ref:[^\)]+\)/gi, '').trim() || selectedNotifForModal.message}
               </div>
 
-              <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 pt-3 shrink-0">
-                {((selectedNotifForModal.message || '').includes('(FounderRef:') || selectedNotifForModal.title?.toLowerCase().includes("founder")) ? (
-                  <Link
-                    href="/dashboard/founder"
-                    onClick={() => setSelectedNotifForModal(null)}
-                    className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
-                  >
-                    Open Founder's Thoughts <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                ) : (
-                  <Link
-                    href="/dashboard/announcements"
-                    onClick={() => setSelectedNotifForModal(null)}
-                    className="text-xs font-bold text-brand-600 dark:text-brand-400 hover:underline flex items-center gap-1"
-                  >
-                    Open Notifications & Notices <ChevronRight className="w-3.5 h-3.5" />
-                  </Link>
-                )}
+              <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 pt-3 shrink-0 gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleTakeMeThere(selectedNotifForModal)}
+                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold transition-all shadow-theme-xs flex items-center gap-1.5 cursor-pointer select-none"
+                >
+                  Take me there <ArrowRight size={13} />
+                </button>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
                       archiveMutation.mutate(selectedNotifForModal.id);
                       setSelectedNotifForModal(null);
                     }}
-                    className="px-3.5 py-1.5 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 transition-all cursor-pointer"
+                    className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs font-semibold hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-all cursor-pointer"
                   >
                     Archive
                   </button>
                   <button
                     onClick={() => setSelectedNotifForModal(null)}
-                    className="px-4 py-1.5 bg-brand-500 text-white rounded-xl text-xs font-bold hover:bg-brand-600 transition-all shadow-theme-xs cursor-pointer"
+                    className="px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-xs font-bold hover:bg-gray-200 dark:hover:bg-gray-700 transition-all cursor-pointer"
                   >
                     Close
                   </button>

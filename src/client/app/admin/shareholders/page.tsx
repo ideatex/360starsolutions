@@ -136,20 +136,44 @@ export default function AdminUsersPage() {
     toast({ title: "Bank Name Added", description: `"${trimmed}" added to bank dropdown and selected.`, type: "success" });
   };
 
-  const isAccountNumberValid = (accNum: string) => {
+  const isAccountNumberValid = (accNum?: string) => {
     if (!accNum) return true;
     const clean = accNum.replace(/\D/g, '');
     return /^\d{10,16}$/.test(clean);
   };
 
-  const isPanValid = (panStr: string) => {
+  const isPanValid = (panStr?: string) => {
     if (!panStr) return true;
     return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(panStr.trim().toUpperCase());
+  };
+
+  const isPhoneValid = (phoneStr?: string) => {
+    if (!phoneStr) return true;
+    const clean = phoneStr.replace(/[^0-9]/g, '');
+    const num = clean.length === 12 && clean.startsWith('91') ? clean.slice(2) : clean.length === 11 && clean.startsWith('0') ? clean.slice(1) : clean;
+    return /^[6-9]\d{9}$/.test(num);
+  };
+
+  const isIfscValid = (ifscStr?: string) => {
+    if (!ifscStr) return true;
+    return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifscStr.trim().toUpperCase());
+  };
+
+  const isDobValid = (dobStr?: string) => {
+    if (!dobStr) return true;
+    const dob = new Date(dobStr);
+    if (isNaN(dob.getTime())) return false;
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+    return age >= 18;
   };
 
   // Wizard Creation Step
   const [wizardStep, setWizardStep] = useState(1);
   const [highestStepReached, setHighestStepReached] = useState(1);
+  const [wizardError, setWizardError] = useState<string | null>(null);
   const [referrerName, setReferrerName] = useState('');
   const [isValidatingReferrer, setIsValidatingReferrer] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -157,6 +181,27 @@ export default function AdminUsersPage() {
   const [createPincodePostOffices, setCreatePincodePostOffices] = useState<string[]>([]);
   const [isLookingUpEditPincode, setIsLookingUpEditPincode] = useState(false);
   const [editPincodePostOffices, setEditPincodePostOffices] = useState<string[]>([]);
+
+  // Password Auto-Generator helper
+  const handleAutoGeneratePassword = () => {
+    const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijkmnopqrstuvwxyz';
+    const numbers = '23456789';
+    const special = '@#$%&*!';
+    let pass = '';
+    pass += uppercase.charAt(Math.floor(Math.random() * uppercase.length));
+    pass += lowercase.charAt(Math.floor(Math.random() * lowercase.length));
+    pass += numbers.charAt(Math.floor(Math.random() * numbers.length));
+    pass += special.charAt(Math.floor(Math.random() * special.length));
+    const all = uppercase + lowercase + numbers + special;
+    for (let i = 0; i < 6; i++) {
+      pass += all.charAt(Math.floor(Math.random() * all.length));
+    }
+    setCreateForm(prev => ({ ...prev, password: pass }));
+    setShowPassword(true);
+    setWizardError(null);
+    toast({ title: "Password Generated", description: `Strong password auto-generated and applied.`, type: "success" });
+  };
 
   // Pincode lookup helper for creation wizard
   const handleCreatePincodeChange = async (pinValue: string) => {
@@ -483,6 +528,7 @@ export default function AdminUsersPage() {
     if (isCreateOpen) {
       setHighestStepReached(1);
       setWizardStep(1);
+      setWizardError(null);
       api.get('/shareholders/next-id').then(res => {
         setCreateForm(prev => ({ ...prev, shareholderId: res.data.nextId }));
       }).catch(console.error);
@@ -499,9 +545,12 @@ export default function AdminUsersPage() {
     try {
       const res = await api.get(`/shareholders/validate-referral/${code}`);
       setReferrerName(res.data.name);
+      setWizardError(null);
     } catch (err: any) {
       setReferrerName('');
-      toast({ title: "Invalid Referrer", description: err.response?.data?.message || "Referrer ID not found", type: "error" });
+      const msg = err.response?.data?.message || "Referrer ID not found";
+      setWizardError(msg);
+      toast({ title: "Invalid Referrer", description: msg, type: "error" });
     } finally {
       setIsValidatingReferrer(false);
     }
@@ -510,6 +559,7 @@ export default function AdminUsersPage() {
   const handleStepperClick = (step: number) => {
     if (step <= highestStepReached) {
       setWizardStep(step);
+      setWizardError(null);
     }
   };
 
@@ -522,6 +572,7 @@ export default function AdminUsersPage() {
       queryClient.invalidateQueries({ queryKey: ['adminUsers'] });
       setIsCreateOpen(false);
       setWizardStep(1);
+      setWizardError(null);
       setCreateForm({
         shareholderId: '',
         password: '',
@@ -558,9 +609,12 @@ export default function AdminUsersPage() {
       const errors = err.response?.data?.errors;
       if (errors) {
         const errorList = Object.entries(errors).map(([field, msg]) => `• ${field}: ${msg}`).join('\n');
+        setWizardError(`Validation Failed:\n${errorList}`);
         toast({ title: "Validation Failed", description: `Please check creation values:\n${errorList}`, type: "error" });
       } else {
-        toast({ title: "Registration Error", description: err.response?.data?.message || 'Error creating shareholder', type: "error" });
+        const msg = err.response?.data?.message || 'Error creating shareholder';
+        setWizardError(msg);
+        toast({ title: "Registration Error", description: msg, type: "error" });
       }
     },
   });
@@ -626,12 +680,6 @@ export default function AdminUsersPage() {
   });
 
   const isSuperAdmin = shareholder?.role === 'SUPER_ADMIN';
-
-  const isIfscValid = (ifsc: string) => {
-    if (!ifsc) return true; // optional
-    const ifscRegex = /^[A-Z]{4}0[A-Z0-9]{6}$/;
-    return ifscRegex.test(ifsc);
-  };
 
   const handleOpenEdit = (u: any) => {
     setSelectedUser(u);
@@ -706,7 +754,7 @@ export default function AdminUsersPage() {
       { header: 'Role', key: 'role' },
       { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
       { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
-      { header: 'Status', key: 'status' },
+      { header: 'Status', key: 'status', formatter: (_, row) => row.accountType === 'ZERO_CONTRIBUTION' || row.status === 'ZERO_ACTIVE' ? 'Zero Contribution' : 'Active' },
       { header: 'Referral Code', key: 'referralCode' },
       { header: 'Bank Name', key: 'bankName' },
       { header: 'Bank Account', key: 'bankAccountNumber' },
@@ -729,7 +777,7 @@ export default function AdminUsersPage() {
       { header: 'Role', key: 'role' },
       { header: 'Account Type', key: 'accountType', formatter: (v) => v === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard' },
       { header: 'Withholding %', key: 'withholdingPercentage', formatter: (v, row) => row.accountType === 'ZERO_CONTRIBUTION' ? `${v ?? 20}%` : '0% (N/A)' },
-      { header: 'Status', key: 'status' },
+      { header: 'Status', key: 'status', formatter: (_, row) => row.accountType === 'ZERO_CONTRIBUTION' || row.status === 'ZERO_ACTIVE' ? 'Zero Contribution' : 'Active' },
       { header: 'Bank Name', key: 'bankName', formatter: (v) => v || '-' },
       { header: 'Account No.', key: 'bankAccountNumber', formatter: (v) => v || '-' },
       { header: 'IFSC Code', key: 'bankIfsc', formatter: (v) => v || '-' },
@@ -865,12 +913,9 @@ export default function AdminUsersPage() {
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
               className="px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-xs bg-white dark:bg-gray-900 font-semibold text-gray-700 dark:text-gray-300 focus:outline-none focus:border-brand-500 cursor-pointer shadow-theme-xs"
             >
-              <option value="">All Active Statuses</option>
+              <option value="">All Statuses</option>
               <option value="ACTIVE">Active</option>
-              <option value="DISABLED">Disabled</option>
-              <option value="AUTO_ARCHIVED">Auto Archived</option>
-              <option value="RESTORED">Restored</option>
-              <option value="BLOCKED">Blocked</option>
+              <option value="ZERO_CONTRIBUTION">Zero Contribution</option>
             </select>
           )}
         </div>
@@ -1038,13 +1083,11 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-5 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-extrabold uppercase border ${
-                        u.status === 'ACTIVE' || u.status === 'RESTORED'
-                          ? 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40' 
-                          : u.status === 'DISABLED' || u.status === 'BLOCKED'
-                          ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-100 dark:border-amber-900/40'
-                          : 'bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400 border-red-100 dark:border-red-900/40'
+                        u.accountType === 'ZERO_CONTRIBUTION' || u.status === 'ZERO_ACTIVE'
+                          ? 'bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800/40'
+                          : 'bg-emerald-50 dark:bg-emerald-950/20 text-emerald-700 dark:text-emerald-400 border-emerald-100 dark:border-emerald-900/40'
                       }`}>
-                        {u.status}
+                        {u.accountType === 'ZERO_CONTRIBUTION' || u.status === 'ZERO_ACTIVE' ? 'Zero Contribution' : 'Active'}
                       </span>
                     </td>
                     <td className="px-5 py-4 font-semibold text-gray-900 dark:text-white">
@@ -1077,18 +1120,6 @@ export default function AdminUsersPage() {
                         title="Edit Shareholder"
                       >
                         <Edit3 size={14} />
-                      </button>
-                      <button
-                        onClick={() => triggerDisableToggle(u)}
-                        disabled={u.status === 'AUTO_ARCHIVED' && !isSuperAdmin}
-                        className={`p-2 rounded-xl transition-all cursor-pointer ${
-                          u.status === 'AUTO_ARCHIVED' && !isSuperAdmin 
-                            ? 'text-gray-300 cursor-not-allowed'
-                            : 'hover:bg-muted text-muted-foreground hover:text-foreground'
-                        }`}
-                        title={u.status === 'DISABLED' || u.status === 'AUTO_ARCHIVED' ? 'Activate Account' : 'Suspend Account'}
-                      >
-                        {u.status === 'DISABLED' || u.status === 'AUTO_ARCHIVED' ? <Check size={14} /> : <ShieldAlert size={14} />}
                       </button>
                       <button
                         onClick={() => { setSelectedUser(u); setIsDeleteOpen(true); }}
@@ -1155,61 +1186,98 @@ export default function AdminUsersPage() {
                 <button onClick={() => setIsCreateOpen(false)} className="p-1 hover:bg-muted dark:hover:bg-secondary rounded-lg text-muted-foreground transition-all cursor-pointer"><X size={16} /></button>
               </div>
 
-              {/* Step indicator */}
+              {/* Step indicator (4 Steps) */}
               <div className="px-6 py-3.5 bg-brand-primary/5 border-b border-brand-primary/10 flex items-center justify-between text-[10px] font-bold text-brand-primary select-none">
-                <span onClick={() => handleStepperClick(1)} className={`cursor-pointer hover:underline ${wizardStep >= 1 ? 'opacity-100' : 'opacity-40'}`}>1. Account</span>
+                <span onClick={() => handleStepperClick(1)} className={`cursor-pointer hover:underline ${wizardStep >= 1 ? 'opacity-100' : 'opacity-40'}`}>1. Account & Capital</span>
                 <ArrowRight size={10} />
-                <span onClick={() => handleStepperClick(2)} className={`cursor-pointer hover:underline ${highestStepReached >= 2 ? 'opacity-100' : 'opacity-40'}`}>2. Personal</span>
+                <span onClick={() => handleStepperClick(2)} className={`cursor-pointer hover:underline ${highestStepReached >= 2 ? 'opacity-100' : 'opacity-40'}`}>2. Personal & Address</span>
                 <ArrowRight size={10} />
-                <span onClick={() => handleStepperClick(3)} className={`cursor-pointer hover:underline ${highestStepReached >= 3 ? 'opacity-100' : 'opacity-40'}`}>3. Bank</span>
+                <span onClick={() => handleStepperClick(3)} className={`cursor-pointer hover:underline ${highestStepReached >= 3 ? 'opacity-100' : 'opacity-40'}`}>3. Bank Details</span>
                 <ArrowRight size={10} />
-                <span onClick={() => handleStepperClick(4)} className={`cursor-pointer hover:underline ${highestStepReached >= 4 ? 'opacity-100' : 'opacity-40'}`}>4. Referrer</span>
-                <ArrowRight size={10} />
-                <span onClick={() => handleStepperClick(5)} className={`cursor-pointer hover:underline ${highestStepReached >= 5 ? 'opacity-100' : 'opacity-40'}`}>5. Capital</span>
-                <ArrowRight size={10} />
-                <span onClick={() => handleStepperClick(6)} className={`cursor-pointer hover:underline ${highestStepReached >= 6 ? 'opacity-100' : 'opacity-40'}`}>6. Review</span>
+                <span onClick={() => handleStepperClick(4)} className={`cursor-pointer hover:underline ${highestStepReached >= 4 ? 'opacity-100' : 'opacity-40'}`}>4. Review & Submit</span>
               </div>
+
+              {/* In-Dialog Error Banner */}
+              {wizardError && (
+                <div className="mx-6 mt-4 p-3 bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 rounded-xl text-xs font-semibold flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  <span className="whitespace-pre-line leading-relaxed">{wizardError}</span>
+                </div>
+              )}
 
               {/* Form Content */}
               <div className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
                 {wizardStep === 1 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 1: Account Parameters</h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 1: Account & Capital Parameters</h4>
                     <div className="p-4 bg-brand-primary/5 border border-brand-primary/20 rounded-2xl flex items-center gap-3">
                       <User className="text-brand-primary w-5 h-5 shrink-0" />
                       <div>
                         <p className="text-[10px] font-bold text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">Business Configuration ID Format</p>
-                        <p className="text-[9px] text-muted-foreground mt-0.5">Shareholder ID / Admin ID format is strictly governed by the active <strong>Business Configuration</strong> module rules (Prefix + Padded Counter).</p>
+                        <p className="text-[9px] text-muted-foreground mt-0.5">Shareholder ID format is strictly governed by active <strong>Business Configuration</strong> rules (Prefix + Sequential Counter).</p>
                       </div>
                     </div>
+
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Shareholder / Admin ID *</label>
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Shareholder ID *</label>
                         <span className="text-[9px] font-semibold text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-full border border-brand-primary/20">Configured Pattern</span>
                       </div>
                       <input 
                         type="text" 
                         required 
                         value={createForm.shareholderId} 
-                        onChange={e => setCreateForm({...createForm, shareholderId: e.target.value.toUpperCase()})} 
+                        onChange={e => {
+                          setCreateForm({...createForm, shareholderId: e.target.value.toUpperCase()});
+                          setWizardError(null);
+                        }} 
                         className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 tracking-wider" 
                         placeholder="e.g. SH100001" 
                       />
-                      <p className="text-[9px] text-muted-foreground">Auto-generated sequential ID based on active Business Configuration.</p>
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Initial Password *</label>
-                      <input type="password" required value={createForm.password} onChange={e => setCreateForm({...createForm, password: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="••••••••" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Security Role</label>
-                      <select value={createForm.role} onChange={e => setCreateForm({...createForm, role: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer">
-                        <option value="SHAREHOLDER">Shareholder</option>
-                        <option value="ADMIN">Admin</option>
-                        <option value="SUPER_ADMIN">Super Admin</option>
-                      </select>
                     </div>
 
+                    {/* Password with Auto-Generation & Visibility Toggle */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Initial Password *</label>
+                        <button
+                          type="button"
+                          onClick={handleAutoGeneratePassword}
+                          className="text-[10px] font-bold text-brand-primary hover:underline flex items-center gap-1 cursor-pointer"
+                        >
+                          <RotateCcw size={11} /> Auto Generate Password
+                        </button>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input 
+                          type={showPassword ? "text" : "password"} 
+                          required 
+                          value={createForm.password} 
+                          onChange={e => {
+                            setCreateForm({...createForm, password: e.target.value});
+                            setWizardError(null);
+                          }} 
+                          className={`w-full px-4 py-2.5 pr-20 border rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono ${
+                            createForm.password && createForm.password.length < 6 ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                          }`} 
+                          placeholder="••••••••" 
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 text-xs text-muted-foreground hover:text-gray-900 dark:hover:text-white font-semibold cursor-pointer select-none"
+                        >
+                          {showPassword ? "Hide" : "Show"}
+                        </button>
+                      </div>
+                      {createForm.password && createForm.password.length < 6 ? (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Password must be at least 6 characters long.</p>
+                      ) : (
+                        <p className="text-[9px] text-muted-foreground">Min 6 characters (recommended mix of letters, digits & symbols).</p>
+                      )}
+                    </div>
+
+                    {/* Account Type & Withholding */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Account Type *</label>
@@ -1222,13 +1290,13 @@ export default function AdminUsersPage() {
                               accountType: newType,
                               withholdingPercentage: newType === 'ZERO_CONTRIBUTION' ? (prev.withholdingPercentage && prev.withholdingPercentage !== '0' ? prev.withholdingPercentage : '20') : '0',
                             }));
+                            setWizardError(null);
                           }} 
                           className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
                         >
                           <option value="CONTRIBUTION">Standard Contribution Account</option>
                           <option value="ZERO_CONTRIBUTION">Zero Contribution Account</option>
                         </select>
-                        <p className="text-[9px] text-muted-foreground">Standard gets full profit & gratitude share; Zero Contribution applies gratitude withholding.</p>
                       </div>
 
                       <div className="space-y-1.5">
@@ -1246,45 +1314,177 @@ export default function AdminUsersPage() {
                             step="0.1"
                             disabled={createForm.accountType !== 'ZERO_CONTRIBUTION'}
                             value={createForm.accountType === 'ZERO_CONTRIBUTION' ? createForm.withholdingPercentage : ''} 
-                            onChange={e => setCreateForm({...createForm, withholdingPercentage: e.target.value})} 
+                            onChange={e => {
+                              setCreateForm({...createForm, withholdingPercentage: e.target.value});
+                              setWizardError(null);
+                            }} 
                             className={`w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.accountType !== 'ZERO_CONTRIBUTION' ? 'opacity-40 cursor-not-allowed bg-muted/40' : ''}`} 
                             placeholder={createForm.accountType !== 'ZERO_CONTRIBUTION' ? "0% (Standard Account - No Withholding)" : "20"} 
                           />
                           <span className="text-xs font-bold text-gray-500">%</span>
                         </div>
                         <p className="text-[9px] text-muted-foreground">
-                          {createForm.accountType === 'ZERO_CONTRIBUTION' 
-                            ? "Admin setting for % of gratitude share withheld by system for zero contribution accounts." 
-                            : "Withholding is not applicable for Standard Contribution accounts."}
+                          {createForm.accountType === 'ZERO_CONTRIBUTION'
+                            ? "Custom rate applied to this account's gratitude share payouts."
+                            : "Standard accounts receive 100% of profit & gratitude payouts."}
                         </p>
                       </div>
+                    </div>
+
+                    {/* Referrer Details */}
+                    <div className="space-y-1.5 pt-1">
+                      <div className="flex items-center justify-between">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Referrer Shareholder ID</label>
+                        <span className="text-[9px] text-muted-foreground">Optional (Defaults to SH000000)</span>
+                      </div>
+                      <input 
+                        type="text" 
+                        value={createForm.referrerId} 
+                        onChange={e => {
+                          const val = e.target.value.toUpperCase();
+                          setCreateForm({...createForm, referrerId: val});
+                          setWizardError(null);
+                          if (val.length >= 3) {
+                            validateReferrer(val);
+                          } else {
+                            setReferrerName('');
+                          }
+                        }} 
+                        onBlur={(e) => {
+                          if (e.target.value) validateReferrer(e.target.value);
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono uppercase" 
+                        placeholder="e.g. SH000000 or SH100001 (Blank = Super Admin)" 
+                      />
+                      {isValidatingReferrer && <p className="text-[10px] text-brand-primary mt-1">Validating referrer...</p>}
+                      {referrerName && <p className="text-[10px] text-emerald-500 mt-1 font-bold">✓ Valid Referrer: {referrerName}</p>}
+                      {!createForm.referrerId && (
+                        <p className="text-[9px] text-muted-foreground">If left empty, system automatically links this shareholder under Company Main Account (Super Admin / SH000000).</p>
+                      )}
+                    </div>
+
+                    {/* Capital Section */}
+                    <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1 pt-2"><Coins size={12} className="inline mr-1" /> Initial Capital Contribution</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund (₹)</label>
+                        <input 
+                          type="number" 
+                          value={createForm.contributionAmount} 
+                          onChange={e => {
+                            setCreateForm({...createForm, contributionAmount: e.target.value});
+                            setWizardError(null);
+                          }} 
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs font-extrabold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
+                            createForm.accountType !== 'ZERO_CONTRIBUTION' && createForm.contributionAmount && Number(createForm.contributionAmount) < 100000 ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                          }`} 
+                          placeholder={createForm.accountType === 'ZERO_CONTRIBUTION' ? "0 (Optional)" : "e.g. 100000"} 
+                        />
+                        {createForm.accountType !== 'ZERO_CONTRIBUTION' && createForm.contributionAmount && Number(createForm.contributionAmount) < 100000 && (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">Minimum contribution amount for Standard account is ₹1,00,000.</p>
+                        )}
+                      </div>
+                      <div className="space-y-1.5">
+                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Mode</label>
+                        <select 
+                          value={createForm.contributionMode} 
+                          onChange={e => setCreateForm({...createForm, contributionMode: e.target.value})} 
+                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer"
+                        >
+                          <option value="Cash">Cash</option>
+                          <option value="Cheque">Cheque</option>
+                          <option value="Bank Transfer">Bank Transfer</option>
+                          <option value="Online Payment">Online Payment</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Investment *</label>
+                      <input 
+                        type="date" 
+                        required 
+                        value={createForm.contributionDate} 
+                        onChange={e => setCreateForm({...createForm, contributionDate: e.target.value})} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-muted-foreground" 
+                      />
                     </div>
                   </motion.div>
                 )}
 
                 {wizardStep === 2 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 2: Personal Profile & Details</h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 2: Personal Profile & Address</h4>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Name *</label>
-                      <input type="text" value={createForm.name} onChange={e => setCreateForm({...createForm, name: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="John Doe" />
+                      <input 
+                        type="text" 
+                        value={createForm.name} 
+                        onChange={e => {
+                          setCreateForm({...createForm, name: e.target.value});
+                          setWizardError(null);
+                        }} 
+                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
+                        placeholder="John Doe" 
+                      />
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number *</label>
-                        <input type="text" value={createForm.phone} onChange={e => setCreateForm({...createForm, phone: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="+91 9876543210" />
+                        <input 
+                          type="text" 
+                          value={createForm.phone} 
+                          onChange={e => {
+                            setCreateForm({...createForm, phone: e.target.value});
+                            setWizardError(null);
+                          }} 
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
+                            createForm.phone && !isPhoneValid(createForm.phone) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                          }`} 
+                          placeholder="9876543210" 
+                        />
+                        {createForm.phone && !isPhoneValid(createForm.phone) && (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">Must be exactly 10 digits starting with 6, 7, 8, or 9.</p>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">PAN Card Number</label>
-                        <input type="text" maxLength={10} value={createForm.pan} onChange={e => setCreateForm({...createForm, pan: e.target.value.toUpperCase()})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="ABCDE1234F" />
+                        <input 
+                          type="text" 
+                          maxLength={10} 
+                          value={createForm.pan} 
+                          onChange={e => {
+                            setCreateForm({...createForm, pan: e.target.value.toUpperCase()});
+                            setWizardError(null);
+                          }} 
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
+                            createForm.pan && !isPanValid(createForm.pan) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                          }`} 
+                          placeholder="ABCDE1234F" 
+                        />
+                        {createForm.pan && !isPanValid(createForm.pan) && (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">Pattern: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F).</p>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Birth</label>
-                        <input type="date" value={createForm.dob} onChange={e => setCreateForm({...createForm, dob: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-muted-foreground" />
+                        <input 
+                          type="date" 
+                          value={createForm.dob} 
+                          onChange={e => {
+                            setCreateForm({...createForm, dob: e.target.value});
+                            setWizardError(null);
+                          }} 
+                          className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-muted-foreground ${
+                            createForm.dob && !isDobValid(createForm.dob) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                          }`} 
+                        />
+                        {createForm.dob && !isDobValid(createForm.dob) && (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">Shareholder must be at least 18 years old.</p>
+                        )}
                       </div>
                     </div>
                     
-                    <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1 pt-2">Complete Address Coordinates</h5>
+                    <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1 pt-2">Address Details</h5>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Building / Street</label>
@@ -1393,10 +1593,18 @@ export default function AdminUsersPage() {
                       <input 
                         type="text" 
                         value={createForm.bankAccountNumber} 
-                        onChange={e => setCreateForm({...createForm, bankAccountNumber: e.target.value})} 
-                        className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" 
-                        placeholder="Enter account number" 
+                        onChange={e => {
+                          setCreateForm({...createForm, bankAccountNumber: e.target.value});
+                          setWizardError(null);
+                        }} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
+                          createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                        }`} 
+                        placeholder="Enter account number (10-16 digits)" 
                       />
+                      {createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber) && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Account number must be 10 to 16 numeric digits.</p>
+                      )}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
@@ -1439,12 +1647,17 @@ export default function AdminUsersPage() {
                       <input 
                         type="text" 
                         value={createForm.bankIfsc} 
-                        onChange={e => setCreateForm({...createForm, bankIfsc: e.target.value.toUpperCase()})} 
-                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${createForm.bankIfsc && !isIfscValid(createForm.bankIfsc) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
-                        placeholder="ABCD0123456" 
+                        onChange={e => {
+                          setCreateForm({...createForm, bankIfsc: e.target.value.toUpperCase()});
+                          setWizardError(null);
+                        }} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold uppercase focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
+                          createForm.bankIfsc && !isIfscValid(createForm.bankIfsc) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                        }`} 
+                        placeholder="e.g. HDFC0001234" 
                       />
                       {createForm.bankIfsc && !isIfscValid(createForm.bankIfsc) && (
-                        <p className="text-[10px] text-red-500 mt-1 flex items-center gap-1"><AlertTriangle size={12} /> Expected IFSC format: 4 uppercase characters, a zero, 6 alpha-numeric digits.</p>
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Valid Indian IFSC pattern required (e.g. HDFC0001234).</p>
                       )}
                     </div>
                   </motion.div>
@@ -1452,154 +1665,44 @@ export default function AdminUsersPage() {
 
                 {wizardStep === 4 && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 4: Referral Links</h4>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Referrer Shareholder ID *</label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          value={createForm.referrerId} 
-                          onChange={e => {
-                            const val = e.target.value.toUpperCase();
-                            setCreateForm({...createForm, referrerId: val});
-                            if (val.length >= 3) {
-                              validateReferrer(val);
-                            } else {
-                              setReferrerName('');
-                            }
-                          }} 
-                          onBlur={(e) => validateReferrer(e.target.value)} 
-                          className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 font-mono uppercase" 
-                          placeholder="e.g. SH000000 or SH100001" 
-                        />
-                      </div>
-                      {isValidatingReferrer && <p className="text-[10px] text-brand-primary mt-1">Validating referrer...</p>}
-                      {referrerName && <p className="text-[10px] text-emerald-500 mt-1 font-bold">✓ Valid Referrer: {referrerName}</p>}
-                      <p className="text-[10px] text-muted-foreground mt-1 leading-normal">
-                        Enter the Shareholder ID of the parent referrer. Referral code is equal to Shareholder ID.
-                      </p>
-                    </div>
-                  </motion.div>
-                )}
-
-                {wizardStep === 5 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 5: Capital Contribution</h4>
-                    
-                    {createForm.accountType === 'ZERO_CONTRIBUTION' && (
-                      <div className="p-3 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-800 dark:text-amber-300">
-                        <strong>Zero Contribution Account:</strong> Capital deposit is optional (can be ₹0). The system will withhold {createForm.withholdingPercentage}% of Gratitude commissions into holding ledger until requirements are met.
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund (₹)</label>
-                        <input type="number" value={createForm.contributionAmount} onChange={e => setCreateForm({...createForm, contributionAmount: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-extrabold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35" placeholder="5000" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Mode</label>
-                        <select value={createForm.contributionMode} onChange={e => setCreateForm({...createForm, contributionMode: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer">
-                          <option value="Cash">Cash</option>
-                          <option value="Cheque">Cheque</option>
-                          <option value="Bank Transfer">Bank Transfer</option>
-                          <option value="Online Payment">Online Payment</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Investment *</label>
-                        <input type="date" required value={createForm.contributionDate} onChange={e => setCreateForm({...createForm, contributionDate: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 text-muted-foreground" />
-                        <p className="text-[9px] text-muted-foreground">Syncs with system profit calculations</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund Validity</label>
-                        <select value={createForm.validityMonths} onChange={e => setCreateForm({...createForm, validityMonths: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none focus:ring-1 focus:ring-brand-primary cursor-pointer">
-                          <option value="1">1 Month</option>
-                          <option value="2">2 Months</option>
-                          <option value="3">3 Months</option>
-                          <option value="4">4 Months</option>
-                          <option value="5">5 Months</option>
-                          <option value="6">6 Months</option>
-                          <option value="7">7 Months</option>
-                          <option value="8">8 Months</option>
-                          <option value="9">9 Months</option>
-                          <option value="10">10 Months</option>
-                          <option value="11">11 Months</option>
-                          <option value="12">12 Months</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div className="space-y-2.5 pt-2 select-none">
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={createForm.issuedAgreement} onChange={e => setCreateForm({...createForm, issuedAgreement: e.target.checked})} className="rounded text-brand-primary focus:ring-brand-primary w-4.5 h-4.5" />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Issued Legal Agreement Paperwork</span>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={createForm.issuedCheque} onChange={e => setCreateForm({...createForm, issuedCheque: e.target.checked})} className="rounded text-brand-primary focus:ring-brand-primary w-4.5 h-4.5" />
-                        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Issued Verification Security Cheque</span>
-                      </label>
-                    </div>
-                  </motion.div>
-                )}
-
-                {wizardStep === 6 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
-                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 6: Review Parameters</h4>
+                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Step 4: Review Parameters & Register</h4>
                     <div className="bg-muted/30 dark:bg-secondary/15 rounded-2xl p-4 text-xs space-y-3 border border-border-subtle">
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">shareholderId:</strong> {createForm.shareholderId}</div>
-                        <div><strong className="text-muted-foreground">Role:</strong> {createForm.role}</div>
+                        <div><strong className="text-muted-foreground">Shareholder ID:</strong> {createForm.shareholderId}</div>
+                        <div><strong className="text-muted-foreground">Security Role:</strong> Shareholder</div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
                         <div><strong className="text-muted-foreground">Account Type:</strong> {createForm.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</div>
-                        <div><strong className="text-muted-foreground">Withholding Rate:</strong> {createForm.withholdingPercentage}%</div>
-                      </div>
-                      <div className="pb-2 border-b border-border-subtle">
-                        <strong className="text-muted-foreground">Full Name:</strong> {createForm.name || '-'}
+                        <div><strong className="text-muted-foreground">Withholding Rate:</strong> {createForm.accountType === 'ZERO_CONTRIBUTION' ? `${createForm.withholdingPercentage}%` : '0% (Standard)'}</div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
+                        <div><strong className="text-muted-foreground">Full Name:</strong> {createForm.name || '-'}</div>
                         <div><strong className="text-muted-foreground">Phone:</strong> {createForm.phone || '-'}</div>
-                        <div><strong className="text-muted-foreground">PAN Card:</strong> {createForm.pan || '-'}</div>
                       </div>
-                      <div className="pb-2 border-b border-border-subtle">
-                        <strong className="text-muted-foreground">DOB:</strong> {createForm.dob || '-'}
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
+                        <div><strong className="text-muted-foreground">PAN Card:</strong> {createForm.pan || '-'}</div>
+                        <div><strong className="text-muted-foreground">DOB:</strong> {createForm.dob || '-'}</div>
                       </div>
                       <div className="pb-2 border-b border-border-subtle leading-relaxed">
-                        <strong className="text-muted-foreground block mb-1">Address Coordinates:</strong>
+                        <strong className="text-muted-foreground block mb-1">Address:</strong>
                         {createForm.addressBuilding && `${createForm.addressBuilding}, `}
                         {createForm.addressArea && `${createForm.addressArea}, `}
                         {createForm.addressCity && `${createForm.addressCity}, `}
                         {createForm.addressDistrict && `${createForm.addressDistrict}, `}
                         {createForm.addressState && `${createForm.addressState} - `}
                         {createForm.addressPincode}
-                        {!createForm.addressBuilding && '-'}
+                        {!createForm.addressBuilding && !createForm.addressPincode && '-'}
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">Bank Account Name:</strong> {createForm.bankAccountName || '-'}</div>
-                        <div><strong className="text-muted-foreground">Account Number:</strong> {createForm.bankAccountNumber || '-'}</div>
+                        <div><strong className="text-muted-foreground">Bank Account:</strong> {createForm.bankAccountNumber || '-'} ({createForm.bankAccountName || '-'})</div>
+                        <div><strong className="text-muted-foreground">Bank & IFSC:</strong> {createForm.bankName || '-'} ({createForm.bankIfsc || '-'})</div>
                       </div>
-                      <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">Bank Name:</strong> {createForm.bankName || '-'}</div>
-                        <div><strong className="text-muted-foreground">Branch:</strong> {createForm.bankBranch || '-'}</div>
-                        <div><strong className="text-muted-foreground">IFSC:</strong> {createForm.bankIfsc || '-'}</div>
+                      <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
+                        <div><strong className="text-muted-foreground">Referrer ID:</strong> {createForm.referrerId || 'SH000000 (Company Main Account / Super Admin)'}</div>
+                        <div><strong className="text-muted-foreground">Contribution Fund:</strong> ₹{createForm.contributionAmount || '0'} ({createForm.contributionMode})</div>
                       </div>
-                      <div className="pb-2 border-b border-border-subtle">
-                        <strong className="text-muted-foreground">Referrer Identifier:</strong> {createForm.referrerId || 'None'}
-                      </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        <div><strong className="text-muted-foreground">Fund Amount:</strong> ₹{createForm.contributionAmount || '0'}</div>
-                        <div><strong className="text-muted-foreground">Mode:</strong> {createForm.contributionMode}</div>
-                        <div><strong className="text-muted-foreground">Validity:</strong> {createForm.validityMonths} Mos</div>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-semibold">
-                        <span className={createForm.issuedAgreement ? 'text-emerald-600 font-bold flex items-center gap-1' : 'text-muted-foreground flex items-center gap-1'}>
-                          {createForm.issuedAgreement ? '✓ Signed Agreement Issued' : '✕ Agreement Not Issued'}
-                        </span>
-                        <span className={createForm.issuedCheque ? 'text-emerald-600 font-bold flex items-center gap-1' : 'text-muted-foreground flex items-center gap-1'}>
-                          {createForm.issuedCheque ? '✓ Company Cheque Issued' : '✕ Cheque Not Issued'}
-                        </span>
+                      <div>
+                        <strong className="text-muted-foreground">Date of Investment:</strong> {createForm.contributionDate || '-'}
                       </div>
                     </div>
                   </motion.div>
@@ -1610,7 +1713,10 @@ export default function AdminUsersPage() {
               <div className="p-4 border-t border-border-subtle bg-muted/10 flex items-center justify-between select-none">
                 {wizardStep > 1 ? (
                   <button
-                    onClick={() => setWizardStep(s => s - 1)}
+                    onClick={() => {
+                      setWizardStep(s => s - 1);
+                      setWizardError(null);
+                    }}
                     className="flex items-center gap-1 px-4 py-2 border border-border-subtle rounded-xl hover:bg-muted dark:hover:bg-secondary text-xs font-bold transition-colors cursor-pointer"
                   >
                     <ArrowLeft size={14} /> Back
@@ -1619,44 +1725,56 @@ export default function AdminUsersPage() {
                   <div></div>
                 )}
 
-                {wizardStep < 6 ? (
+                {wizardStep < 4 ? (
                   <button
                     onClick={() => {
                       if (wizardStep === 1) {
-                        if (!createForm.shareholderId || !createForm.password) {
-                          toast({ title: "Inputs Required", description: "Account ID and password details are required.", type: "warning" });
+                        if (!createForm.shareholderId?.trim()) {
+                          setWizardError("Shareholder ID is required.");
+                          toast({ title: "Inputs Required", description: "Shareholder ID is required.", type: "warning" });
+                          return;
+                        }
+                        if (!createForm.password) {
+                          setWizardError("Initial password is required.");
+                          toast({ title: "Inputs Required", description: "Initial password is required.", type: "warning" });
                           return;
                         }
                         const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,64}$/;
                         if (!passwordRegex.test(createForm.password)) {
+                          setWizardError("Password must be at least 8 characters long, containing uppercase, lowercase, numeric, and special characters.");
                           toast({ title: "Weak Password", description: "Password must be at least 8 characters, with uppercase, lowercase, numeric, and special characters.", type: "warning" });
                           return;
                         }
                       }
                       if (wizardStep === 2) {
                         if (!createForm.name?.trim()) {
+                          setWizardError("Name field is required.");
                           toast({ title: "Input Required", description: "Name field is required.", type: "warning" });
                           return;
                         }
                         const cleanPhone = (createForm.phone || '').replace(/\D/g, '');
                         if (!cleanPhone || !/^[6-9]\d{9}$/.test(cleanPhone)) {
+                          setWizardError("Phone number must be exactly 10 digits starting with 6, 7, 8, or 9.");
                           toast({ title: "Invalid Phone Number", description: "Phone number must be exactly 10 digits starting with 6, 7, 8, or 9.", type: "warning" });
                           return;
                         }
                         if (createForm.pan) {
                           const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
                           if (!panRegex.test(createForm.pan.trim().toUpperCase())) {
+                            setWizardError("Standard Indian PAN format: 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F).");
                             toast({ title: "Invalid PAN Format", description: "Standard Indian PAN format: AAAAA9999A (e.g. ABCDE1234F).", type: "warning" });
                             return;
                           }
                         }
                         if (createForm.addressPincode && createForm.addressPincode.replace(/\D/g, '').length !== 6) {
+                          setWizardError("Pincode must be exactly 6 digits.");
                           toast({ title: "Invalid Pincode", description: "Pincode must be exactly 6 digits.", type: "warning" });
                           return;
                         }
                         if (createForm.dob) {
                           const age = (new Date().getTime() - new Date(createForm.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000);
                           if (age < 18) {
+                            setWizardError("Shareholder must be at least 18 years old.");
                             toast({ title: "Age Restriction", description: "Shareholder must be at least 18 years old.", type: "warning" });
                             return;
                           }
@@ -1664,14 +1782,17 @@ export default function AdminUsersPage() {
                       }
                       if (wizardStep === 3) {
                         if (createForm.bankAccountNumber && !isAccountNumberValid(createForm.bankAccountNumber)) {
+                          setWizardError("Bank Account Number must be between 10 and 16 digits containing only numbers.");
                           toast({ title: "Account Number Mismatch", description: "Bank Account Number must be between 10 and 16 digits containing only numbers.", type: "warning" });
                           return;
                         }
                         if (createForm.bankIfsc && !isIfscValid(createForm.bankIfsc)) {
+                          setWizardError("Please enter a valid IFSC code (e.g. SBIN0001234).");
                           toast({ title: "IFSC Mismatch", description: "Please enter a valid IFSC code block.", type: "warning" });
                           return;
                         }
                       }
+                      setWizardError(null);
                       setWizardStep(s => s + 1);
                       setHighestStepReached(Math.max(highestStepReached, wizardStep + 1));
                     }}
@@ -1729,15 +1850,47 @@ export default function AdminUsersPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Phone Number</label>
-                      <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none" />
+                      <input 
+                        type="text" 
+                        value={editForm.phone} 
+                        onChange={e => setEditForm({...editForm, phone: e.target.value})} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:outline-none ${
+                          editForm.phone && !isPhoneValid(editForm.phone) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                        }`} 
+                      />
+                      {editForm.phone && !isPhoneValid(editForm.phone) && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Must be 10 digits starting with 6, 7, 8, or 9.</p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">PAN Card Number</label>
-                      <input type="text" maxLength={10} value={editForm.pan} onChange={e => setEditForm({...editForm, pan: e.target.value.toUpperCase()})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold uppercase focus:outline-none" placeholder="ABCDE1234F" />
+                      <input 
+                        type="text" 
+                        maxLength={10} 
+                        value={editForm.pan} 
+                        onChange={e => setEditForm({...editForm, pan: e.target.value.toUpperCase()})} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold uppercase focus:outline-none ${
+                          editForm.pan && !isPanValid(editForm.pan) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                        }`} 
+                        placeholder="ABCDE1234F" 
+                      />
+                      {editForm.pan && !isPanValid(editForm.pan) && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Pattern: ABCDE1234F.</p>
+                      )}
                     </div>
                     <div className="space-y-1.5">
                       <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Date of Birth</label>
-                      <input type="date" value={editForm.dob} onChange={e => setEditForm({...editForm, dob: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground" />
+                      <input 
+                        type="date" 
+                        value={editForm.dob} 
+                        onChange={e => setEditForm({...editForm, dob: e.target.value})} 
+                        className={`w-full px-4 py-2.5 border rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground ${
+                          editForm.dob && !isDobValid(editForm.dob) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                        }`} 
+                      />
+                      {editForm.dob && !isDobValid(editForm.dob) && (
+                        <p className="text-[11px] text-red-500 font-semibold mt-0.5">Must be 18+ years.</p>
+                      )}
                     </div>
                   </div>
 
@@ -1901,9 +2054,14 @@ export default function AdminUsersPage() {
                       type="text" 
                       value={editForm.bankAccountNumber} 
                       onChange={e => setEditForm({...editForm, bankAccountNumber: e.target.value})} 
-                      className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-secondary/35" 
+                      className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none dark:bg-secondary/35 ${
+                        editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                      }`} 
                       placeholder="Enter account number"
                     />
+                    {editForm.bankAccountNumber && !isAccountNumberValid(editForm.bankAccountNumber) && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">Account number must be 10 to 16 numeric digits.</p>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-1.5">
@@ -1949,6 +2107,9 @@ export default function AdminUsersPage() {
                       onChange={e => setEditForm({...editForm, bankIfsc: e.target.value.toUpperCase()})} 
                       className={`w-full px-4 py-2.5 border rounded-xl text-xs font-mono font-bold focus:outline-none ${editForm.bankIfsc && !isIfscValid(editForm.bankIfsc) ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'}`} 
                     />
+                    {editForm.bankIfsc && !isIfscValid(editForm.bankIfsc) && (
+                      <p className="text-[11px] text-red-500 font-semibold mt-0.5">Valid IFSC pattern required (e.g. ABCD0123456).</p>
+                    )}
                   </div>
                 </div>
 
@@ -1979,38 +2140,9 @@ export default function AdminUsersPage() {
                       </select>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Placement Date</label>
-                      <input type="date" value={editForm.contributionDate} onChange={e => setEditForm({...editForm, contributionDate: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Fund Validity</label>
-                      <select value={editForm.validityMonths} onChange={e => setEditForm({...editForm, validityMonths: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl bg-white dark:bg-card text-xs font-bold text-muted-foreground focus:outline-none cursor-pointer">
-                        <option value="1">1 Month</option>
-                        <option value="2">2 Months</option>
-                        <option value="3">3 Months</option>
-                        <option value="4">4 Months</option>
-                        <option value="5">5 Months</option>
-                        <option value="6">6 Months</option>
-                        <option value="7">7 Months</option>
-                        <option value="8">8 Months</option>
-                        <option value="9">9 Months</option>
-                        <option value="10">10 Months</option>
-                        <option value="11">11 Months</option>
-                        <option value="12">12 Months</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-2.5 pt-2 select-none">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={editForm.issuedAgreement} onChange={e => setEditForm({...editForm, issuedAgreement: e.target.checked})} className="rounded text-brand-primary focus:ring-brand-primary w-4.5 h-4.5" />
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Issued Legal Agreement Paperwork</span>
-                    </label>
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={editForm.issuedCheque} onChange={e => setEditForm({...editForm, issuedCheque: e.target.checked})} className="rounded text-brand-primary focus:ring-brand-primary w-4.5 h-4.5" />
-                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Issued Verification Security Cheque</span>
-                    </label>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Placement Date</label>
+                    <input type="date" value={editForm.contributionDate} onChange={e => setEditForm({...editForm, contributionDate: e.target.value})} className="w-full px-4 py-2.5 border border-border-subtle rounded-xl text-xs font-semibold focus:outline-none text-muted-foreground" />
                   </div>
                 </div>
               </div>
@@ -2077,10 +2209,22 @@ export default function AdminUsersPage() {
 
               {/* Scrollable details */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6 text-xs custom-scrollbar">
-                <div className="p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 space-y-2 select-none">
-                  <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Account Status</span> <strong className="text-brand-primary font-bold uppercase">{selectedUser.status}</strong></div>
+                <div className="p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 space-y-2.5 select-none">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground font-semibold">Account Status</span> 
+                    <strong className={`font-bold uppercase ${
+                      selectedUser.accountType === 'ZERO_CONTRIBUTION' || selectedUser.status === 'ZERO_ACTIVE'
+                        ? 'text-amber-600 dark:text-amber-400'
+                        : 'text-emerald-600 dark:text-emerald-400'
+                    }`}>
+                      {selectedUser.accountType === 'ZERO_CONTRIBUTION' || selectedUser.status === 'ZERO_ACTIVE' ? 'Zero Contribution' : 'Active'}
+                    </strong>
+                  </div>
                   <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Account Role</span> <strong className="text-gray-800 dark:text-gray-250 font-bold">{selectedUser.role}</strong></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referral Code</span> <strong className="text-gray-950 dark:text-white font-mono font-bold">{selectedUser.referralCode}</strong></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referrer Shareholder ID</span> <strong className="text-emerald-700 dark:text-emerald-400 font-mono font-bold">{selectedUser.parent?.shareholderId || (selectedUser.parentId ? selectedUser.parentId : 'SH000000 (Super Admin / Direct)')}</strong></div>
+                  {selectedUser.parent?.name && (
+                    <div className="flex justify-between"><span className="text-muted-foreground font-semibold">Referrer Name</span> <strong className="text-gray-800 dark:text-gray-200 font-bold">{selectedUser.parent.name}</strong></div>
+                  )}
                   {selectedUser.disabledAt && (
                     <div className="flex justify-between text-red-600 dark:text-red-400 font-semibold"><span className="text-muted-foreground">Disabled Date</span> <strong>{new Date(selectedUser.disabledAt).toLocaleDateString()}</strong></div>
                   )}
