@@ -63,7 +63,6 @@ export class UsersService {
           
           
           accountType: true,
-          withholdingPercentage: true,
           dob: true,
           pan: true,
           permissions: true,

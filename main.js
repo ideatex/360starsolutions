@@ -1,9 +1,9 @@
-import * as fs from 'fs';
+const fs = require('fs');
 
-// Automatically load .env if present and needed
+// Automatically load .env if present
 if (fs.existsSync('.env')) {
   try {
-    (process as any).loadEnvFile?.('.env');
+    process.loadEnvFile?.('.env');
   } catch (e) {}
 }
 
@@ -28,26 +28,10 @@ if (process.env.DATABASE_URL) {
   process.env.DATABASE_URL = url;
 }
 
-
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { AppModule } from '@server/app.module';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api/v1');
-  
-  app.enableCors({
-    origin: true,
-    credentials: true,
-  });
-
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-  }));
-
-  const port = process.env.PORT ?? 3002;
-  await app.listen(port, '0.0.0.0');
+if (fs.existsSync('./dist/server/main.js')) {
+  require('./dist/server/main.js');
+} else if (fs.existsSync('./server/main.js')) {
+  require('./server/main.js');
+} else {
+  require(__dirname + '/dist/server/main.js');
 }
-bootstrap();
