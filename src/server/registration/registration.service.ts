@@ -97,30 +97,13 @@ export class RegistrationService {
       }
     }
 
-    // Validate PAN Card if provided & enforce system-wide uniqueness
+    // Validate PAN Card format if provided (Note: PAN can be used for multiple shareholder accounts)
     let panClean: string | null = null;
     if (dto.pan && dto.pan.trim()) {
       panClean = dto.pan.trim().toUpperCase();
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panClean)) {
         throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
-      }
-
-      const existingUserByPan = await this.prisma.shareholder.findFirst({
-        where: { pan: { equals: panClean, mode: 'insensitive' } },
-      });
-      if (existingUserByPan) {
-        throw new ConflictException(`An account with PAN card ${panClean} is already registered (User ID: ${existingUserByPan.shareholderId}). Every shareholder must use a unique PAN card.`);
-      }
-
-      const existingReqByPan = await this.prisma.registrationRequest.findFirst({
-        where: {
-          pan: { equals: panClean, mode: 'insensitive' },
-          status: { in: [RegistrationStatus.PENDING_REVIEW, RegistrationStatus.PENDING_ADMIN_REVIEW] },
-        },
-      });
-      if (existingReqByPan) {
-        throw new ConflictException(`A registration request with PAN card ${panClean} is already pending admin review.`);
       }
     }
 

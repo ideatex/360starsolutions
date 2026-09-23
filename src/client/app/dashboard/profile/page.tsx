@@ -58,6 +58,23 @@ export default function ProfilePage() {
     setIsFinancialModalOpen(true);
   };
 
+  const formatAddress = (addr: any) => {
+    if (!addr) return 'Not Provided';
+    if (typeof addr === 'string') return addr.trim() || 'Not Provided';
+    if (typeof addr === 'object') {
+      const parts = [
+        addr.building,
+        addr.area,
+        addr.city,
+        addr.district,
+        addr.state,
+        addr.pincode ? `PIN: ${addr.pincode}` : '',
+      ].filter((p) => Boolean(p && String(p).trim()));
+      return parts.length > 0 ? parts.join(', ') : 'Not Provided';
+    }
+    return 'Not Provided';
+  };
+
   const isIfscValid = (ifsc: string) => {
     if (!ifsc) return false;
     return /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc.trim().toUpperCase());
@@ -317,7 +334,7 @@ export default function ProfilePage() {
                   <label className="text-[11px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Residential Address</label>
                   <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 mt-1 flex items-start gap-2">
                     <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" /> 
-                    <span className="leading-relaxed">{profile?.address || 'N/A'}</span>
+                    <span className="leading-relaxed">{formatAddress(profile?.address)}</span>
                   </p>
                 </div>
                 <div>
@@ -590,7 +607,7 @@ export default function ProfilePage() {
                   Updates to banking credentials require approval from the Super Admin before taking effect on your payout distributions. (PAN card is permanent and cannot be modified).
                 </p>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Bank Name *</label>
                     <input
@@ -626,7 +643,7 @@ export default function ProfilePage() {
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Account Number *</label>
                     <input

@@ -191,22 +191,12 @@ export class UsersService {
 
     const isAdminRole = data.role === 'ADMIN' || data.role === 'SUPER_ADMIN';
 
-    // PAN Card validation (AAAAA9999A) & Uniqueness
+    // PAN Card format validation (AAAAA9999A) - PAN can be shared across multiple shareholder accounts
     if (data.pan) {
       const panClean = data.pan.trim().toUpperCase();
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panClean)) {
         errors.pan = 'Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)';
-      } else {
-        const existingPan = await this.prisma.shareholder.findFirst({
-          where: {
-            pan: { equals: panClean, mode: 'insensitive' },
-            ...(data.excludeUserId ? { id: { not: data.excludeUserId } } : {}),
-          },
-        });
-        if (existingPan) {
-          errors.pan = `PAN card "${panClean}" is already registered to shareholder ${existingPan.shareholderId}. Every shareholder must use a unique PAN card.`;
-        }
       }
     }
 
@@ -541,21 +531,12 @@ export class UsersService {
       throw new NotFoundException('Shareholder not found');
     }
 
-    // Validate PAN if provided & enforce uniqueness
+    // Validate PAN format if provided (Note: PAN can be used for multiple shareholder accounts)
     if (updates.pan) {
       const panClean = updates.pan.trim().toUpperCase();
       const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
       if (!panRegex.test(panClean)) {
         throw new BadRequestException('Invalid PAN format. Standard format: AAAAA9999A (e.g. ABCDE1234F)');
-      }
-      const existingPan = await this.prisma.shareholder.findFirst({
-        where: {
-          pan: { equals: panClean, mode: 'insensitive' },
-          id: { not: id },
-        },
-      });
-      if (existingPan) {
-        throw new BadRequestException(`PAN card "${panClean}" is already registered to shareholder ${existingPan.shareholderId}. Every shareholder must use a unique PAN card.`);
       }
       updates.pan = panClean;
     }

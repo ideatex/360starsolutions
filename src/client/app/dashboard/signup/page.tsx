@@ -628,9 +628,13 @@ export default function ShareholderSignupPage() {
                       </span>
                     )}
                   </div>
-                  {form.pan && !isPanValid(form.pan) && (
+                  {form.pan && !isPanValid(form.pan) ? (
                     <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
                       <AlertCircle className="w-3 h-3 shrink-0" /> PAN must be 5 letters, 4 digits, 1 letter (e.g. ABCDE1234F)
+                    </p>
+                  ) : (
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                      Note: The same PAN Card can be used for multiple shareholder accounts.
                     </p>
                   )}
                 </div>
