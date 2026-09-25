@@ -18,27 +18,30 @@ async function main() {
   await client.connect();
   console.log('Connected to Supabase.');
   
-  const check = await client.query(`
-    SELECT column_name 
-    FROM information_schema.columns 
-    WHERE table_schema = 'public' AND table_name = 'User' AND column_name = 'previousParentId';
+  const constraints = await client.query(`
+    SELECT conname, contype, pg_get_constraintdef(oid) as def 
+    FROM pg_constraint 
+    WHERE conrelid = 'public."User"'::regclass;
   `);
-  
-  if (check.rows.length === 0) {
-    console.log('Adding previousParentId column to "User" table...');
-    await client.query(`
-      ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "previousParentId" TEXT;
-    `);
-    console.log('Successfully added previousParentId column to "User" table.');
-  } else {
-    console.log('Column previousParentId already exists in "User" table.');
-  }
+  console.log('Constraints on "User" table:');
+  console.table(constraints.rows);
 
-  // Also check if any foreign key is needed or indexes
-  const checkIndex = await client.query(`
-    SELECT indexname FROM pg_indexes WHERE tablename = 'User' AND indexname = 'User_previousParentId_idx';
+  const indexes = await client.query(`
+    SELECT indexname, indexdef 
+    FROM pg_indexes 
+    WHERE tablename = 'User';
   `);
-  console.log('Done.');
+  console.log('\nIndexes on "User" table:');
+  console.table(indexes.rows);
+
+  // Check admin account
+  const admin = await client.query(`
+    SELECT id, "shareholderId", name, role, status 
+    FROM "User" 
+    WHERE role = 'SUPER_ADMIN' OR "shareholderId" = '360SS001';
+  `);
+  console.log('\nSuper Admin in Database:');
+  console.table(admin.rows);
 
   await client.end();
 }

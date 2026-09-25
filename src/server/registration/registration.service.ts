@@ -512,7 +512,7 @@ export class RegistrationService {
 
     // Execute atomic creation inside a unified Prisma transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Re-check phone & PAN uniqueness inside transaction to avoid race conditions
+      // Re-check phone uniqueness inside transaction to avoid race conditions (PAN is NOT a unique identifier)
       if (request.phone) {
         const existingPhone = await tx.shareholder.findFirst({
           where: {
@@ -524,15 +524,6 @@ export class RegistrationService {
         });
         if (existingPhone) {
           throw new BadRequestException(`An account with phone number ${request.phone} already exists (${existingPhone.shareholderId}).`);
-        }
-      }
-
-      if (request.pan) {
-        const existingPan = await tx.shareholder.findFirst({
-          where: { pan: { equals: request.pan, mode: 'insensitive' } },
-        });
-        if (existingPan) {
-          throw new BadRequestException(`An account with PAN card ${request.pan} already exists (${existingPan.shareholderId}).`);
         }
       }
 

@@ -23,8 +23,8 @@ async function cleanDatabase() {
     const adminRes = await client.query(`
       SELECT id, "shareholderId", name, role, phone 
       FROM "User" 
-      WHERE "shareholderId" = 'SH000000' OR role = 'SUPER_ADMIN' 
-      ORDER BY "createdAt" ASC 
+      WHERE "shareholderId" = '360SS001' OR role = 'SUPER_ADMIN' 
+      ORDER BY CASE WHEN "shareholderId" = '360SS001' THEN 0 ELSE 1 END, "createdAt" ASC 
       LIMIT 1;
     `);
 

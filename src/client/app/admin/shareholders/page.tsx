@@ -18,6 +18,7 @@ import {
   getDistrictsByState, 
   lookupPincode 
 } from '@/lib/indianLocations';
+import { amountToWords } from '@/lib/amountToWords';
 
 const DEFAULT_INDIAN_BANKS = [
   "State Bank of India (SBI)",
@@ -566,6 +567,20 @@ export default function AdminUsersPage() {
   // Create Mutation
   const createUserMutation = useMutation({
     mutationFn: async () => {
+      if (createForm.accountType !== 'ZERO_CONTRIBUTION') {
+        const amt = Number(createForm.contributionAmount);
+        if (!amt || amt < 100000) {
+          throw new Error('Contribution fund must be at least ₹1,00,000 for Standard accounts.');
+        }
+        if (amt % 100000 !== 0) {
+          throw new Error('Contribution fund must be in exact multiples of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹5,00,000).');
+        }
+      } else if (createForm.contributionAmount && Number(createForm.contributionAmount) > 0) {
+        const amt = Number(createForm.contributionAmount);
+        if (amt % 100000 !== 0) {
+          throw new Error('Contribution fund must be in exact multiples of ₹1,00,000.');
+        }
+      }
       await api.post('/shareholders', createForm);
     },
     onSuccess: () => {
@@ -1367,22 +1382,86 @@ export default function AdminUsersPage() {
                     <h5 className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border-subtle pb-1 pt-2"><Coins size={12} className="inline mr-1" /> Initial Capital Contribution</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-1.5">
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Contribution Fund (₹)</label>
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                            Contribution Fund (₹) {createForm.accountType !== 'ZERO_CONTRIBUTION' ? '*' : '(Optional)'}
+                          </label>
+                          {createForm.contributionAmount && Number(createForm.contributionAmount) > 0 && (
+                            <span className="text-[10px] font-extrabold text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded-md border border-brand-primary/20">
+                              {amountToWords(createForm.contributionAmount)}
+                            </span>
+                          )}
+                        </div>
                         <input 
                           type="number" 
+                          step="100000"
+                          min={createForm.accountType === 'ZERO_CONTRIBUTION' ? 0 : 100000}
                           value={createForm.contributionAmount} 
                           onChange={e => {
                             setCreateForm({...createForm, contributionAmount: e.target.value});
                             setWizardError(null);
                           }} 
                           className={`w-full px-4 py-2.5 border rounded-xl text-xs font-extrabold focus:outline-none focus:ring-1 focus:ring-brand-primary dark:bg-secondary/35 ${
-                            createForm.accountType !== 'ZERO_CONTRIBUTION' && createForm.contributionAmount && Number(createForm.contributionAmount) < 100000 ? 'border-red-500 bg-red-500/5' : 'border-border-subtle'
+                            createForm.contributionAmount && (
+                              (createForm.accountType !== 'ZERO_CONTRIBUTION' && Number(createForm.contributionAmount) < 100000) ||
+                              (Number(createForm.contributionAmount) % 100000 !== 0)
+                            )
+                              ? 'border-red-500 bg-red-500/5' 
+                              : createForm.contributionAmount && Number(createForm.contributionAmount) >= 100000 && Number(createForm.contributionAmount) % 100000 === 0
+                              ? 'border-emerald-500/60'
+                              : 'border-border-subtle'
                           }`} 
-                          placeholder={createForm.accountType === 'ZERO_CONTRIBUTION' ? "0 (Optional)" : "e.g. 100000"} 
+                          placeholder={createForm.accountType === 'ZERO_CONTRIBUTION' ? "0 (Optional, Multiples of ₹1,00,000)" : "e.g. 100000 (Multiples of ₹1,00,000)"} 
                         />
-                        {createForm.accountType !== 'ZERO_CONTRIBUTION' && createForm.contributionAmount && Number(createForm.contributionAmount) < 100000 && (
-                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">Minimum contribution amount for Standard account is ₹1,00,000.</p>
+                        
+                        {/* Multiplier Presets & Quick Adjustments */}
+                        <div className="flex flex-wrap items-center gap-1 pt-1">
+                          <span className="text-[9px] font-bold text-muted-foreground mr-0.5">Multiples:</span>
+                          {[100000, 200000, 300000, 500000, 1000000, 2500000].map(preset => (
+                            <button
+                              type="button"
+                              key={preset}
+                              onClick={() => {
+                                setCreateForm(prev => ({ ...prev, contributionAmount: String(preset) }));
+                                setWizardError(null);
+                              }}
+                              className={`text-[9px] font-bold px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                                Number(createForm.contributionAmount) === preset
+                                  ? 'bg-brand-primary text-white border-brand-primary'
+                                  : 'bg-muted/40 hover:bg-muted text-foreground border-border-subtle'
+                              }`}
+                            >
+                              ₹{preset >= 10000000 ? `${preset / 10000000} Cr` : `${preset / 100000} L`}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const curr = Number(createForm.contributionAmount) || 0;
+                              const next = curr + 100000;
+                              setCreateForm(prev => ({ ...prev, contributionAmount: String(next) }));
+                              setWizardError(null);
+                            }}
+                            className="text-[9px] font-bold px-2 py-0.5 rounded border border-brand-primary/40 bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors cursor-pointer"
+                          >
+                            + ₹1 L
+                          </button>
+                        </div>
+
+                        {createForm.contributionAmount && Number(createForm.contributionAmount) > 0 && (
+                          <p className="text-[11px] font-semibold text-brand-primary flex items-center gap-1 mt-0.5">
+                            <span className="font-bold text-muted-foreground">In words:</span> {amountToWords(createForm.contributionAmount)}
+                          </p>
                         )}
+                        {createForm.contributionAmount && Number(createForm.contributionAmount) % 100000 !== 0 ? (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                            Amount must be in exact multiples of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹3,00,000, etc.). Manual entry supported.
+                          </p>
+                        ) : createForm.accountType !== 'ZERO_CONTRIBUTION' && createForm.contributionAmount && Number(createForm.contributionAmount) < 100000 ? (
+                          <p className="text-[11px] text-red-500 font-semibold mt-0.5">
+                            Minimum contribution amount for Standard account is ₹1,00,000.
+                          </p>
+                        ) : null}
                       </div>
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest">Payment Mode</label>
@@ -1698,8 +1777,25 @@ export default function AdminUsersPage() {
                         <div><strong className="text-muted-foreground">Bank & IFSC:</strong> {createForm.bankName || '-'} ({createForm.bankIfsc || '-'})</div>
                       </div>
                       <div className="grid grid-cols-2 gap-4 pb-2 border-b border-border-subtle">
-                        <div><strong className="text-muted-foreground">Referrer ID:</strong> {createForm.referrerId || '360SS001 (Company Main Account / Super Admin)'}</div>
-                        <div><strong className="text-muted-foreground">Contribution Fund:</strong> ₹{createForm.contributionAmount || '0'} ({createForm.contributionMode})</div>
+                        <div>
+                          <strong className="text-muted-foreground">Referrer:</strong>{' '}
+                          {createForm.referrerId ? (
+                            <span>
+                              <span className="font-bold text-foreground">{referrerName ? `${referrerName} ` : ''}</span>
+                              <span className="font-mono text-xs text-muted-foreground">({createForm.referrerId})</span>
+                            </span>
+                          ) : (
+                            <span className="font-semibold text-foreground">Super Admin / Company Main (360SS001)</span>
+                          )}
+                        </div>
+                        <div>
+                          <strong className="text-muted-foreground">Contribution Fund:</strong> ₹{Number(createForm.contributionAmount || 0).toLocaleString('en-IN')} ({createForm.contributionMode})
+                          {createForm.contributionAmount && Number(createForm.contributionAmount) > 0 && (
+                            <span className="block text-[11px] font-bold text-brand-primary mt-0.5">
+                              {amountToWords(createForm.contributionAmount)}
+                            </span>
+                          )}
+                        </div>
                       </div>
                       <div>
                         <strong className="text-muted-foreground">Date of Investment:</strong> {createForm.contributionDate || '-'}
@@ -1744,6 +1840,26 @@ export default function AdminUsersPage() {
                           setWizardError("Password must be at least 8 characters long, containing uppercase, lowercase, numeric, and special characters.");
                           toast({ title: "Weak Password", description: "Password must be at least 8 characters, with uppercase, lowercase, numeric, and special characters.", type: "warning" });
                           return;
+                        }
+                        if (createForm.accountType !== 'ZERO_CONTRIBUTION') {
+                          const amt = Number(createForm.contributionAmount);
+                          if (!amt || amt < 100000) {
+                            setWizardError("Contribution fund must be at least ₹1,00,000 for Standard accounts.");
+                            toast({ title: "Invalid Contribution Fund", description: "Contribution fund must be at least ₹1,00,000.", type: "warning" });
+                            return;
+                          }
+                          if (amt % 100000 !== 0) {
+                            setWizardError("Contribution fund must be an exact multiple of ₹1,00,000 (e.g., ₹1,00,000, ₹2,00,000, ₹5,00,000, etc.).");
+                            toast({ title: "Multiple of ₹1,00,000 Required", description: "Contribution fund must be in exact multiples of ₹1,00,000.", type: "warning" });
+                            return;
+                          }
+                        } else if (createForm.contributionAmount && Number(createForm.contributionAmount) > 0) {
+                          const amt = Number(createForm.contributionAmount);
+                          if (amt % 100000 !== 0) {
+                            setWizardError("Contribution fund must be in exact multiples of ₹1,00,000.");
+                            toast({ title: "Multiple of ₹1,00,000 Required", description: "Contribution fund must be in exact multiples of ₹1,00,000.", type: "warning" });
+                            return;
+                          }
                         }
                       }
                       if (wizardStep === 2) {

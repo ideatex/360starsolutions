@@ -12,7 +12,9 @@ const itemsToInclude = [
   'package.json',
   'package-lock.json',
   '.env',
-  'main.js'
+  'main.js',
+  'seed.js',
+  'seed-config.js'
 ];
 
 const tempDir = path.join(__dirname, 'hostinger-temp');
@@ -20,6 +22,22 @@ if (fs.existsSync(tempDir)) {
   fs.rmSync(tempDir, { recursive: true, force: true });
 }
 fs.mkdirSync(tempDir);
+
+// Guarantee dist/client exists and is fully populated
+const distClientDir = path.join(__dirname, '..', 'dist', 'client');
+const clientOutDir = path.join(__dirname, '..', 'src', 'client', 'out');
+const publicDir = path.join(__dirname, '..', 'public');
+
+if (fs.existsSync(clientOutDir)) {
+  if (!fs.existsSync(distClientDir)) {
+    fs.mkdirSync(distClientDir, { recursive: true });
+  }
+  fs.cpSync(clientOutDir, distClientDir, { recursive: true });
+  if (fs.existsSync(publicDir)) {
+    fs.cpSync(publicDir, distClientDir, { recursive: true });
+  }
+  console.log('✅ Verified and populated dist/client from src/client/out');
+}
 
 for (const item of itemsToInclude) {
   const src = path.join(__dirname, '..', item);

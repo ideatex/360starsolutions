@@ -375,6 +375,18 @@ export class UsersService {
     const referralCode = finalShareholderId;
 
     const accountType = data.accountType || (data.contributionAmount && Number(data.contributionAmount) > 0 ? 'CONTRIBUTION' : 'ZERO_CONTRIBUTION');
+    if (accountType === 'CONTRIBUTION') {
+      const amt = Number(data.contributionAmount);
+      if (!amt || amt < 100000 || amt % 100000 !== 0) {
+        throw new BadRequestException('Contribution amount must be at least ₹1,00,000 and an exact integer multiple of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹5,00,000).');
+      }
+    } else if (data.contributionAmount && Number(data.contributionAmount) > 0) {
+      const amt = Number(data.contributionAmount);
+      if (amt % 100000 !== 0) {
+        throw new BadRequestException('Contribution amount must be an exact integer multiple of ₹1,00,000.');
+      }
+    }
+
     const withholdingPercentage = accountType === 'ZERO_CONTRIBUTION'
       ? (data.withholdingPercentage !== undefined && data.withholdingPercentage !== null && data.withholdingPercentage !== ''
           ? Number(data.withholdingPercentage)

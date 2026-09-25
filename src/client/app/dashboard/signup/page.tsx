@@ -16,6 +16,7 @@ import {
   getDistrictsByState, 
   lookupPincode 
 } from '@/lib/indianLocations';
+import { amountToWords } from '@/lib/amountToWords';
 
 const DEFAULT_INDIAN_BANKS = [
   "State Bank of India (SBI)",
@@ -309,6 +310,11 @@ export default function ShareholderSignupPage() {
       if (!amt || amt < 100000) {
         setValidationError("Contribution amount must be at least ₹1,00,000.");
         toast({ title: "Invalid Amount", description: "Contribution amount must be at least ₹1,00,000.", type: "warning" });
+        return;
+      }
+      if (amt % 100000 !== 0) {
+        setValidationError("Contribution amount must be an exact multiple of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹5,00,000).");
+        toast({ title: "Multiple of ₹1,00,000 Required", description: "Contribution amount must be in exact multiples of ₹1,00,000.", type: "warning" });
         return;
       }
       if (!form.paymentProofUrl) {
@@ -1123,38 +1129,92 @@ export default function ShareholderSignupPage() {
 
                   {form.accountType === 'CONTRIBUTION' && (
                     <div>
-                      <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
-                        Contribution Amount (₹) *
-                      </label>
+                      <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
+                        <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                          Contribution Fund (₹) *
+                        </label>
+                        {form.contributionAmount && Number(form.contributionAmount) > 0 && (
+                          <span className="text-[10px] font-extrabold text-brand-600 dark:text-brand-400 bg-brand-50 dark:bg-brand-950/50 px-2 py-0.5 rounded-md border border-brand-500/20">
+                            {amountToWords(form.contributionAmount)}
+                          </span>
+                        )}
+                      </div>
                       <div className="relative">
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-500">₹</span>
                         <input
                           type="number"
                           min="100000"
-                          step="1000"
+                          step="100000"
                           required
                           value={form.contributionAmount}
                           onChange={(e) => {
                             setForm({ ...form, contributionAmount: e.target.value });
                             setValidationError(null);
                           }}
-                          placeholder="e.g. 100000 (Min ₹1,00,000)"
+                          placeholder="e.g. 100000 (Multiples of ₹1,00,000)"
                           className={`w-full pl-8 pr-3.5 py-2 bg-white dark:bg-gray-900 border rounded-lg focus:outline-none text-xs font-bold font-mono text-gray-900 dark:text-white ${
-                            form.contributionAmount && Number(form.contributionAmount) < 100000
+                            form.contributionAmount && (
+                              Number(form.contributionAmount) < 100000 ||
+                              Number(form.contributionAmount) % 100000 !== 0
+                            )
                               ? 'border-rose-500 focus:border-rose-500'
-                              : form.contributionAmount && Number(form.contributionAmount) >= 100000
+                              : form.contributionAmount && Number(form.contributionAmount) >= 100000 && Number(form.contributionAmount) % 100000 === 0
                               ? 'border-emerald-500/60 focus:border-emerald-500'
                               : 'border-gray-200 dark:border-gray-800 focus:border-brand-500'
                           }`}
                         />
                       </div>
-                      {form.contributionAmount && Number(form.contributionAmount) < 100000 ? (
+
+                      {/* Multiplier Presets & Quick Adjustments */}
+                      <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 mr-0.5">Multiples:</span>
+                        {[100000, 200000, 300000, 500000, 1000000, 2500000].map(preset => (
+                          <button
+                            type="button"
+                            key={preset}
+                            onClick={() => {
+                              setForm(prev => ({ ...prev, contributionAmount: String(preset) }));
+                              setValidationError(null);
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded border transition-colors cursor-pointer ${
+                              Number(form.contributionAmount) === preset
+                                ? 'bg-brand-600 text-white border-brand-600'
+                                : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700'
+                            }`}
+                          >
+                            ₹{preset >= 10000000 ? `${preset / 10000000} Cr` : `${preset / 100000} L`}
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const curr = Number(form.contributionAmount) || 0;
+                            const next = curr + 100000;
+                            setForm(prev => ({ ...prev, contributionAmount: String(next) }));
+                            setValidationError(null);
+                          }}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded border border-brand-500/40 bg-brand-50 dark:bg-brand-950/40 text-brand-600 dark:text-brand-400 hover:bg-brand-100 transition-colors cursor-pointer"
+                        >
+                          + ₹1 L
+                        </button>
+                      </div>
+
+                      {form.contributionAmount && Number(form.contributionAmount) > 0 && (
+                        <p className="text-[11px] font-semibold text-brand-600 dark:text-brand-400 mt-1 flex items-center gap-1">
+                          <span className="font-bold text-gray-500">In words:</span> {amountToWords(form.contributionAmount)}
+                        </p>
+                      )}
+                      {form.contributionAmount && Number(form.contributionAmount) % 100000 !== 0 ? (
+                        <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3 h-3 shrink-0" /> Amount must be in exact multiples of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹3,00,000, etc.). Manual entry supported.
+                        </p>
+                      ) : form.contributionAmount && Number(form.contributionAmount) < 100000 ? (
                         <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
                           <AlertCircle className="w-3 h-3 shrink-0" /> Minimum contribution amount is ₹1,00,000
                         </p>
                       ) : (
                         <p className="text-[10px] text-gray-400 mt-1">
-                          Manual entry: Enter any investment amount of ₹1,00,000 or above.
+                          Manual entry: Enter any investment amount in multiples of ₹1,00,000 (e.g. ₹1,00,000, ₹2,00,000, ₹5,00,000).
                         </p>
                       )}
                     </div>
@@ -1218,9 +1278,16 @@ export default function ShareholderSignupPage() {
                   <span className="font-semibold text-brand-600 dark:text-brand-400">{shareholder?.name} ({shareholder?.shareholderId})</span>
                 </div>
                 {form.accountType === 'CONTRIBUTION' && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500 dark:text-gray-400">Contribution Amount:</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{Number(form.contributionAmount || 0).toLocaleString('en-IN')}</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 dark:text-gray-400">Contribution Fund:</span>
+                    <div className="text-right">
+                      <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{Number(form.contributionAmount || 0).toLocaleString('en-IN')}</span>
+                      {form.contributionAmount && Number(form.contributionAmount) > 0 && (
+                        <span className="block text-[10px] font-bold text-brand-600 dark:text-brand-400">
+                          {amountToWords(form.contributionAmount)}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

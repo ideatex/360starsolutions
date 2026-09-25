@@ -12,6 +12,15 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: "360 Star Solutions - Financial CRM & Referral Platform",
   description: "Next-generation Financial Referral CRM and Shareholder Network Management System",
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon-96x96.png', sizes: '96x96', type: 'image/png' },
+    ],
+    shortcut: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
 };
 
 export default function RootLayout({

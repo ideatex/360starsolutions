@@ -9,6 +9,7 @@ import {
   Clock, FileText, ArrowRight, ShieldCheck, RefreshCw, Layers, Send,
   X, ExternalLink, Calendar, Phone, User as UserIcon, Key, Sparkles, Download, Maximize2
 } from 'lucide-react';
+import { amountToWords } from '@/lib/amountToWords';
 
 export default function AdminRegistrationsPage() {
   const queryClient = useQueryClient();
@@ -376,11 +377,11 @@ export default function AdminRegistrationsPage() {
 
             <div className="flex-1 overflow-y-auto space-y-4 pr-1 text-xs custom-scrollbar">
               {/* Summary Status Header */}
-              <div className="p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 flex flex-wrap items-center justify-between gap-3 select-none">
+              <div className="p-4 bg-brand-primary/5 rounded-2xl border border-brand-primary/10 grid grid-cols-2 sm:grid-cols-4 gap-3 select-none">
                 <div>
                   <span className="text-[10px] text-muted-foreground uppercase font-bold block">Account Plan</span>
                   <span className="font-extrabold text-foreground text-sm">
-                    {detailModalItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution Account' : 'Standard Contribution Account'}
+                    {detailModalItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard'}
                   </span>
                 </div>
                 <div>
@@ -388,10 +389,24 @@ export default function AdminRegistrationsPage() {
                   <span className="font-mono font-extrabold text-emerald-600 dark:text-emerald-400 text-sm">
                     {detailModalItem.contributionAmount ? `₹${Number(detailModalItem.contributionAmount).toLocaleString('en-IN')}` : '₹0 (Zero Contrib)'}
                   </span>
+                  {detailModalItem.contributionAmount && Number(detailModalItem.contributionAmount) > 0 && (
+                    <span className="block text-[10px] text-brand-primary font-semibold truncate">
+                      {amountToWords(detailModalItem.contributionAmount)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold block">Sponsor / Referrer</span>
+                  <span className="font-bold text-brand-primary text-xs block truncate" title={detailModalItem.referrer?.name || 'Super Admin'}>
+                    {detailModalItem.referrer?.name || 'Super Admin'}
+                  </span>
+                  <span className="font-mono text-[10px] text-muted-foreground block">
+                    {detailModalItem.referrer ? `(${detailModalItem.referrer.shareholderId})` : '(360SS001)'}
+                  </span>
                 </div>
                 <div>
                   <span className="text-[10px] text-muted-foreground uppercase font-bold block">Queue Status</span>
-                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/10 text-amber-600 border-amber-500/20">
+                  <span className="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase border bg-amber-500/10 text-amber-600 border-amber-500/20 inline-block mt-0.5">
                     {detailModalItem.status}
                   </span>
                 </div>
@@ -601,11 +616,18 @@ export default function AdminRegistrationsPage() {
               </div>
             )}
 
-            <div className="p-3 bg-muted/20 rounded-xl border border-border/60 text-xs space-y-1">
-              <div><strong className="text-muted-foreground">Applicant:</strong> <span className="font-bold text-foreground">{approveItem.name}</span></div>
-              <div><strong className="text-muted-foreground">Phone:</strong> <span className="font-mono text-foreground">{approveItem.phone}</span></div>
-              <div><strong className="text-muted-foreground">PAN:</strong> <span className="font-mono font-bold text-brand-primary">{approveItem.pan || 'Not Provided'}</span></div>
-              <div><strong className="text-muted-foreground">Account Type:</strong> <span className="font-bold text-foreground">{approveItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</span></div>
+            <div className="p-3.5 bg-muted/20 rounded-xl border border-border/60 text-xs space-y-1.5">
+              <div className="flex justify-between"><strong className="text-muted-foreground">Applicant:</strong> <span className="font-bold text-foreground">{approveItem.name}</span></div>
+              <div className="flex justify-between"><strong className="text-muted-foreground">Phone:</strong> <span className="font-mono text-foreground">{approveItem.phone}</span></div>
+              <div className="flex justify-between"><strong className="text-muted-foreground">Referrer:</strong> <span className="font-bold text-brand-primary">{approveItem.referrer ? `${approveItem.referrer.name} (${approveItem.referrer.shareholderId})` : 'Super Admin / Company Main (360SS001)'}</span></div>
+              <div className="flex justify-between"><strong className="text-muted-foreground">PAN:</strong> <span className="font-mono font-bold text-foreground">{approveItem.pan || 'Not Provided'}</span></div>
+              <div className="flex justify-between"><strong className="text-muted-foreground">Account Type:</strong> <span className="font-bold text-foreground">{approveItem.accountType === 'ZERO_CONTRIBUTION' ? 'Zero Contribution' : 'Standard Contribution'}</span></div>
+              {approveItem.contributionAmount && Number(approveItem.contributionAmount) > 0 && (
+                <div className="pt-1 border-t border-border/40">
+                  <div className="flex justify-between"><strong className="text-muted-foreground">Contribution Fund:</strong> <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{Number(approveItem.contributionAmount).toLocaleString('en-IN')}</span></div>
+                  <div className="text-right text-[11px] font-bold text-brand-primary mt-0.5">{amountToWords(approveItem.contributionAmount)}</div>
+                </div>
+              )}
             </div>
 
             {/* Initial Password Configuration */}
@@ -724,7 +746,8 @@ export default function AdminRegistrationsPage() {
           <div className="bg-card border border-border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-xl">
             <h3 className="text-base font-extrabold text-foreground">Reject Registration</h3>
             <p className="text-xs text-muted-foreground">
-              Rejecting applicant <strong>{selectedRequest.name}</strong> ({selectedRequest.phone}). Provide a reason for the permanent audit trail:
+              Rejecting applicant <strong>{selectedRequest.name}</strong> ({selectedRequest.phone})
+              {selectedRequest.referrer ? ` referred by ${selectedRequest.referrer.name} (${selectedRequest.referrer.shareholderId})` : ''}. Provide a reason for the permanent audit trail:
             </p>
 
             {rejectMutation.isError && (
