@@ -6,6 +6,7 @@ import { useSidebarStore } from '@/store/useSidebarStore';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
 import Topbar from '@/components/layout/Topbar';
+import FirstTimePasswordResetModal from '@/components/FirstTimePasswordResetModal';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = React.useState(false);
@@ -48,6 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {children}
         </main>
       </div>
+      <FirstTimePasswordResetModal />
     </div>
   );
 }

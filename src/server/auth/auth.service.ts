@@ -3,12 +3,14 @@ import { PrismaService } from '@server/prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { SmsService } from '@server/sms/sms.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
+    private smsService: SmsService,
   ) {}
 
   async register(shareholderId: string, password: string, referralCode?: string) {
@@ -87,7 +89,14 @@ export class AuthService {
     const payload = { sub: shareholder.id, shareholderId: shareholder.shareholderId, role: shareholder.role };
     return {
       access_token: this.jwtService.sign(payload),
-      shareholder: { id: shareholder.id, shareholderId: shareholder.shareholderId, name: shareholder.name, role: shareholder.role }
+      shareholder: { 
+        id: shareholder.id, 
+        shareholderId: shareholder.shareholderId, 
+        name: shareholder.name, 
+        role: shareholder.role,
+        phone: shareholder.phone,
+        mustChangePassword: Boolean(shareholder.mustChangePassword),
+      }
     };
   }
 
@@ -140,7 +149,7 @@ export class AuthService {
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Invalidate existing unused OTPs for this identifier
     await this.prisma.otpVerification.updateMany({
@@ -159,15 +168,8 @@ export class AuthService {
       },
     });
 
-    // Log SMS in database
-    await this.prisma.smsLog.create({
-      data: {
-        recipient: shareholder.phone,
-        shareholderId: shareholder.id,
-        message: `Your OTP for password reset is ${otp}. Valid for 10 minutes. Do not share this OTP with anyone.`,
-        status: 'SENT',
-      },
-    });
+    // Send and log SMS via central SMS Service with approved DLT Reset_Password template
+    await this.smsService.sendResetPasswordOtpSms(shareholder.phone, otp, shareholder.id);
 
     const maskedPhone = shareholder.phone.length > 4 
       ? shareholder.phone.slice(0, 2) + '******' + shareholder.phone.slice(-3) 
@@ -264,7 +266,10 @@ export class AuthService {
 
     await this.prisma.shareholder.update({
       where: { id: shareholder.id },
-      data: { passwordHash },
+      data: { 
+        passwordHash,
+        mustChangePassword: false,
+      },
     });
 
     // Invalidate resetToken
@@ -314,7 +319,7 @@ export class AuthService {
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     await this.prisma.otpVerification.updateMany({
       where: { identifier: shareholder.shareholderId, purpose: 'CHANGE_PASSWORD', isUsed: false },
@@ -331,14 +336,8 @@ export class AuthService {
       },
     });
 
-    await this.prisma.smsLog.create({
-      data: {
-        recipient: shareholder.phone,
-        shareholderId: shareholder.id,
-        message: `Your OTP for changing account password is ${otp}. Valid for 10 minutes.`,
-        status: 'SENT',
-      },
-    });
+    // Send and log SMS via central SMS Service with approved DLT Reset_Password template
+    await this.smsService.sendResetPasswordOtpSms(shareholder.phone, otp, shareholder.id);
 
     const maskedPhone = shareholder.phone.length > 4 
       ? shareholder.phone.slice(0, 2) + '******' + shareholder.phone.slice(-3) 
@@ -399,7 +398,10 @@ export class AuthService {
 
     await this.prisma.shareholder.update({
       where: { id: shareholderId },
-      data: { passwordHash },
+      data: { 
+        passwordHash,
+        mustChangePassword: false,
+      },
     });
 
     await this.prisma.otpVerification.update({

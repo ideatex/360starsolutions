@@ -6,6 +6,7 @@ import Topbar from '@/components/layout/Topbar';
 import { useSidebarStore } from '@/store/useSidebarStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
+import FirstTimePasswordResetModal from '@/components/FirstTimePasswordResetModal';
 
 export default function DashboardLayout({
   children,
@@ -50,6 +51,7 @@ export default function DashboardLayout({
           {children}
         </main>
       </div>
+      <FirstTimePasswordResetModal />
     </div>
   );
 }

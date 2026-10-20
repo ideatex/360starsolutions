@@ -11,6 +11,7 @@ export interface Shareholder {
   phone?: string;
   email?: string;
   rank?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface AuthState {
@@ -21,6 +22,7 @@ export interface AuthState {
   login: (shareholder: Shareholder, token: string) => void;
   logout: () => void;
   setHydrated: (val: boolean) => void;
+  setMustChangePassword: (val: boolean) => void;
 }
 
 // Synchronously read from sessionStorage or localStorage on client to prevent logout on page refresh
@@ -76,6 +78,20 @@ export const useAuthStore = create<AuthState>()(
         set({ shareholder: null, token: null, isAuthenticated: false, isHydrated: true });
       },
       setHydrated: (isHydrated) => set({ isHydrated }),
+      setMustChangePassword: (val) => {
+        set((state) => {
+          if (!state.shareholder) return state;
+          const updated = { ...state.shareholder, mustChangePassword: val };
+          if (typeof window !== 'undefined') {
+            try {
+              const payload = JSON.stringify({ state: { shareholder: updated, token: state.token, isAuthenticated: true }, version: 0 });
+              sessionStorage.setItem('auth-storage', payload);
+              localStorage.setItem('auth-storage', payload);
+            } catch (e) {}
+          }
+          return { shareholder: updated };
+        });
+      },
     }),
     {
       name: 'auth-storage',

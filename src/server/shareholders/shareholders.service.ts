@@ -397,6 +397,7 @@ export class UsersService {
       data: {
         shareholderId: finalShareholderId,
         passwordHash: data.passwordHash,
+        mustChangePassword: true,
         name: data.name,
         phone: data.phone,
         pan: data.pan ? data.pan.trim().toUpperCase() : null,
@@ -844,7 +845,10 @@ export class UsersService {
 
     await this.prisma.shareholder.update({
       where: { id },
-      data: { passwordHash },
+      data: { 
+        passwordHash,
+        mustChangePassword: true,
+      },
     });
 
     // Create Audit Log
@@ -905,7 +909,10 @@ export class UsersService {
     const passwordHash = await bcrypt.hash(newPasswordText, 10);
     await this.prisma.shareholder.update({
       where: { id: shareholderId },
-      data: { passwordHash },
+      data: { 
+        passwordHash,
+        mustChangePassword: false,
+      },
     });
 
     await this.prisma.notification.create({
@@ -1292,6 +1299,15 @@ export class UsersService {
       });
     }
 
+    // Dispatch Details_Update_Request_Submitted SMS to the shareholder via MSG91
+    if (shareholder.phone) {
+      try {
+        await this.smsService.sendDetailsUpdateSubmittedSms(shareholder.phone, shareholder.id);
+      } catch (smsErr: any) {
+        console.warn(`[SMS] Failed to send financial change submission SMS: ${smsErr.message}`);
+      }
+    }
+
     return {
       success: true,
       message: 'Financial information change request submitted successfully. Awaiting Super Admin approval.',
@@ -1431,6 +1447,18 @@ export class UsersService {
         priority: 'HIGH',
       },
     });
+
+    // Dispatch Details_Update_Request_Approved SMS to the shareholder via MSG91
+    if (request.shareholder?.phone) {
+      try {
+        await this.smsService.sendDetailsUpdateApprovedSms(
+          request.shareholder.phone,
+          request.shareholder.id,
+        );
+      } catch (smsErr: any) {
+        console.warn(`[SMS] Failed to send financial change approved SMS: ${smsErr.message}`);
+      }
+    }
 
     return {
       success: true,

@@ -137,6 +137,7 @@ model Shareholder {
   bankIfsc          String?
 
   disabledAt        DateTime?
+  mustChangePassword Boolean @default(false)
   
   investments          Investment[]
   profitLedgers        ProfitLedger[]

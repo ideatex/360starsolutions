@@ -122,7 +122,7 @@ export default function Sidebar() {
       <div className="h-18 flex items-center justify-between px-5 border-b border-gray-200 dark:border-gray-800 shrink-0">
         <Link href={isAdminPath ? "/admin" : "/dashboard"} className="flex items-center gap-3 overflow-hidden py-1">
           <img 
-            src="/logo-369.png" 
+            src="/logo-360.png" 
             alt="360 Star Logo" 
             className="h-9 w-auto max-w-[42px] object-contain shrink-0 drop-shadow-xs" 
           />

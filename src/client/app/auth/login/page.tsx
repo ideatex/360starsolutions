@@ -199,7 +199,7 @@ export default function LoginPage() {
       >
         <div className="text-center mb-8">
           <img 
-            src="/logo-369.png" 
+            src="/logo-360.png" 
             alt="360 Star Logo" 
             className="h-16 sm:h-20 max-w-[200px] w-auto mx-auto object-contain mb-3 drop-shadow-xs" 
           />

@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '@server/prisma/prisma.service';
 import { SmsStatus } from '@prisma/client';
+import axios from 'axios';
 
 export interface SendSmsParams {
   recipient: string;
   message: string;
   template?: string;
+  templateId?: string;
+  variables?: Record<string, any>;
   shareholderId?: string;
 }
 
@@ -20,14 +23,151 @@ export class SmsService {
   }
 
   /**
+   * Format Indian mobile numbers for MSG91 / international SMS gateway
+   * (e.g., '9876543210' -> '919876543210')
+   */
+  private formatMobileNumber(phone: string): string {
+    const cleaned = (phone || '').replace(/\D/g, '');
+    if (cleaned.length === 10) {
+      return `91${cleaned}`;
+    }
+    if (cleaned.length === 12 && cleaned.startsWith('91')) {
+      return cleaned;
+    }
+    return cleaned;
+  }
+
+  /**
+   * Dispatch SMS via MSG91 Flow API
+   */
+  private async dispatchViaMsg91(
+    recipient: string,
+    message: string,
+    templateName?: string,
+    templateId?: string,
+    variables?: Record<string, any>,
+  ): Promise<{ success: boolean; response: string }> {
+    const authKey = process.env.MSG91_AUTH_KEY;
+    if (!authKey) {
+      this.logger.warn('[MSG91] MSG91_AUTH_KEY is not defined in environment variables. Falling back to simulated log.');
+      return {
+        success: true,
+        response: JSON.stringify({ warning: 'MSG91_AUTH_KEY missing, logged in simulated mode', timestamp: new Date().toISOString() }),
+      };
+    }
+
+    // Resolve template / flow ID from parameter or environment variables
+    let resolvedTemplateId = templateId;
+    if (!resolvedTemplateId && templateName) {
+      if (
+        templateName === 'FORGOT_PASSWORD_OTP' ||
+        templateName === 'RESET_PASSWORD' ||
+        templateName === 'CHANGE_PASSWORD_OTP'
+      ) {
+        resolvedTemplateId =
+          process.env.MSG91_FLOW_RESET_PASSWORD ||
+          process.env.MSG91_FLOW_FORGOT_PASSWORD ||
+          '6ad361f9a6bdd2827d0662d2';
+      } else if (
+        templateName === 'REQUEST_SUBMITTED' ||
+        templateName === 'REGISTRATION_SUBMITTED'
+      ) {
+        resolvedTemplateId =
+          process.env.MSG91_FLOW_REQUEST_SUBMITTED || '6ad3624fe27a608e220ab3c2';
+      } else if (
+        templateName === 'DETAILS_UPDATE_REQUEST_SUBMITTED' ||
+        templateName === 'DETAILS_UPDATE_SUBMITTED'
+      ) {
+        resolvedTemplateId =
+          process.env.MSG91_FLOW_DETAILS_UPDATE_SUBMITTED ||
+          '6ad362d7d866890654026100';
+      } else if (
+        templateName === 'DETAILS_UPDATE_REQUEST_APPROVED' ||
+        templateName === 'DETAILS_UPDATE_APPROVED'
+      ) {
+        resolvedTemplateId =
+          process.env.MSG91_FLOW_DETAILS_UPDATE_APPROVED ||
+          '6ad361c36e899fdc450629b3';
+      } else if (
+        templateName === 'WELCOME_CREDENTIALS' ||
+        templateName === 'REQUEST_APPROVED'
+      ) {
+        resolvedTemplateId =
+          process.env.MSG91_FLOW_REQUEST_APPROVED ||
+          process.env.MSG91_FLOW_WELCOME ||
+          '6ad62a56ffea3763630b5942';
+      } else if (templateName === 'PAYMENT_RECEIPT') {
+        resolvedTemplateId = process.env.MSG91_FLOW_PAYMENT;
+      }
+    }
+
+    const formattedMobile = this.formatMobileNumber(recipient);
+
+    if (resolvedTemplateId) {
+      // Build variable payload ensuring variables map properly to DLT tags
+      const recipientVars: Record<string, any> = { ...(variables || {}) };
+      if (recipientVars.otp && !recipientVars.num) {
+        recipientVars.num = String(recipientVars.otp);
+      }
+      if (recipientVars.user_id && !recipientVars.alp1) {
+        recipientVars.alp1 = String(recipientVars.user_id);
+        recipientVars.var1 = String(recipientVars.user_id);
+      }
+      if (recipientVars.password && !recipientVars.alp2) {
+        recipientVars.alp2 = String(recipientVars.password);
+        recipientVars.var2 = String(recipientVars.password);
+      }
+      if (recipientVars.user_id && recipientVars.password && !recipientVars.alp) {
+        recipientVars.alp = [String(recipientVars.user_id), String(recipientVars.password)];
+      }
+
+      // Use MSG91 Flow API (DLT template compliant)
+      const payload: any = {
+        template_id: resolvedTemplateId,
+        short_url: '0',
+        recipients: [
+          {
+            mobiles: formattedMobile,
+            ...recipientVars,
+          },
+        ],
+      };
+
+      this.logger.log(`[MSG91 FLOW DISPATCH] To: ${formattedMobile} | Template ID: ${resolvedTemplateId}`);
+      const res = await axios.post('https://control.msg91.com/api/v5/flow/', payload, {
+        headers: {
+          authkey: authKey,
+          'content-type': 'application/json',
+        },
+        timeout: 10000,
+      });
+
+      return {
+        success: res.status >= 200 && res.status < 300,
+        response: JSON.stringify(res.data),
+      };
+    } else {
+      // Fallback: If template ID is not yet configured, log warning
+      this.logger.warn(`[MSG91] No Flow/Template ID found for template "${templateName || 'DEFAULT'}". Message: "${message}"`);
+      return {
+        success: true,
+        response: JSON.stringify({
+          status: 'PENDING_TEMPLATE_CONFIG',
+          note: 'Template ID not yet configured for MSG91. Please provide template ID in environment variables.',
+          recipient: formattedMobile,
+        }),
+      };
+    }
+  }
+
+  /**
    * Abstracted SMS dispatch method.
-   * Pluggable provider architecture: console/mock by default, extensible to SMS gateway.
+   * Pluggable provider architecture: supports MOCK_GATEWAY, CONSOLE, and MSG91.
    * Logs every attempt to SmsLog table with sensitive information masked.
    */
   async sendSms(params: SendSmsParams): Promise<{ success: boolean; logId: string; status: SmsStatus }> {
-    const { recipient, message, template, shareholderId } = params;
+    const { recipient, message, template, templateId, variables, shareholderId } = params;
 
-    // Default provider: MOCK_GATEWAY / CONSOLE
     const provider = process.env.SMS_PROVIDER || 'MOCK_GATEWAY';
     const maskedMessage = this.maskSensitiveMessage(message);
 
@@ -36,19 +176,21 @@ export class SmsService {
     let status: SmsStatus = SmsStatus.SENT;
     let providerResponse = 'Delivered to console mock';
 
-    // Simulated provider dispatch
     try {
       if (provider === 'CONSOLE' || provider === 'MOCK_GATEWAY') {
         // Mock successful delivery
         providerResponse = JSON.stringify({ status: 'DELIVERED', timestamp: new Date().toISOString() });
+      } else if (provider === 'MSG91') {
+        const msg91Result = await this.dispatchViaMsg91(recipient, message, template, templateId, variables);
+        status = msg91Result.success ? SmsStatus.SENT : SmsStatus.FAILED;
+        providerResponse = msg91Result.response;
       } else {
-        // Extensible hook for third-party SMS providers (Twilio, Gupshup, Fast2SMS, etc.)
         providerResponse = JSON.stringify({ status: 'QUEUED', provider });
       }
     } catch (err: any) {
       status = SmsStatus.FAILED;
-      providerResponse = JSON.stringify({ error: err.message });
-      this.logger.error(`Failed to dispatch SMS to ${recipient}: ${err.message}`);
+      providerResponse = JSON.stringify({ error: err.response?.data || err.message });
+      this.logger.error(`Failed to dispatch SMS to ${recipient} via ${provider}: ${err.message}`);
     }
 
     let validShareholderUuid: string | null = null;
@@ -106,12 +248,16 @@ export class SmsService {
     try {
       if (provider === 'CONSOLE' || provider === 'MOCK_GATEWAY') {
         providerResponse = JSON.stringify({ status: 'DELIVERED', retry: log.retryCount + 1, timestamp: new Date().toISOString() });
+      } else if (provider === 'MSG91') {
+        const msg91Result = await this.dispatchViaMsg91(log.recipient, log.message, log.template || undefined);
+        status = msg91Result.success ? SmsStatus.SENT : SmsStatus.FAILED;
+        providerResponse = msg91Result.response;
       } else {
         providerResponse = JSON.stringify({ status: 'QUEUED', retry: log.retryCount + 1, provider });
       }
     } catch (err: any) {
       status = SmsStatus.FAILED;
-      providerResponse = JSON.stringify({ error: err.message, retry: log.retryCount + 1 });
+      providerResponse = JSON.stringify({ error: err.response?.data || err.message, retry: log.retryCount + 1 });
     }
 
     const updated = await this.prisma.smsLog.update({
@@ -130,16 +276,87 @@ export class SmsService {
   }
 
   /**
-   * Helper: Send user login credentials upon registration approval
+   * Helper: Send Password Reset / Change Password OTP SMS
    */
-  async sendCredentialsSms(recipient: string, shareholderId: string, tempPassword: string, userUuid?: string) {
-    const message = `Welcome to 360 Star Solutions! Your User ID is ${shareholderId} and password is ${tempPassword}. Please log in to complete your profile.`;
+  async sendResetPasswordOtpSms(recipient: string, otp: string, shareholderId?: string) {
+    const message = `${otp} is your One-Time Password (OTP) to reset your password on 369Portfolio.\n\nThis code is valid for 15 minutes.\n\nPlease do not share it with anyone.\n\n369Portfolio - Visual DE System`;
     return this.sendSms({
       recipient,
       message,
-      template: 'WELCOME_CREDENTIALS',
-      shareholderId: userUuid || shareholderId,
+      template: 'RESET_PASSWORD',
+      shareholderId,
+      variables: {
+        num: otp,
+        otp,
+        time: '15 min',
+      },
     });
+  }
+
+  /**
+   * Helper: Send Request_Submitted SMS upon account registration
+   */
+  async sendRegistrationSubmittedSms(recipient: string, shareholderId?: string) {
+    const message = `Hello, your account creation request has been successfully submitted to 369Portfolio.\n\nWe are currently reviewing your details.\nYou will be notified once it is approved.\n\nThank you for your patience!\n\n369Portfolio - Visual DE System`;
+    return this.sendSms({
+      recipient,
+      message,
+      template: 'REQUEST_SUBMITTED',
+      shareholderId,
+    });
+  }
+
+  /**
+   * Helper: Send Details_Update_Request_Submitted SMS
+   */
+  async sendDetailsUpdateSubmittedSms(recipient: string, shareholderId?: string) {
+    const message = `We have received your request to update your Account details on 369Portfolio.\n\nOur team is reviewing the changes for security purposes.\n\nWe will notify you once approved.\n\n369Portfolio - Visual DE System`;
+    return this.sendSms({
+      recipient,
+      message,
+      template: 'DETAILS_UPDATE_REQUEST_SUBMITTED',
+      shareholderId,
+    });
+  }
+
+  /**
+   * Helper: Send Details_Update_Request_Approved SMS
+   */
+  async sendDetailsUpdateApprovedSms(recipient: string, shareholderId?: string) {
+    const message = `Your requested Account details have been successfully verified and approved.\n\n369Portfolio - Visual DE System`;
+    return this.sendSms({
+      recipient,
+      message,
+      template: 'DETAILS_UPDATE_REQUEST_APPROVED',
+      shareholderId,
+    });
+  }
+
+  /**
+   * Helper: Send user login credentials upon registration approval (Request_Approved)
+   */
+  async sendCredentialsSms(recipient: string, shareholderId: string, tempPassword: string, userUuid?: string) {
+    const message = `Welcome to 369Portfolio!\n\nYour account request has been approved.\nYou can now log in using your credentials.\nUsername: ${shareholderId}\nPassword: ${tempPassword}\n\n369Portfolio - Visual DE System`;
+    return this.sendSms({
+      recipient,
+      message,
+      template: 'REQUEST_APPROVED',
+      shareholderId: userUuid || shareholderId,
+      variables: {
+        user_id: shareholderId,
+        password: tempPassword,
+        alp1: shareholderId,
+        alp2: tempPassword,
+        alp: [shareholderId, tempPassword],
+      },
+    });
+  }
+
+  /**
+   * Alias: Send Request_Approved SMS
+   */
+  async sendRequestApprovedSms(recipient: string, username: string, tempPassword: string, userUuid?: string) {
+    return this.sendCredentialsSms(recipient, username, tempPassword, userUuid);
   }
 
   /**
@@ -152,6 +369,10 @@ export class SmsService {
       message,
       template: 'PAYMENT_RECEIPT',
       shareholderId: userUuid || shareholderId,
+      variables: {
+        amount: amount.toLocaleString('en-IN'),
+        user_id: shareholderId,
+      },
     });
   }
 

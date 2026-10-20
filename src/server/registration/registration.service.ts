@@ -252,6 +252,13 @@ export class RegistrationService {
       newValue: `Name: ${name}, Phone: ${phone}, PAN: ${panClean || 'N/A'}, Type: ${accountType}, Amount: ${dto.contributionAmount || 0}, Referrer: ${verifiedReferrerId || 'NONE'}`,
     });
 
+    // Dispatch Request_Submitted SMS to the applicant via MSG91
+    try {
+      await this.smsService.sendRegistrationSubmittedSms(phone);
+    } catch (smsErr: any) {
+      this.logger.warn(`Failed to dispatch registration submitted SMS to ${phone}: ${smsErr.message}`);
+    }
+
     this.logger.log(`Registration request #${request.id} submitted for ${name} (${phone}) [PENDING_ADMIN_REVIEW].`);
     return request;
   }
@@ -596,6 +603,7 @@ export class RegistrationService {
           withholdingPercentage: new Prisma.Decimal(finalWithholdingPercentage),
           status: initialStatus,
           holdingBalance: new Prisma.Decimal(0),
+          mustChangePassword: true,
         } as any,
       });
 
